@@ -1,0 +1,24 @@
+[Unit]
+Description=Colectores de la agencia y su filtro de salida al NAS
+Wants=network-online.target
+Requires=docker.service
+After=network-online.target docker.service nftables.service netfilter-persistent.service
+PartOf=docker.service
+RequiresMountsFor=/opt/media-platform/observability-nas-v1 /var/lib/docker
+StartLimitIntervalSec=180
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 -I -S -B /opt/media-platform/observability-nas-v1/collector_boot.py start
+ExecStop=/usr/bin/python3 -I -S -B /opt/media-platform/observability-nas-v1/collector_boot.py stop
+Restart=on-failure
+RestartSec=10s
+TimeoutStartSec=180s
+TimeoutStopSec=100s
+UMask=0077
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

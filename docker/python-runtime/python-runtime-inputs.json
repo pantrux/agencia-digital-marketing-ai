@@ -1,0 +1,796 @@
+{
+  "base": {
+    "config": "sha256:b70d618358405f051541c210351e890477c8bf782624d2275cbb3198aff2cfb7",
+    "manifest": "sha256:ce3d463053d289b9cb4fd8a1b5202acaa5b20093acefb232df7304cf2be0bb72",
+    "packages": {
+      "apk-tools": {
+        "A": "x86_64",
+        "C": "Q1Mu4S4nmI0FiN2FLlKa6zQgsS04w=",
+        "D": "ca-certificates-bundle merged-sbin so:ld-linux-x86-64.so.2 so:libc.so.6 so:libcrypto.so.4 so:libssl.so.4 so:libz.so.1 wolfi-baselayout",
+        "I": "456604",
+        "L": "GPL-2.0-only",
+        "P": "apk-tools",
+        "S": "194134",
+        "T": "apk-tools (Wolfi package manager)",
+        "V": "2.14.13-r0",
+        "c": "ba8add7343cc5fbc6ca4206d6ce70465bfdad24a",
+        "m": "wolfi",
+        "o": "apk-tools",
+        "p": "cmd:apk=2.14.13-r0 so-ver:libapk.so.2.14.10=2.14.13-r0 so:libapk.so.2.14.10=2.14.10",
+        "t": "1793715085"
+      },
+      "busybox": {
+        "A": "x86_64",
+        "C": "Q1nJ0RNPYKE/6p9+1WgdqC1lA0JnM=",
+        "D": "merged-bin merged-sbin merged-usrsbin so:ld-linux-x86-64.so.2 so:libc.so.6 so:libcrypt.so.1 so:libm.so.6 wolfi-baselayout",
+        "I": "740243",
+        "L": "GPL-2.0-only",
+        "P": "busybox",
+        "S": "436005",
+        "T": "swiss-army knife for embedded systems",
+        "V": "1.38.0-r3",
+        "c": "59d45eb49286129d8d21b2469befa3b55be4719b",
+        "k": "10",
+        "m": "wolfi",
+        "o": "busybox",
+        "p": "cmd:busybox=1.38.0-r3",
+        "t": "1791521937"
+      },
+      "ca-certificates-bundle": {
+        "A": "x86_64",
+        "C": "Q19P7fzB945PuRaQEnzg9napiRzKE=",
+        "D": "merged-usrsbin wolfi-baselayout",
+        "I": "229624",
+        "L": "MPL-2.0 AND MIT",
+        "P": "ca-certificates-bundle",
+        "S": "118541",
+        "T": "",
+        "V": "20261020-r0",
+        "c": "8061afafa65af5a9026707a8880e14120dd6f4a0",
+        "m": "wolfi",
+        "o": "ca-certificates",
+        "t": "1793012842"
+      },
+      "glibc-2.44": {
+        "A": "x86_64",
+        "C": "Q1DBDsZ6yhBPYsa/V7pltJ5OXPtPs=",
+        "D": "!musl glibc-2.44-locale-posix ld-linux-2.44=2.44-r13 libgcc merged-lib merged-sbin merged-usrsbin so:ld-linux-x86-64.so.2 wolfi-baselayout",
+        "I": "6596636",
+        "L": "LGPL-2.1-or-later",
+        "P": "glibc-2.44",
+        "S": "3168783",
+        "T": "the GNU C library",
+        "V": "2.44-r13",
+        "c": "e56b3f33a6e7ea76029947d68ce17227fd1fe841",
+        "k": "244",
+        "m": "wolfi",
+        "o": "glibc-2.44",
+        "p": "cmd:ldconfig=2.44-r13 glibc=2.44-r13 so-ver:libBrokenLocale.so.1=2.44-r13 so-ver:libanl.so.1=2.44-r13 so-ver:libc.so.6=2.44-r13 so-ver:libc_malloc_debug.so.0=2.44-r13 so-ver:libdl.so.2=2.44-r13 so-ver:libm.so.6=2.44-r13 so-ver:libmemusage.so=2.44-r13 so-ver:libmvec.so.1=2.44-r13 so-ver:libnsl.so.1=2.44-r13 so-ver:libnss_compat.so.2=2.44-r13 so-ver:libnss_dns.so.2=2.44-r13 so-ver:libnss_files.so.2=2.44-r13 so-ver:libpthread.so.0=2.44-r13 so-ver:libresolv.so.2=2.44-r13 so-ver:librt.so.1=2.44-r13 so-ver:libthread_db.so.1=2.44-r13 so-ver:libutil.so.1=2.44-r13 so:libBrokenLocale.so.1=1 so:libanl.so.1=1 so:libc.so.6=6 so:libc_malloc_debug.so.0=0 so:libdl.so.2=2 so:libm.so.6=6 so:libmemusage.so=0 so:libmvec.so.1=1 so:libnsl.so.1=1 so:libnss_compat.so.2=2 so:libnss_dns.so.2=2 so:libnss_files.so.2=2 so:libpthread.so.0=0 so:libresolv.so.2=2 so:librt.so.1=1 so:libthread_db.so.1=1 so:libutil.so.1=1",
+        "t": "1793655970"
+      },
+      "glibc-2.44-locale-posix": {
+        "A": "x86_64",
+        "C": "Q1TfI55+eRQkOMi4FXiVIteycJ8do=",
+        "D": "merged-lib merged-sbin merged-usrsbin wolfi-baselayout",
+        "I": "421850",
+        "L": "LGPL-2.1-or-later",
+        "P": "glibc-2.44-locale-posix",
+        "S": "99278",
+        "T": "POSIX locale data for glibc",
+        "V": "2.44-r13",
+        "c": "e56b3f33a6e7ea76029947d68ce17227fd1fe841",
+        "m": "wolfi",
+        "o": "glibc-2.44",
+        "p": "glibc-locale-posix=2.44-r13",
+        "t": "1793655970"
+      },
+      "ld-linux-2.44": {
+        "A": "x86_64",
+        "C": "Q1uAfRmX2ZNzQOk3Hk8fZ4OzQ5i6M=",
+        "D": "glibc-2.44=2.44-r13 merged-lib merged-sbin merged-usrsbin wolfi-baselayout",
+        "I": "315116",
+        "L": "LGPL-2.1-or-later",
+        "P": "ld-linux-2.44",
+        "S": "163191",
+        "T": "the GLIBC ELF interpreter",
+        "V": "2.44-r13",
+        "c": "e56b3f33a6e7ea76029947d68ce17227fd1fe841",
+        "k": "244",
+        "m": "wolfi",
+        "o": "glibc-2.44",
+        "p": "ld-linux=2.44-r13 so-ver:ld-linux-x86-64.so.2=2.44-r13 so:ld-linux-x86-64.so.2=2",
+        "t": "1793655970"
+      },
+      "libbrotlicommon1": {
+        "A": "x86_64",
+        "C": "Q1d6173SiBWI/3ZTJ9usIqKVhqlNQ=",
+        "D": "so:libc.so.6",
+        "I": "177261",
+        "L": "MIT",
+        "P": "libbrotlicommon1",
+        "S": "85956",
+        "T": "",
+        "V": "1.2.1-r3",
+        "c": "f5ef816d1cb2bd0e165a402c4e8a4c4622464bf3",
+        "m": "wolfi",
+        "o": "brotli",
+        "p": "so-ver:libbrotlicommon.so.1=1.2.1-r3 so:libbrotlicommon.so.1=1",
+        "t": "1793620546"
+      },
+      "libbrotlidec1": {
+        "A": "x86_64",
+        "C": "Q1SxcpNPM7TTnimjuCfB+KWbRChZ4=",
+        "D": "so:libbrotlicommon.so.1 so:libc.so.6",
+        "I": "97682",
+        "L": "MIT",
+        "P": "libbrotlidec1",
+        "S": "49256",
+        "T": "",
+        "V": "1.2.1-r3",
+        "c": "f5ef816d1cb2bd0e165a402c4e8a4c4622464bf3",
+        "m": "wolfi",
+        "o": "brotli",
+        "p": "so-ver:libbrotlidec.so.1=1.2.1-r3 so:libbrotlidec.so.1=1",
+        "t": "1793620546"
+      },
+      "libbrotlienc1": {
+        "A": "x86_64",
+        "C": "Q1ct7hg38j5fftUTCqmF8s60d3nwA=",
+        "D": "so:libbrotlicommon.so.1 so:libc.so.6 so:libm.so.6",
+        "I": "936714",
+        "L": "MIT",
+        "P": "libbrotlienc1",
+        "S": "448579",
+        "T": "",
+        "V": "1.2.1-r3",
+        "c": "f5ef816d1cb2bd0e165a402c4e8a4c4622464bf3",
+        "m": "wolfi",
+        "o": "brotli",
+        "p": "so-ver:libbrotlienc.so.1=1.2.1-r3 so:libbrotlienc.so.1=1",
+        "t": "1793620546"
+      },
+      "libcrypt1-2.44": {
+        "A": "x86_64",
+        "C": "Q1SR5C380WjSTDaptA94C2rZ9FL6g=",
+        "D": "glibc-2.44=2.44-r13 libxcrypt merged-lib merged-sbin merged-usrsbin wolfi-baselayout",
+        "I": "26438",
+        "L": "LGPL-2.1-or-later",
+        "P": "libcrypt1-2.44",
+        "S": "24184",
+        "T": "Password hashing library included with glibc",
+        "V": "2.44-r13",
+        "c": "e56b3f33a6e7ea76029947d68ce17227fd1fe841",
+        "k": "244",
+        "m": "wolfi",
+        "o": "glibc-2.44",
+        "p": "libcrypt1=2.44-r13 so:libcrypt.so.1=1",
+        "t": "1793655970"
+      },
+      "libgcc": {
+        "A": "x86_64",
+        "C": "Q1ZiXgGGwe5h6UXD0/Zbd/7LKBpkw=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6",
+        "I": "236504",
+        "L": "GPL-3.0-or-later WITH GCC-exception-3.1",
+        "P": "libgcc",
+        "S": "112648",
+        "T": "GCC runtime library",
+        "V": "16.2.0-r2",
+        "c": "1a8a06e57ab63d92834a9467dd0eaa5d54ade3b0",
+        "m": "wolfi",
+        "o": "gcc",
+        "p": "libgcc-16=16.2.0-r2 so-ver:libgcc_s.so.1=16.2.0-r2 so:libgcc_s.so.1=1",
+        "t": "1793036444"
+      },
+      "libxcrypt": {
+        "A": "x86_64",
+        "C": "Q1+8LswRqfx4C6qb8NnOfwhjKSNWc=",
+        "I": "255531",
+        "L": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+        "P": "libxcrypt",
+        "S": "119228",
+        "T": "Modern library for one-way hashing of passwords",
+        "V": "4.5.2-r8",
+        "c": "b9898dbb7125f3678bc8c6cd9e7a43d9d9d2c518",
+        "m": "wolfi",
+        "o": "libxcrypt",
+        "t": "1793905898"
+      },
+      "openssl-4.0-libcrypto": {
+        "A": "x86_64",
+        "C": "Q1W9piTcgyubhrducJCMM7+qErDxo=",
+        "D": "openssl-provider-legacy-allowed so:libbrotlidec.so.1 so:libbrotlienc.so.1 so:libc.so.6",
+        "I": "6124765",
+        "L": "Apache-2.0",
+        "P": "openssl-4.0-libcrypto",
+        "S": "2403081",
+        "T": "OpenSSL libcrypto library",
+        "V": "4.0.3-r8",
+        "c": "53fb2f6751f832fa61ddba06cb8a40dbba5f409f",
+        "m": "wolfi",
+        "o": "openssl-4.0",
+        "p": "so-ver:libcrypto.so.4=4.0.3-r8 so:libcrypto.so.4=4",
+        "t": "1792447220"
+      },
+      "openssl-4.0-libssl": {
+        "A": "x86_64",
+        "C": "Q1arwi4n4L3VZ3S8YJ6P4WwY/7JjY=",
+        "D": "so:libc.so.6 so:libcrypto.so.4",
+        "I": "1232616",
+        "L": "Apache-2.0",
+        "P": "openssl-4.0-libssl",
+        "S": "575950",
+        "T": "OpenSSL libssl library",
+        "V": "4.0.3-r8",
+        "c": "53fb2f6751f832fa61ddba06cb8a40dbba5f409f",
+        "m": "wolfi",
+        "o": "openssl-4.0",
+        "p": "so-ver:libssl.so.4=4.0.3-r8 so:libssl.so.4=4",
+        "t": "1792447220"
+      },
+      "openssl-provider-legacy-allowed": {
+        "A": "x86_64",
+        "C": "Q1K5CR6PVd/wWU++lG1SG1MRrQkJA=",
+        "D": "so:libc.so.6",
+        "I": "845759",
+        "L": "Apache-2.0",
+        "P": "openssl-provider-legacy-allowed",
+        "S": "364302",
+        "T": "Chainguard Legacy Allowed FIPS 140-3 I.G. 2.4.A Provider",
+        "V": "4.1.0-r0",
+        "c": "aeae4801330be6fd269d5ed5640dc37b58ccab09",
+        "m": "wolfi",
+        "o": "openssl-provider-legacy-allowed",
+        "t": "1793013247"
+      },
+      "wolfi-base": {
+        "A": "x86_64",
+        "C": "Q16Ctc7TvokDUPOi+0TkHCeSmryh0=",
+        "D": "apk-tools busybox wolfi-keys",
+        "I": "22517",
+        "L": "MIT",
+        "P": "wolfi-base",
+        "S": "1816",
+        "T": "Wolfi base metapackage",
+        "V": "1-r7",
+        "c": "c80c31b811557bc8724fcb901bdcc09615fcf4fc",
+        "o": "wolfi-base",
+        "t": "1739304383"
+      },
+      "wolfi-baselayout": {
+        "A": "x86_64",
+        "C": "Q1W4ff78hzbtDn6J9JJRRwbjKmKR4=",
+        "D": "ca-certificates-bundle",
+        "I": "137722",
+        "L": "MIT",
+        "P": "wolfi-baselayout",
+        "S": "14592",
+        "T": "baselayout data for Wolfi",
+        "V": "20230201-r31",
+        "c": "ed415005c84750f03c4a9252137813734a224ae7",
+        "m": "wolfi",
+        "o": "wolfi-baselayout",
+        "p": "merged-bin merged-lib merged-sbin merged-usrsbin merged-varrun",
+        "t": "1793220575"
+      },
+      "wolfi-keys": {
+        "A": "x86_64",
+        "C": "Q1pjSE0onslwptVuXi4b8BfLXGXXw=",
+        "I": "63936",
+        "L": "MIT",
+        "P": "wolfi-keys",
+        "S": "3939",
+        "T": "Wolfi signing keyring",
+        "V": "1-r14",
+        "c": "e723835f288b5f24b0697499d0e8e83dddbcff45",
+        "m": "wolfi",
+        "o": "wolfi-keys",
+        "t": "1792668781"
+      },
+      "zlib": {
+        "A": "x86_64",
+        "C": "Q1VhYXgIFnt54EjOK+EDlVL9ypZVI=",
+        "D": "merged-lib so:libc.so.6 wolfi-baselayout",
+        "I": "151376",
+        "L": "MPL-2.0 AND MIT",
+        "P": "zlib",
+        "S": "83911",
+        "T": "a library implementing the zlib compression algorithms",
+        "V": "1.3.2.1_rc20260921-r2",
+        "c": "5aeb575ed7ca64fb21dfda042e170d08f1654bbc",
+        "k": "100",
+        "m": "wolfi",
+        "o": "zlib",
+        "p": "so-ver:libz.so.1=1.3.2.1_rc20260921-r2 so:libz.so.1=1",
+        "t": "1793820126"
+      }
+    },
+    "physical_file_catalog_verified": false,
+    "raw_apk_database_sha256": null,
+    "reference": "cgr.dev/chainguard/wolfi-base@sha256:ce3d463053d289b9cb4fd8a1b5202acaa5b20093acefb232df7304cf2be0bb72"
+  },
+  "image_built": false,
+  "load_paths": [
+    "/usr/lib64",
+    "/usr/lib"
+  ],
+  "manual_apks": [
+    {
+      "archive": {
+        "bytes": 289760,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/gdbm-1.26-r9.apk",
+        "sha256": "20acccdc729df98cb3c088eeea3f84080596c0b23a9809f82da7ee977473ed12"
+      },
+      "authentication_receipt": {
+        "bytes": 10272,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/gdbm-1.26-r9.json",
+        "sha256": "cb1bb3a30bfb2e99c7042ea0381a8334356effa6493f24a193f5bcd74b49513f"
+      },
+      "name": "gdbm",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1+OpsdmzH2i87yrQzTUkS0smKEPg=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6",
+        "I": "908698",
+        "L": "GPL-3.0-or-later",
+        "P": "gdbm",
+        "S": "289760",
+        "T": "GNU dbm is a set of database routines which use extensible hashing",
+        "V": "1.26-r9",
+        "c": "bdc197227f39597f43727c03854efbb4e834c5ef",
+        "m": "wolfi",
+        "o": "gdbm",
+        "p": "cmd:gdbm_dump=1.26-r9 cmd:gdbm_load=1.26-r9 cmd:gdbmtool=1.26-r9 so-ver:libgdbm.so.6=1.26-r9 so-ver:libgdbm_compat.so.4=1.26-r9 so:libgdbm.so.6=6 so:libgdbm_compat.so.4=4",
+        "t": "1793047564"
+      },
+      "version": "1.26-r9"
+    },
+    {
+      "archive": {
+        "bytes": 59582,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/libbz2-1-1.0.8-r30.apk",
+        "sha256": "f3cd974cbff13c551edd28e13bb65c01938f01483fd9d2af03646c6ba2fec8c8"
+      },
+      "authentication_receipt": {
+        "bytes": 2153,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/libbz2-1-1.0.8-r30.json",
+        "sha256": "f2fc0f182482b166724364cd6d825b70c7c4f4306212450249b831ce0f910dfb"
+      },
+      "name": "libbz2-1",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1uJUw7U9e/1Jwt+vRSM5r8xKMJBE=",
+        "D": "so:libc.so.6",
+        "I": "122373",
+        "L": "MPL-2.0 AND MIT",
+        "P": "libbz2-1",
+        "S": "59582",
+        "T": "bzip2 shared library",
+        "V": "1.0.8-r30",
+        "c": "f353805867a3059d7018cceac9746da7c23634fe",
+        "m": "wolfi",
+        "o": "bzip2",
+        "p": "so-ver:libbz2.so.1=1.0.8-r30 so:libbz2.so.1=1",
+        "t": "1793675311"
+      },
+      "version": "1.0.8-r30"
+    },
+    {
+      "archive": {
+        "bytes": 121940,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/libexpat1-2.10.0-r1.apk",
+        "sha256": "c2e5e062faaa066ef15752a4fb55fdae07c8c16e98b251d0b49651041ed6965f"
+      },
+      "authentication_receipt": {
+        "bytes": 2069,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/libexpat1-2.10.0-r1.json",
+        "sha256": "fa605694cf089808532bc70557df6377b3ad624bf543f39169fe84d71e1309cf"
+      },
+      "name": "libexpat1",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1/qFHF88NrKvQQcegKi7sppEYI5M=",
+        "D": "so:libc.so.6",
+        "I": "279548",
+        "L": "MIT",
+        "P": "libexpat1",
+        "S": "121940",
+        "T": "libexpat shared library",
+        "V": "2.10.0-r1",
+        "c": "5aeb575ed7ca64fb21dfda042e170d08f1654bbc",
+        "m": "wolfi",
+        "o": "expat",
+        "p": "so-ver:libexpat.so.1=2.10.0-r1 so:libexpat.so.1=1",
+        "t": "1793820126"
+      },
+      "version": "2.10.0-r1"
+    },
+    {
+      "archive": {
+        "bytes": 47462,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/libffi-3.8.0-r2.apk",
+        "sha256": "93fe2f937802653775e8537c7a2840c6de8a1d83c396559be200c0d5d86375f6"
+      },
+      "authentication_receipt": {
+        "bytes": 2253,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/libffi-3.8.0-r2.json",
+        "sha256": "5671a55b86ca55846dadea64799c9b54495c874cf619f41c34e9fbaaace0eedf"
+      },
+      "name": "libffi",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1Xv/AsO+lsjORCxdKxyfkMMLLkO0=",
+        "D": "so:libc.so.6",
+        "I": "114535",
+        "L": "MIT",
+        "P": "libffi",
+        "S": "47462",
+        "T": "portable foreign function interface library",
+        "V": "3.8.0-r2",
+        "c": "aaa2344b75ef8b19889f087c91e10b11f191e15c",
+        "m": "wolfi",
+        "o": "libffi",
+        "p": "so-ver:libffi.so.8=3.8.0-r2 so:libffi.so.8=8",
+        "t": "1791622591"
+      },
+      "version": "3.8.0-r2"
+    },
+    {
+      "archive": {
+        "bytes": 1267168,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/libstdc++-16.2.0-r2.apk",
+        "sha256": "91d46dc63af715208b8d1424909f4df7e30cbc2321afaa9dcd412476e0297ebd"
+      },
+      "authentication_receipt": {
+        "bytes": 2349,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/libstdc++-16.2.0-r2.json",
+        "sha256": "0fa73815bbb155714254fbffedc30b2f4a504e1aca768b742a4df4d8fb66e450"
+      },
+      "name": "libstdc++",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1TDYeh0Iq9Fjbp5cPck+zZfmDn14=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6 so:libgcc_s.so.1 so:libm.so.6",
+        "I": "3580046",
+        "L": "GPL-3.0-or-later WITH GCC-exception-3.1",
+        "P": "libstdc++",
+        "S": "1267168",
+        "T": "",
+        "V": "16.2.0-r2",
+        "c": "1a8a06e57ab63d92834a9467dd0eaa5d54ade3b0",
+        "m": "wolfi",
+        "o": "gcc",
+        "p": "libstdc++-16=16.2.0-r2 so-ver:libstdc++.so.6=16.2.0-r2 so:libstdc++.so.6=6",
+        "t": "1793036444"
+      },
+      "version": "16.2.0-r2"
+    },
+    {
+      "archive": {
+        "bytes": 39968,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/libuuid-2.42.4-r2.apk",
+        "sha256": "a3a7119c1dc97372b1ee41fd7d18cf5d2953c5d85bd126ce791d3a2be8ca4a81"
+      },
+      "authentication_receipt": {
+        "bytes": 2298,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/libuuid-2.42.4-r2.json",
+        "sha256": "2a57aba5f5015bf0a68b7f7fc0c94751d0fc12a99217c7497f3912171ac1123f"
+      },
+      "name": "libuuid",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1RMgxwtEheWi8izRUHv/oGNNwqKA=",
+        "D": "merged-bin merged-sbin merged-usrsbin so:libc.so.6 wolfi-baselayout",
+        "I": "79210",
+        "L": "GPL-3.0-or-later AND GPL-2.0-or-later AND GPL-2.0-only AND GPL-1.0-only AND LGPL-2.1-or-later AND BSD-1-Clause AND BSD-2-Clause AND BSD-3-Clause AND BSD-4-Clause-UC AND MIT AND CC-PDDC",
+        "P": "libuuid",
+        "S": "39968",
+        "T": "DCE compatible Universally Unique Identifier library",
+        "V": "2.42.4-r2",
+        "c": "8298ba7be686605b03c1943f22ccf5a0640e0042",
+        "m": "wolfi",
+        "o": "util-linux",
+        "p": "so-ver:libuuid.so.1=2.42.4-r2 so:libuuid.so.1=1",
+        "t": "1793358545"
+      },
+      "version": "2.42.4-r2"
+    },
+    {
+      "archive": {
+        "bytes": 135908,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/mpdecimal-4.0.1-r6.apk",
+        "sha256": "1d8cbdf4a1a99910af28dfaad19643a3604159f9decb380c0e39166bd0c812e8"
+      },
+      "authentication_receipt": {
+        "bytes": 3056,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/mpdecimal-4.0.1-r6.json",
+        "sha256": "0ffa72b333770487b87e6c1c8249a3bcc1f7a57977aa2823dbaeb4cc058f39ab"
+      },
+      "name": "mpdecimal",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1kpDYLUMV5sHuT7URRwDjYUwBYp8=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6 so:libgcc_s.so.1 so:libm.so.6 so:libstdc++.so.6",
+        "I": "351034",
+        "L": "BSD-2-Clause",
+        "P": "mpdecimal",
+        "S": "135908",
+        "T": "complete implementation of the general decimal arithmetic specification",
+        "V": "4.0.1-r6",
+        "c": "491b184c82ef2868d73a46a98997db789342ff15",
+        "m": "wolfi",
+        "o": "mpdecimal",
+        "p": "so-ver:libmpdec++.so.4=4.0.1-r6 so-ver:libmpdec.so.4=4.0.1-r6 so:libmpdec++.so.4=4 so:libmpdec.so.4=4",
+        "t": "1793045637"
+      },
+      "version": "4.0.1-r6"
+    },
+    {
+      "archive": {
+        "bytes": 632291,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/ncurses-6.6.20261031-r0.apk",
+        "sha256": "fa790001688f4229106589cd6b51a9475663c1b029c65b0ae0e852149869ae0d"
+      },
+      "authentication_receipt": {
+        "bytes": 8422,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/ncurses-6.6.20261031-r0.json",
+        "sha256": "435f9fc2f57ce883041aef5196f2f1ff80d3d079e5167bc5b5585048c1ffbe3b"
+      },
+      "name": "ncurses",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1gW25Kb9fqmel5hPO4cWZedYPvDw=",
+        "D": "ncurses-terminfo-base=6.6.20261031-r0 so:ld-linux-x86-64.so.2 so:libc.so.6",
+        "I": "1522440",
+        "L": "MIT",
+        "P": "ncurses",
+        "S": "632291",
+        "T": "console display library",
+        "V": "6.6.20261031-r0",
+        "c": "1e23bef29f698095b9e2a213402d2af2ce6d65e8",
+        "m": "wolfi",
+        "o": "ncurses",
+        "p": "cmd:clear=6.6.20261031-r0 cmd:infocmp=6.6.20261031-r0 cmd:tabs=6.6.20261031-r0 cmd:tic=6.6.20261031-r0 cmd:toe=6.6.20261031-r0 cmd:tput=6.6.20261031-r0 cmd:tset=6.6.20261031-r0 so-ver:libform.so.6=6.6.20261031-r0 so-ver:libformw.so.6=6.6.20261031-r0 so-ver:libmenu.so.6=6.6.20261031-r0 so-ver:libmenuw.so.6=6.6.20261031-r0 so-ver:libncurses.so.6=6.6.20261031-r0 so-ver:libncursesw.so.6=6.6.20261031-r0 so-ver:libpanel.so.6=6.6.20261031-r0 so-ver:libpanelw.so.6=6.6.20261031-r0 so-ver:libtic.so.6=6.6.20261031-r0 so-ver:libtinfo.so.6=6.6.20261031-r0 so:libform.so.6=6 so:libformw.so.6=6 so:libmenu.so.6=6 so:libmenuw.so.6=6 so:libncurses.so.6=6 so:libncursesw.so.6=6 so:libpanel.so.6=6 so:libpanelw.so.6=6 so:libtic.so.6=6 so:libtinfo.so.6=6",
+        "t": "1793510478"
+      },
+      "version": "6.6.20261031-r0"
+    },
+    {
+      "archive": {
+        "bytes": 122153,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/ncurses-terminfo-base-6.6.20261031-r0.apk",
+        "sha256": "ca983c16e5a6ecf07d5fb0268fe48369f2153074108fb28378159dc86af1ab39"
+      },
+      "authentication_receipt": {
+        "bytes": 62510,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/ncurses-terminfo-base-6.6.20261031-r0.json",
+        "sha256": "97b893497a1be584e66cc8c8d0fabeb841d325141ca1a5fb17dd40dcf1ec7594"
+      },
+      "name": "ncurses-terminfo-base",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1k7ds1A74ij4vql3+aeD2h5i3Koo=",
+        "I": "617850",
+        "L": "MIT",
+        "P": "ncurses-terminfo-base",
+        "S": "122153",
+        "T": "descriptions of common terminals",
+        "V": "6.6.20261031-r0",
+        "c": "1e23bef29f698095b9e2a213402d2af2ce6d65e8",
+        "m": "wolfi",
+        "o": "ncurses",
+        "t": "1793510478"
+      },
+      "version": "6.6.20261031-r0"
+    },
+    {
+      "archive": {
+        "bytes": 1845334,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/py3-pip-wheel-26.2.2-r2.apk",
+        "sha256": "623147e8782f0e9353f75759a32a4c9a9674ecddaaf934eaa89fcdf7354a45d6"
+      },
+      "authentication_receipt": {
+        "bytes": 1997,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/py3-pip-wheel-26.2.2-r2.json",
+        "sha256": "1573fabd0605f7dab21a7003598ca465399bd61116b3fd1dddd2912fab7ae449"
+      },
+      "name": "py3-pip-wheel",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1BWb5vwrbg4NJu9UjvsQh38ETTAc=",
+        "I": "1870777",
+        "L": "MIT",
+        "P": "py3-pip-wheel",
+        "S": "1845334",
+        "T": "wheel of pip",
+        "V": "26.2.2-r2",
+        "c": "58b78718f8e8947523a1ad3eb0deb82aee6911d7",
+        "k": "10",
+        "m": "wolfi",
+        "o": "py3-pip",
+        "t": "1793300690"
+      },
+      "version": "26.2.2-r2"
+    },
+    {
+      "archive": {
+        "bytes": 12403757,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/python-3.12-base-3.12.16-r0.apk",
+        "sha256": "0a79422e80e1d164899c8e25737f3ca6b7058f3e8e0dc52ecc75197e2630090d"
+      },
+      "authentication_receipt": {
+        "bytes": 305841,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/python-3.12-base-3.12.16-r0.json",
+        "sha256": "3d9da7f260c9e5080ed232efd5fb4ffe33927042aa8eb3f23795af9eca19af39"
+      },
+      "name": "python-3.12-base",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1G3V7umduU1h6fR92rTIbRNB60H4=",
+        "D": "py3-pip-wheel so:ld-linux-x86-64.so.2 so:libbz2.so.1 so:libc.so.6 so:libcrypt.so.1 so:libcrypto.so.4 so:libexpat.so.1 so:libffi.so.8 so:libgdbm.so.6 so:libgdbm_compat.so.4 so:liblzma.so.5 so:libm.so.6 so:libmpdec.so.4 so:libncursesw.so.6 so:libpanelw.so.6 so:libreadline.so.8 so:libsqlite3.so.0 so:libssl.so.4 so:libtinfo.so.6 so:libuuid.so.1 so:libz.so.1",
+        "I": "36543792",
+        "L": "PSF-2.0",
+        "P": "python-3.12-base",
+        "S": "12403757",
+        "T": "python-3.12 without /usr/bin/python3",
+        "V": "3.12.16-r0",
+        "c": "22063bc246742742a25cd702202142c433afcf1e",
+        "m": "wolfi",
+        "o": "python-3.12",
+        "p": "cmd:pydoc3.12=3.12.16-r0 cmd:python3.12=3.12.16-r0 so-ver:libpython3.12.so.1.0=3.12.16-r0 so:libpython3.12.so.1.0=1.0",
+        "t": "1792969341"
+      },
+      "version": "3.12.16-r0"
+    },
+    {
+      "archive": {
+        "bytes": 349087,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/readline-8.3-r3.apk",
+        "sha256": "bc694bcbfcf3d3d48c890b2701714269c9c0851a85c44bb5bf38347e4999f80b"
+      },
+      "authentication_receipt": {
+        "bytes": 3420,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/readline-8.3-r3.json",
+        "sha256": "3fa119433d7f2f98b54de37e493b9210804ee9b31b15dc212d99501089ba4ccc"
+      },
+      "name": "readline",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1DpD7gaJW7NfhS6UXgOqJ/d9LlBc=",
+        "D": "so:libc.so.6 so:libtinfo.so.6",
+        "I": "988978",
+        "L": "GPL-3.0-or-later",
+        "P": "readline",
+        "S": "349087",
+        "T": "GNU readline library",
+        "V": "8.3-r3",
+        "c": "20a5359ac0a7a6aca23efa343f0f29c8d3ea1453",
+        "m": "wolfi",
+        "o": "readline",
+        "p": "so-ver:libhistory.so.8=8.3-r3 so-ver:libreadline.so.8=8.3-r3 so:libhistory.so.8=8 so:libreadline.so.8=8",
+        "t": "1787998807"
+      },
+      "version": "8.3-r3"
+    },
+    {
+      "archive": {
+        "bytes": 989586,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/sqlite-libs-3.54.1-r0.apk",
+        "sha256": "5ea68a7dad00791dbc5eff42aad9022b0984f82e271058811a4d72181e450144"
+      },
+      "authentication_receipt": {
+        "bytes": 2077,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/sqlite-libs-3.54.1-r0.json",
+        "sha256": "73aaf33ddafbe0eefb4a70d2d3296eed3d64c9430af1122d171abdcb36f21ad9"
+      },
+      "name": "sqlite-libs",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1VRLw0RR5HoAu1uTfKALfMDoAMco=",
+        "D": "so:libc.so.6 so:libm.so.6",
+        "I": "1852624",
+        "L": "blessing",
+        "P": "sqlite-libs",
+        "S": "989586",
+        "T": "sqlite library",
+        "V": "3.54.1-r0",
+        "c": "b0ca8c95606371be2557980059c10b34df30fa9f",
+        "m": "wolfi",
+        "o": "sqlite",
+        "p": "so-ver:libsqlite3.so.0=3.54.1-r0 so:libsqlite3.so.0=0",
+        "t": "1792176806"
+      },
+      "version": "3.54.1-r0"
+    },
+    {
+      "archive": {
+        "bytes": 407246,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/xz-5.8.4-r1.apk",
+        "sha256": "cc5f7eb6691f74e422eefc8c5bf23de7260fdc98a62edc5419a3be4b8954b6b7"
+      },
+      "authentication_receipt": {
+        "bytes": 16332,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/xz-5.8.4-r1.json",
+        "sha256": "d86c3e87cdbaf7ba107d8f95c3368cdb253b3accd43d439a36317c95c008e6a7"
+      },
+      "name": "xz",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1LyyjHbT9tm1oWo6nH6SZGi+F8jo=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6",
+        "I": "1332074",
+        "L": "GPL-3.0-or-later",
+        "P": "xz",
+        "S": "407246",
+        "T": "Library and CLI tools for XZ and LZMA compressed files",
+        "V": "5.8.4-r1",
+        "c": "5aeb575ed7ca64fb21dfda042e170d08f1654bbc",
+        "m": "wolfi",
+        "o": "xz",
+        "p": "cmd:lzmadec=5.8.4-r1 cmd:lzmainfo=5.8.4-r1 cmd:xz=5.8.4-r1 cmd:xzdec=5.8.4-r1 cmd:xzdiff=5.8.4-r1 cmd:xzgrep=5.8.4-r1 cmd:xzless=5.8.4-r1 cmd:xzmore=5.8.4-r1 so-ver:liblzma.so.5=5.8.4-r1 so:liblzma.so.5=5",
+        "t": "1793820126"
+      },
+      "version": "5.8.4-r1"
+    }
+  ],
+  "output_relative": ".tools/backup-source-build/python-runtime-v1",
+  "owner": "agencia-digital-marketing-ai:python-runtime:v1",
+  "pending_aliases": {
+    "usr/lib/terminfo": "../share/terminfo"
+  },
+  "python": {
+    "executable": "usr/bin/python3.12",
+    "executable_sha256": "54bb87946dd0d8231507c0cef7a5745443a97411c406bf6f010f3ec75780a75b",
+    "libpython": "usr/lib/libpython3.12.so.1.0",
+    "libpython_sha256": "ad918e7753f89b9c256a6c40a17e48d080583cd25577d8634d737ab9a1e960b8",
+    "package": "python-3.12-base",
+    "package_version": "3.12.16-r0",
+    "version": "3.12.16"
+  },
+  "references": {
+    "apk_verifier": {
+      "bytes": 11367,
+      "path": "docker/postgres-immich/native_inputs.py",
+      "sha256": "b00b1a1a1822b13ed145128209664a15f3efa781b39cd850d0d63bcc0666192b"
+    },
+    "base_report": {
+      "bytes": 32245,
+      "path": ".tools/evidence/phase4-wolfi-base-trivy.json",
+      "sha256": "419f999d5268db32a90b201ec9ec3a8dfba03fefab737f9cc4ac711c704da5fe"
+    },
+    "elf_parser": {
+      "bytes": 58437,
+      "path": "docker/postgres-immich/final_image_remote.py",
+      "sha256": "9e0a282940bd7585b6953b43dbc3f02df9bf01bb9f775e5a7a4eb1172ed4fa49"
+    },
+    "index": {
+      "bytes": 9597573,
+      "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/wolfi-APKINDEX.tar.gz",
+      "sha256": "9b27ab69add838665af44c9aa304a0dd910af90f2cd9e191e52e0b585a3ce2fd"
+    },
+    "key": {
+      "bytes": 800,
+      "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/wolfi-signing.rsa.pub",
+      "sha256": "f0031424cf46f7db780ce63a45f0fd6aa6f85f601e6bb3b7a91fe3d4d5b7d2cc"
+    },
+    "manifest": {
+      "bytes": 203011,
+      "path": ".tools/backup-source-build/opencv-relocation-inputs-v1/manifest-approved.json",
+      "sha256": "1207f5840f3d663775ee54fd377688ef00081681a1a50952df61c5d1ee01cd3a"
+    },
+    "packager": {
+      "bytes": 26860,
+      "path": "docker/kitsu-zou/package_opencv_minimal.py",
+      "sha256": "831a28043da1de203bae7845244e90efd548da4cd75f707d1358d33288b2b9d9"
+    },
+    "relocator": {
+      "bytes": 30407,
+      "path": "docker/kitsu-zou/prepare_opencv_relocated_wheel.py",
+      "sha256": "b7b14e650a0eb900f585591077680fa91a335c0224057ad99cb24e68afd771f6"
+    }
+  },
+  "runtime_approved": false,
+  "schema_version": 1,
+  "scripts_executed": false,
+  "sdk_executed": false
+}

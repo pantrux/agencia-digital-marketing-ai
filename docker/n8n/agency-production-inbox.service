@@ -1,0 +1,29 @@
+[Unit]
+Description=Recepción de producciones de Studio desde n8n
+Requires=agency-n8n-private.service
+After=agency-n8n-private.service
+PartOf=agency-n8n-private.service
+RequiresMountsFor=/mnt/producciones
+
+[Service]
+Type=simple
+ExecStartPre=+/usr/local/lib/agency-production-inbox/production_inbox_firewall.py apply
+ExecStopPost=+/usr/local/lib/agency-production-inbox/production_inbox_firewall.py remove
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-inbox
+StateDirectoryMode=0700
+ExecStart=/usr/bin/python3 -I -S -B /usr/local/lib/agency-production-inbox/production_inbox.py --listen 172.31.240.1 --peer 172.31.240.2 --token-file %d/token --state /var/lib/agency-production-inbox
+LoadCredential=token:/opt/media-platform/production-inbox-v1/token
+Restart=on-failure
+RestartSec=3s
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "purpose": "Inventario estático de JavaScript incorporado, sin aprobación SCA.",
+  "artifacts": {
+    "kitsu": {
+      "path": ".tools/cache/phase4-sources/kitsu-1.0.77.tgz",
+      "sha256": "f030dc59ae28155d3686c09ce35a2855381582ab42fcc983158c727ec5f1204e",
+      "maximum_bytes": 33554432,
+      "kind": "tar.gz",
+      "source_url": "https://github.com/cgwire/kitsu/releases/download/v1.0.77/kitsu-1.0.77.tgz"
+    },
+    "flasgger": {
+      "path": ".tools/kitsu-zou-build-flasgger-v2/wheels/flasgger-0.9.7.1-py2.py3-none-any.whl",
+      "sha256": "ee71b3e30ed15c59274d72a27277ae258378a7f28dc50ac17a4526d343c4618f",
+      "maximum_bytes": 33554432,
+      "kind": "zip",
+      "build_receipt": ".tools/evidence/phase4-flasgger-wheel-build.json",
+      "build_receipt_sha256": "8e1fbe9e1a2ca8b117beb5ec73aca7c3268ed0b2fbe50e4f2a20c5796b163109"
+    },
+    "flasgger_sdist": {
+      "path": ".tools/cache/phase4-sources/flasgger-0.9.7.1.tar.gz",
+      "sha256": "ca098e10bfbb12f047acc6299cc70a33851943a746e550d86e65e60d4df245fb",
+      "maximum_bytes": 33554432,
+      "kind": "tar.gz",
+      "source_url": "https://files.pythonhosted.org/packages/8a/e4/05e80adeadc39f171b51bd29b24a6d9838127f3aaa1b07c1501e662a8cee/flasgger-0.9.7.1.tar.gz"
+    }
+  },
+  "kitsu_identity": {
+    ".commit.txt": "c1edc91a3e2bfcefabf6f9abf682e2c420f0831f",
+    ".tag.txt": "v1.0.77",
+    ".version.txt": "1.0.77"
+  },
+  "kitsu_lock": {
+    "path": ".tools/cache/phase4-sources/kitsu-c1edc91a3e2bfcef-package-lock.json",
+    "sha256": "5e8e258946c3944cd0768afafeb8a5ea3dd7dec6024591ed7334f12e55076583",
+    "git_blob_sha1": "463cb3faca6126bf2ddfbe9963a5b8d0386fab05",
+    "maximum_bytes": 1048576,
+    "source_url": "https://raw.githubusercontent.com/cgwire/kitsu/c1edc91a3e2bfcefabf6f9abf682e2c420f0831f/package-lock.json"
+  },
+  "kitsu_package": {
+    "path": ".tools/cache/phase4-sources/kitsu-c1edc91a3e2bfcef-package.json",
+    "sha256": "88d73c7be2350ae1cf3f32db37aefbfe3180e96cea2551a71542546b891478b1",
+    "git_blob_sha1": "65f978788afa6cbb89eb445d55c4daecc3873b88",
+    "maximum_bytes": 1048576,
+    "source_url": "https://raw.githubusercontent.com/cgwire/kitsu/c1edc91a3e2bfcefabf6f9abf682e2c420f0831f/package.json"
+  },
+  "version_claims": {
+    "flasgger": [
+      {
+        "member": "flasgger/ui2/static/lib/jquery-1.8.0.min.js",
+        "sha256": "33558bca53e7d0081c95808d5783159338237e843178dc04eb36a23a839705ac",
+        "name": "jquery",
+        "version": "1.8.0",
+        "needle": "jquery:\"1.8.0\"",
+        "kind": "self-declared-jquery-property"
+      },
+      {
+        "member": "flasgger/ui3/static/lib/jquery.min.js",
+        "sha256": "05b85d96f41fff14d8f608dad03ab71e2c1017c2da0914d7c59291bad7a54f8e",
+        "name": "jquery",
+        "version": "2.2.4",
+        "needle": "/*! jQuery v2.2.4 |",
+        "kind": "self-declared-banner"
+      },
+      {
+        "member": "flasgger/ui2/static/lib/backbone-min.js",
+        "sha256": "7e789cb0bbb4f421e0fdcfa00764aa2d0f4c0b9611a2cc4af9203fc306b65251",
+        "name": "backbone",
+        "version": "1.1.2",
+        "needle": ".VERSION=\"1.1.2\"",
+        "kind": "self-declared-backbone-property"
+      }
+    ],
+    "kitsu": []
+  },
+  "primary_references": [
+    "https://github.com/cgwire/kitsu/tree/c1edc91a3e2bfcefabf6f9abf682e2c420f0831f",
+    "https://pypi.org/project/flasgger/0.9.7.1/",
+    "https://tc39.es/ecma426/#sec-mappings"
+  ],
+  "limitations": [
+    "Los mapas atribuyen fuentes al generado; no se ha reproducido el build ni cotejado cada fuente contra un tarball npm autenticado.",
+    "Una entrada sources sin segmentos mappings no acredita incorporación y no genera un componente.",
+    "El lock Kitsu del mismo commit es evidencia de candidatos; no convierte automáticamente sus versiones en versiones confirmadas del bundle.",
+    "Los selectores de versión sólo acreditan autodeclaración de los miembros fijados; no igualdad completa con una distribución npm.",
+    "El nombre handlebars-4.0.5.js y cadenas de versión ajenas no son prueba suficiente para asignar esa versión.",
+    "Los archivos JS sin mapa, CSS, WASM y dependencias anidadas dentro de bundles de proveedores conservan huecos explícitos.",
+    "No existe un lock Swagger acreditado por estos artefactos; versiones pendientes no se rellenan con un lock de otra release.",
+    "Se conservan UI2 y UI3 presentes en Flasgger independientemente de la configuración futura de rutas. No se eliminan archivos ni hallazgos.",
+    "El inventario no ejecuta JavaScript, Node/npm/pnpm, SDK, Trivy, HTTP/SSH, instalación o modificación de originales y no lee .env.",
+    "No genera SBOM con versiones desconocidas inventadas ni certifica SCA, compatibilidad o imagen final."
+  ]
+}

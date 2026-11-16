@@ -1,0 +1,8 @@
+[Unit]
+Description=Activa a Mateo cuando Sofía registra un brief preliminar
+
+[Path]
+PathChanged=/var/lib/agency-production-sofia
+
+[Install]
+WantedBy=paths.target

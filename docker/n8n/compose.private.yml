@@ -1,0 +1,174 @@
+name: agency-n8n-private
+
+x-runtime: &runtime
+  platform: linux/amd64
+  pull_policy: never
+  user: "1000:1000"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  init: true
+  restart: "no"
+  stop_grace_period: 65s
+  logging:
+    driver: local
+    options: {max-size: "10m", max-file: "2"}
+  labels:
+    agency.owner: agencia-digital-marketing-ai:n8n-private:v1
+
+x-runner: &runner
+  <<: *runtime
+  pids_limit: 96
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,noexec,size=64m,uid=1000,gid=1000,mode=0700
+  networks: [broker]
+  depends_on:
+    n8n: {condition: service_healthy}
+  secrets: [n8n_broker_token]
+
+x-runner-environment: &runner-environment
+  N8N_RUNNERS_TASK_BROKER_URI: http://n8n:5679
+  N8N_RUNNERS_AUTH_TOKEN_FILE: /run/secrets/n8n_broker_token
+  N8N_RUNNERS_MAX_CONCURRENCY: "1"
+  N8N_RUNNERS_TASK_TIMEOUT: "60"
+  N8N_RUNNERS_GRACEFUL_SHUTDOWN_TIMEOUT: "55"
+
+x-health: &health
+  interval: 15s
+  timeout: 5s
+  retries: 5
+
+services:
+  n8n:
+    <<: *runtime
+    image: sha256:085d127780cfffdc1725b6e20b6dc37b0ecc325f38c63aead09f736f9f576bcc
+    mem_limit: 1280m
+    memswap_limit: 1280m
+    cpus: "1.5"
+    pids_limit: 192
+    stop_grace_period: 90s
+    environment:
+      NODE_OPTIONS: --max-old-space-size=768
+      npm_config_cache: /home/node/.cache/npm
+      N8N_HOST: 192.168.0.85
+      N8N_LISTEN_ADDRESS: ${AGENCY_N8N_INGRESS_IP:?Falta la IP del servidor en el bridge de entrada}
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: https
+      N8N_EDITOR_BASE_URL: https://192.168.0.85:5678/
+      N8N_WEBHOOK_URL: https://192.168.0.85:5678/
+      N8N_SSL_CERT: /run/secrets/n8n_tls_cert
+      N8N_SSL_KEY: /run/secrets/n8n_tls_key
+      N8N_SECURE_COOKIE: "true"
+      N8N_PROXY_HOPS: "0"
+      TZ: America/Santiago
+      GENERIC_TIMEZONE: America/Santiago
+      N8N_ENCRYPTION_KEY_FILE: /run/secrets/n8n_encryption_key
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_GRACEFUL_SHUTDOWN_TIMEOUT: "75"
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres-n8n
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD_FILE: /run/secrets/n8n_database_password
+      DB_POSTGRESDB_SCHEMA: public
+      N8N_RUNNERS_ENABLED: "true"
+      N8N_RUNNERS_MODE: external
+      N8N_RUNNERS_AUTH_TOKEN_FILE: /run/secrets/n8n_broker_token
+      N8N_RUNNERS_BROKER_LISTEN_ADDRESS: ${AGENCY_N8N_BROKER_IP:?Falta la IP del servidor en el bridge del broker}
+      N8N_RUNNERS_BROKER_PORT: "5679"
+      N8N_RUNNERS_INSECURE_MODE: "false"
+      N8N_RUNNERS_TASK_TIMEOUT: "60"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_TEMPLATES_ENABLED: "false"
+    ports:
+      - "192.168.0.85:5678:5678/tcp"
+    networks:
+      ingress:
+        ipv4_address: ${AGENCY_N8N_INGRESS_IP:?Falta la IP del servidor en el bridge de entrada}
+        gw_priority: 1
+      broker:
+        ipv4_address: ${AGENCY_N8N_BROKER_IP:?Falta la IP del servidor en el bridge del broker}
+      database:
+        ipv4_address: ${AGENCY_N8N_DB_CLIENT_IP:?Falta la IP reservada de n8n en PostgreSQL}
+    volumes:
+      - type: bind
+        source: ${AGENCY_N8N_DATA_PATH:?Falta el directorio local de datos n8n}
+        target: /home/node/.n8n
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m,uid=1000,gid=1000,mode=0700
+      - /home/node/.cache:rw,nosuid,nodev,noexec,size=128m,uid=1000,gid=1000,mode=0700
+    secrets: [n8n_database_password, n8n_encryption_key, n8n_broker_token, n8n_tls_cert, n8n_tls_key, n8n_tls_ca]
+    healthcheck:
+      <<: *health
+      start_period: 90s
+      test:
+        - CMD
+        - /usr/local/bin/node
+        - -e
+        - >-
+          const fs=require('node:fs'),http=require('node:http'),https=require('node:https'),tls=require('node:tls');
+          function check(client, options){return new Promise((resolve,reject)=>{const req=client.get(options,res=>{res.resume();res.on('end',()=>res.statusCode===200?resolve():reject(new Error('health')));});req.setTimeout(1800,()=>req.destroy(new Error('timeout')));req.on('error',reject);});}
+          Promise.all([check(https,{hostname:process.env.N8N_LISTEN_ADDRESS,port:5678,path:'/healthz/readiness',ca:fs.readFileSync('/run/secrets/n8n_tls_ca'),checkServerIdentity:(_,cert)=>tls.checkServerIdentity('192.168.0.85',cert)}),check(http,{hostname:process.env.N8N_RUNNERS_BROKER_LISTEN_ADDRESS,port:5679,path:'/healthz'})]).catch(()=>{process.exitCode=1;});
+
+  javascript:
+    <<: *runner
+    image: sha256:8741b3b1c0be32cf84af05f0ad89405bffe7702f04a7cb39ccbaae1a5efd3492
+    mem_limit: 640m
+    memswap_limit: 640m
+    cpus: "1.0"
+    environment:
+      <<: *runner-environment
+      NODE_OPTIONS: --max-old-space-size=256
+    healthcheck:
+      <<: *health
+      start_period: 30s
+      test: [CMD, /usr/local/bin/node, -e, "const r=require('node:http').get('http://127.0.0.1:5680/healthz',s=>{s.resume();if(s.statusCode!==200)process.exitCode=1;});r.setTimeout(1800,()=>r.destroy());r.on('error',()=>{process.exitCode=1;});"]
+
+  python:
+    <<: *runner
+    image: sha256:96f303b7f4b9f47a4c24b1760479a1e117522f6bab91b4089fc2ed6437b47fd8
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: "1.0"
+    environment:
+      <<: *runner-environment
+    healthcheck:
+      <<: *health
+      start_period: 30s
+      test: [CMD, /opt/runners/task-runner-python/.venv/bin/python, -I, -B, -c, "from urllib.request import build_opener, ProxyHandler; response=build_opener(ProxyHandler({})).open('http://127.0.0.1:5680/healthz',timeout=2); assert response.status == 200"]
+
+networks:
+  ingress:
+    driver: bridge
+    enable_ipv6: false
+    driver_opts: {com.docker.network.bridge.name: br-ag-n8n-in}
+    ipam:
+      config:
+        - subnet: ${AGENCY_N8N_INGRESS_SUBNET:?Falta la subred de entrada n8n}
+  broker:
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${AGENCY_N8N_BROKER_SUBNET:?Falta la subred del broker n8n}
+  database:
+    name: agency-n8n-postgres
+    external: true
+
+secrets:
+  n8n_database_password:
+    file: ${AGENCY_N8N_DB_PASSWORD_FILE:?Falta el archivo respaldado de PostgreSQL}
+  n8n_encryption_key:
+    file: ${AGENCY_N8N_ENCRYPTION_KEY_FILE:?Falta el archivo respaldado de cifrado}
+  n8n_broker_token:
+    file: ${AGENCY_N8N_BROKER_TOKEN_FILE:?Falta el archivo respaldado del broker}
+  n8n_tls_cert:
+    file: ${AGENCY_N8N_TLS_CERT_FILE:?Falta el certificado TLS LAN}
+  n8n_tls_key:
+    file: ${AGENCY_N8N_TLS_KEY_FILE:?Falta la clave TLS respaldada}
+  n8n_tls_ca:
+    file: ${AGENCY_N8N_TLS_CA_FILE:?Falta la CA pública del certificado LAN}

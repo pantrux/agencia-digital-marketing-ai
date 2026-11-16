@@ -1,0 +1,28 @@
+[Unit]
+Description=Zou API y eventos con previews en Synology
+Wants=network-online.target
+Requires=docker.service
+BindsTo=mnt-producciones.mount
+After=network-online.target docker.service mnt-producciones.mount
+PartOf=docker.service
+RequiresMountsFor=/mnt/producciones /opt/media-platform/kitsu-base-v1 /var/lib/media-platform/kitsu-base-v1 /var/lib/docker
+StartLimitIntervalSec=180
+StartLimitBurst=12
+
+[Service]
+Type=exec
+User=root
+Group=root
+UMask=0077
+Environment=COMPOSE_DISABLE_ENV_FILE=true
+Environment=DOCKER_CONFIG=/opt/media-platform/kitsu-base-v1/docker-client
+ExecStartPre=/usr/bin/python3 -I -S -B /opt/media-platform/kitsu-base-v1/preview_mount_guard.py
+ExecStart=/usr/bin/docker --host unix:///var/run/docker.sock compose --ansi never --project-name agency-media --project-directory /opt/media-platform/kitsu-base-v1 --env-file /opt/media-platform/kitsu-base-v1/compose.env -f /opt/media-platform/kitsu-base-v1/compose.yml up --no-recreate --no-build --pull never --no-deps --abort-on-container-exit zou-api zou-events
+ExecStop=/usr/bin/docker --host unix:///var/run/docker.sock compose --ansi never --project-name agency-media --project-directory /opt/media-platform/kitsu-base-v1 --env-file /opt/media-platform/kitsu-base-v1/compose.env -f /opt/media-platform/kitsu-base-v1/compose.yml stop --timeout 30 zou-api zou-events
+Restart=always
+RestartSec=10s
+TimeoutStartSec=45s
+TimeoutStopSec=45s
+
+[Install]
+WantedBy=multi-user.target

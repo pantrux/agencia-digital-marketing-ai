@@ -1,0 +1,12 @@
+{
+  "id": "agency-sofia-owner-pilot",
+  "name": "Piloto privado Sofía",
+  "description": "Una respuesta de texto para el titular del OAuth de Codex.",
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": { "profileFile": { "type": "string", "minLength": 2 } },
+    "required": ["profileFile"]
+  }
+}

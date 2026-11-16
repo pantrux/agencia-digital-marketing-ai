@@ -1,0 +1,10 @@
+[Unit]
+Description=Comprobar filtros de observabilidad en DSM cada minuto
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

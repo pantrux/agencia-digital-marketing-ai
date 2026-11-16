@@ -1,0 +1,9 @@
+[Unit]
+Description=Activa la entrega en Kitsu y Studio cuando se registra un dictamen o una asignación
+
+[Path]
+PathChanged=/var/lib/agency-production-elena
+PathChanged=/etc/agency-production-handoff/delivery-assignments.json
+
+[Install]
+WantedBy=paths.target

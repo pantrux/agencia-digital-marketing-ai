@@ -1,0 +1,12 @@
+# pythonruntime es el OCI local Wolfi/CPython 3.12.16 acreditado.
+FROM pythonruntime
+USER 0:0
+WORKDIR /MoneyPrinterTurbo
+COPY --chown=0:0 --chmod=0555 launch_wolfi.py /opt/moneyprinter/launch_wolfi.py
+COPY --chown=0:0 --chmod=0555 app-tree/ /MoneyPrinterTurbo/
+RUN --network=none --mount=type=bind,source=.,target=/inputs,ro ["/usr/bin/python3.12", "-I", "-S", "-B", "/opt/moneyprinter/launch_wolfi.py", "install"]
+ENV MPT_HOME=/run/mpt PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHON_DOTENV_DISABLED=1
+ENV FFMPEG_BINARY=/usr/bin/ffmpeg IMAGEIO_FFMPEG_EXE=/usr/bin/ffmpeg
+USER 65532:65532
+ENTRYPOINT ["/usr/bin/python3.12", "-I", "-S", "-B", "/opt/moneyprinter/launch_wolfi.py"]
+CMD ["api"]

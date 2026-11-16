@@ -1,0 +1,24 @@
+[Unit]
+Description=Entrega en Kitsu del máster aprobado para el piloto
+After=agency-production-elena.service
+RequiresMountsFor=/mnt/producciones
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-delivery
+StateDirectoryMode=0700
+EnvironmentFile=/etc/agency-production-handoff/delivery-runtime.env
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+LoadCredential=assignments:/etc/agency-production-handoff/delivery-assignments.json
+LoadCredential=dispatch:/etc/agency-production-handoff/dispatch-token
+LoadCredential=gpu:/etc/agency-production-handoff/gpu-render-token
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_delivery.py ${AGENCY_MCP_ROOT} %d/profile %d/assignments /var/lib/agency-production-delivery --dispatch %d/dispatch --gpu %d/gpu
+TimeoutStartSec=24min
+ProtectSystem=full
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

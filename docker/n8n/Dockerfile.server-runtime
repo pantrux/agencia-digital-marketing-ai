@@ -1,0 +1,56 @@
+FROM docker.io/library/node:26.12.1-alpine3.24@sha256:65fb44a19eb983bc475aebef8ca3416da172e5b7b0e52418cca100997959ca6e
+
+# Los APK sólo se montan durante la instalación. No quedan en una capa de la imagen.
+RUN --network=none --mount=type=bind,source=apk,target=/runtime-apk,ro \
+    set -eu; \
+    cd /runtime-apk; \
+    sha256sum -c SHA256SUMS; \
+    set -- ./*.apk; \
+    test "$#" -eq 12; \
+    apk verify "$@"; \
+    apk --no-network --repositories-file /dev/null add --simulate "$@"; \
+    apk --no-network --repositories-file /dev/null add "$@"; \
+    apk info -v | sort > /usr/local/share/n8n-runtime-apks.txt; \
+    mkdir -p /home/node/.n8n; \
+    chown 1000:1000 /home/node/.n8n; \
+    chmod 0700 /home/node/.n8n
+
+# npm y npx se usan para administrar paquetes comunitarios.
+RUN --network=none --mount=type=bind,source=npm,target=/runtime-npm,ro \
+    set -eu; \
+    cd /runtime-npm; \
+    sha256sum -c SHA256SUMS; \
+    test "$(npm --version)" = 11.20.0; \
+    test "$(readlink /usr/local/bin/npm)" = ../lib/node_modules/npm/bin/npm-cli.js; \
+    test "$(readlink /usr/local/bin/npx)" = ../lib/node_modules/npm/bin/npx-cli.js; \
+    npm_root=/usr/local/lib/node_modules/npm; \
+    test "$(readlink -f "$npm_root")" = "$npm_root"; \
+    rm -rf -- "$npm_root"; \
+    mkdir -m 0755 "$npm_root"; \
+    tar -xzf npm-11.21.2.tgz --strip-components=1 --no-same-owner -C "$npm_root"
+
+ADD --chown=0:0 application.tar.gz /opt/n8n/
+COPY --chown=0:0 kafka/addon/confluent-kafka-javascript.node /opt/n8n/compiled/node_modules/.pnpm/@confluentinc+kafka-javascript@1.9.1_patch_hash=c597d3e3d9d6d0d33588b7dc1e88d55f270ba15_602b6fdd5199747e8d909d98d456db49/node_modules/@confluentinc/kafka-javascript/build/Release/confluent-kafka-javascript.node
+COPY --chown=0:0 kafka/lib/ /usr/local/lib/
+COPY --chown=0:0 kafka/licenses/ /usr/local/share/licenses/librdkafka/
+
+ENV NODE_ENV=production \
+    N8N_RELEASE_TYPE=stable \
+    SHELL=/bin/sh
+WORKDIR /home/node
+USER 1000:1000
+RUN --network=none --mount=type=bind,source=verify,target=/verify,ro \
+    set -eu; \
+    root=/opt/n8n/compiled; \
+    node "$root/bin/n8n" --version > /tmp/n8n-version; \
+    grep -Fxq 2.46.6 /tmp/n8n-version; \
+    rm /tmp/n8n-version; \
+    node /verify/verify-npm-runtime.cjs; \
+    node /verify/verify-sqlite3-native.cjs "$root/node_modules/sqlite3"; \
+    node /verify/verify-server-native-image.cjs "$root"; \
+    node /verify/verify-quickjs-wasm-sdk.mjs "$root" /verify/quickjs-build.json; \
+    node /verify/verify-kafka-native.cjs "$(node -p 'require("node:path").dirname(require("node:module").createRequire(require("node:module").createRequire(process.argv[1]).resolve("n8n-nodes-base/package.json")).resolve("@confluentinc/kafka-javascript/package.json"))' "$root/package.json")"
+
+EXPOSE 5678/tcp
+ENTRYPOINT ["/usr/local/bin/node", "/opt/n8n/compiled/bin/n8n"]
+CMD ["start"]

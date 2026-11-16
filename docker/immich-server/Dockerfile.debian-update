@@ -1,0 +1,9 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+USER 0:0
+RUN --network=none \
+    --mount=type=bind,source=payload,target=/immich-debs,ro \
+    ["/bin/bash", "/immich-debs/install.sh"]
+
+USER 1000:1000

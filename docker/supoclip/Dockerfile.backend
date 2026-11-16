@@ -1,0 +1,12 @@
+# wolfi es el contexto OCI local linux/amd64 ce3d4630... aprobado para el ensayo.
+FROM wolfi
+USER 0:0
+COPY --chown=0:0 --chmod=0555 assemble_backend.sh backend_runtime.py verify_opencv_expanded.py /opt/supoclip/bin/
+RUN --network=none --mount=type=bind,from=stage,source=.,target=/inputs,ro --mount=type=bind,from=products,source=.,target=/products,ro --mount=type=tmpfs,target=/tmp ["/bin/sh", "/opt/supoclip/bin/assemble_backend.sh"]
+
+USER 1000:1000
+WORKDIR /opt/supoclip/backend
+RUN --network=none --mount=type=tmpfs,target=/tmp ["/usr/bin/python3.12", "-I", "-S", "-B", "/opt/supoclip/bin/backend_runtime.py", "probe"]
+EXPOSE 8000
+ENTRYPOINT ["/usr/bin/python3.12", "-I", "-S", "-B", "/opt/supoclip/bin/backend_runtime.py"]
+CMD ["api"]

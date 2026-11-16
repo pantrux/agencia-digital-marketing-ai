@@ -1,0 +1,8 @@
+# Sin frontend descargado ni RUN: la compilación ya pertenece al SDK aislado.
+FROM pgbase
+LABEL org.opencontainers.image.title="PostgreSQL Immich de la agencia" \
+      org.opencontainers.image.version="16.15-vchord1.1.1-vector0.8.5-sqlite3.54.1-agencia.1" \
+      cl.e-scale.agencia.owner="agencia-digital-marketing-ai:postgres-immich-runtime:v4.1"
+# Los directorios preparados son 0755 y sus archivos 0444, de root.
+COPY --chown=0:0 runtime-root/ /
+USER 70:70

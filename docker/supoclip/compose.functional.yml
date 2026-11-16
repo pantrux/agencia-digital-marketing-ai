@@ -1,0 +1,301 @@
+name: agency-media-supoclip-trial
+
+x-trial: &trial
+  platform: linux/amd64
+  pull_policy: never
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: "no"
+  stop_grace_period: 30s
+  labels:
+    agency.owner: agencia-digital-marketing-ai:supoclip-trial:v1
+  logging:
+    driver: local
+    options: {max-size: "10m", max-file: "2"}
+
+x-node: &node
+  <<: *trial
+  image: ${MEDIA_SUPOCLIP_TRIAL_FRONTEND_IMAGE:?Falta imagen local de Next}
+  user: "1000:1000"
+  cpus: "1.0"
+  mem_limit: 768m
+  memswap_limit: 768m
+  pids_limit: 96
+  entrypoint: [/bin/sh, /run/supoclip/launch-trial.sh]
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,noexec,size=64m,uid=1000,gid=1000,mode=0700
+
+x-python: &python
+  <<: *trial
+  image: ${MEDIA_SUPOCLIP_TRIAL_BACKEND_IMAGE:?Falta imagen local de SupoClip CPU}
+  user: "1000:1000"
+  pids_limit: 128
+  environment:
+    REDIS_HOST: valkey
+    REDIS_PORT: "6379"
+    MAX_VIDEO_UPLOAD_BYTES: "67108864"
+    TMPDIR: /state/temp
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,noexec,size=64m,uid=1000,gid=1000,mode=0700
+
+x-launch: &launch
+  type: bind
+  source: ./launch-trial.sh
+  target: /run/supoclip/launch-trial.sh
+  read_only: true
+  bind: {create_host_path: false}
+
+x-node-db: &node-db
+  type: bind
+  source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/secrets/database-node
+  target: /run/secrets/supoclip-database-node
+  read_only: true
+  bind: {create_host_path: false}
+
+x-backend-db: &backend-db
+  type: bind
+  source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/secrets/database-url
+  target: /run/secrets/supoclip-database-url
+  read_only: true
+  bind: {create_host_path: false}
+
+x-backend-auth: &backend-auth
+  type: bind
+  source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/secrets/backend-auth
+  target: /run/secrets/supoclip-backend-auth
+  read_only: true
+  bind: {create_host_path: false}
+
+x-redis-password: &redis-password
+  type: bind
+  source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/secrets/redis-password
+  target: /run/secrets/supoclip-redis-password
+  read_only: true
+  bind: {create_host_path: false}
+
+x-speaches-token: &speaches-token
+  type: bind
+  source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/secrets/speaches
+  target: /run/secrets/supoclip-speaches
+  read_only: true
+  bind: {create_host_path: false}
+
+x-state: &state
+  type: bind
+  source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/state
+  target: /state
+  bind: {create_host_path: false}
+
+services:
+  postgres:
+    <<: *trial
+    image: ${MEDIA_SUPOCLIP_TRIAL_POSTGRES_IMAGE:?Falta imagen local PostgreSQL}
+    user: "70:70"
+    cpus: "1.0"
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 128
+    shm_size: 128m
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_USER: ${MEDIA_SUPOCLIP_TRIAL_PG_ADMIN:?Falta rol de inicialización propio}
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256 --auth-local=scram-sha-256
+      PGPASSFILE: /run/secrets/postgres_pgpass
+    volumes:
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/postgres
+        target: /var/lib/postgresql/data
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/secrets/postgres-password
+        target: /run/secrets/postgres_password
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/secrets/postgres-pgpass
+        target: /run/secrets/postgres_pgpass
+        read_only: true
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m,uid=70,gid=70,mode=0775
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, 'exec psql -X -q -A -t -w -h 127.0.0.1 -p 5432 -U "$${POSTGRES_USER}" -d postgres --set=ON_ERROR_STOP=1 -c "SELECT 1"']
+      interval: 10s
+      timeout: 4s
+      retries: 4
+      start_period: 40s
+
+  valkey:
+    <<: *trial
+    image: ${MEDIA_SUPOCLIP_TRIAL_VALKEY_IMAGE:?Falta imagen local Valkey}
+    user: "1000:1000"
+    cpus: "0.5"
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    command:
+      - valkey-server
+      - --bind
+      - 0.0.0.0
+      - --protected-mode
+      - "yes"
+      - --port
+      - "6379"
+      - --aclfile
+      - /run/secrets/supoclip-redis-acl
+      - --dir
+      - /data
+      - --save
+      - ""
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 96mb
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - *redis-password
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/secrets/redis-acl
+        target: /run/secrets/supoclip-redis-acl
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/valkey
+        target: /data
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,uid=1000,gid=1000,mode=0700
+    networks: [data]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          REDISCLI_AUTH=$$(cat /run/secrets/supoclip-redis-password) &&
+          test -n "$$REDISCLI_AUTH" && export REDISCLI_AUTH &&
+          exec valkey-cli --no-auth-warning -e -h 127.0.0.1 -p 6379 ping
+      interval: 10s
+      timeout: 4s
+      retries: 4
+
+  migrate:
+    <<: *node
+    image: ${MEDIA_SUPOCLIP_TRIAL_MIGRATE_IMAGE:-${MEDIA_SUPOCLIP_TRIAL_FRONTEND_IMAGE:?Falta imagen local de Prisma}}
+    profiles: [migration]
+    command: [migrate]
+    working_dir: /run/supoclip/prisma
+    volumes:
+      - *launch
+      - *node-db
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_PRISMA_SOURCE:?Falta árbol Prisma Linux fijado}
+        target: /run/supoclip/prisma
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/prisma-bin
+        target: /run/supoclip/prisma-bin
+        read_only: true
+        bind: {create_host_path: false}
+    networks: [data]
+    healthcheck:
+      disable: true
+
+  backend:
+    <<: *python
+    command: [api]
+    cpus: "1.0"
+    mem_limit: 768m
+    memswap_limit: 768m
+    volumes:
+      - *backend-db
+      - *backend-auth
+      - *redis-password
+      - *speaches-token
+      - *state
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/logs/api
+        target: /opt/supoclip/backend/logs
+        bind: {create_host_path: false}
+    networks: [app, data]
+
+  worker:
+    <<: *python
+    command: [worker]
+    cpus: "2.0"
+    mem_limit: 2g
+    memswap_limit: 2g
+    volumes:
+      - *backend-db
+      - *backend-auth
+      - *redis-password
+      - *speaches-token
+      - *state
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/logs/worker
+        target: /opt/supoclip/backend/logs
+        bind: {create_host_path: false}
+    networks:
+      data: {}
+      speaches:
+        gw_priority: 1
+
+  frontend:
+    <<: *node
+    command: [frontend]
+    environment:
+      BETTER_AUTH_URL: http://${MEDIA_SUPOCLIP_TRIAL_HOST:?Falta host del origen compilado}:3080
+      NEXT_PUBLIC_APP_URL: http://${MEDIA_SUPOCLIP_TRIAL_HOST:?Falta host del origen compilado}:3080
+      NEXT_PUBLIC_API_URL: http://${MEDIA_SUPOCLIP_TRIAL_HOST:?Falta host del origen compilado}:3080
+      NEXT_PUBLIC_SELF_HOST: "true"
+      BACKEND_INTERNAL_URL: http://backend:8000
+    volumes:
+      - *launch
+      - *node-db
+      - *backend-auth
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_TRIAL_ROOT:?Falta raíz privada}/secrets/better-auth
+        target: /run/secrets/supoclip-better-auth
+        read_only: true
+        bind: {create_host_path: false}
+    networks: [app, data]
+
+  proxy:
+    <<: *trial
+    image: ${MEDIA_SUPOCLIP_TRIAL_NGINX_IMAGE:?Falta imagen local Nginx}
+    user: "1000:1000"
+    cpus: "0.5"
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 64
+    entrypoint: [/usr/bin/nginx, -e, stderr, -c, /etc/nginx/supoclip.conf]
+    ports:
+      - target: 3080
+        published: "3080"
+        host_ip: ${MEDIA_SUPOCLIP_TRIAL_HOST:?Falta host del origen compilado}
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: ./nginx.functional.conf
+        target: /etc/nginx/supoclip.conf
+        read_only: true
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m,uid=1000,gid=1000,mode=0700
+    networks: [ingress, app]
+
+networks:
+  ingress: {}
+  app: {internal: true}
+  data: {internal: true}
+  speaches:
+    external: true
+    name: ${MEDIA_SUPOCLIP_TRIAL_SPEACHES_NETWORK:?Falta red aprobada de salida Speaches}

@@ -1,0 +1,42 @@
+services:
+  worker:
+    environment:
+      LLM: ollama:qwen-supoclip
+      RERANK_LLM: ollama:qwen-supoclip
+      OLLAMA_BASE_URL: http://127.0.0.1:18963/v1
+      OLLAMA_API_KEY: local-only
+    restart: unless-stopped
+
+  model:
+    image: ${MEDIA_SUPOCLIP_MODEL_IMAGE:?Falta la imagen local de inferencia verificada}
+    platform: linux/amd64
+    pull_policy: never
+    network_mode: service:worker
+    depends_on:
+      worker:
+        condition: service_started
+    command: [serve]
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    init: true
+    cpus: "3.0"
+    mem_limit: 4g
+    memswap_limit: 4g
+    pids_limit: 96
+    stop_grace_period: 30s
+    labels:
+      agency.owner: agencia-digital-marketing-ai:supoclip-local-model:v1
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,uid=1000,gid=1000,mode=0700
+    volumes:
+      - type: bind
+        source: ${MEDIA_SUPOCLIP_MODEL_WEIGHTS:?Falta el GGUF persistente verificado}
+        target: /run/supoclip-model/qwen.gguf
+        read_only: true
+        bind: {create_host_path: false}
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "2"}

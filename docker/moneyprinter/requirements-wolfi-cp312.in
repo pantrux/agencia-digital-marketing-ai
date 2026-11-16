@@ -1,0 +1,26 @@
+# MoneyPrinterTurbo 1.3.9 con overlay Speaches. Linux x86-64, CPython 3.12.16.
+# El manifiesto fija las dos ruedas propias y las restricciones transitivas.
+moviepy==2.2.1+agency1
+streamlit==1.67.0
+starlette==1.3.1
+streamlit-tour==1.1.0
+edge-tts==7.3.1
+fastapi==0.136.3
+uvicorn==0.32.1
+openai==2.24.0
+toml==0.10.2
+imageio-ffmpeg==0.6.0
+loguru==0.7.3
+dashscope==1.20.14
+azure-cognitiveservices-speech==1.41.1
+redis==5.2.0
+python-multipart==0.0.33
+pyyaml==6.0.3
+requests==2.33.1
+packaging==24.2
+socksio==1.0.0
+pydub==0.25.1
+litellm==1.95.0
+google-genai==2.11.0
+pillow==13.0.0
+numpy==2.4.6

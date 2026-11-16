@@ -1,0 +1,11 @@
+[Unit]
+Description=Medición periódica del piloto de Studio
+
+[Timer]
+OnCalendar=*:0/5
+AccuracySec=15s
+Persistent=true
+Unit=agency-studio-delivery-metrics.service
+
+[Install]
+WantedBy=timers.target

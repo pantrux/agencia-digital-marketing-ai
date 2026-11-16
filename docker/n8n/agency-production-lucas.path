@@ -1,0 +1,8 @@
+[Unit]
+Description=Activa a Lucas cuando se registra una escaleta
+
+[Path]
+PathChanged=/var/lib/agency-production-valeria
+
+[Install]
+WantedBy=paths.target

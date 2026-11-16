@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-11-05",
+  "status": "Contratos preparados; instalación y pruebas GPU pendientes",
+  "node_major": 24,
+  "remotion": {
+    "version": "4.0.541",
+    "packages": {
+      "remotion": {
+        "url": "https://registry.npmjs.org/remotion/-/remotion-4.0.541.tgz",
+        "integrity": "sha512-qpXfkMwKk3NJmlUzl6gJYebnMjbweXomna7KRu0EEBFPjxG94x8T0nAbXJmTUT3bHR8XA/edxsa9/HEr0ytA0g==",
+        "sha256": "d180e8639ff9afdae0c1a8e7d24c7ad6aa425003405404c8241abfcb5599910a",
+        "archive": "artifacts/remotion-4.0.541.tgz"
+      },
+      "@remotion/renderer": {
+        "url": "https://registry.npmjs.org/@remotion/renderer/-/renderer-4.0.541.tgz",
+        "integrity": "sha512-HEhx8x5m0YZuTzbBkIKl7iLWSFpRhsuu4UMaiTuqJurRUZ+O+QTn6jYeoawTji8CwLHg1tNwk1D613V32nI7Qg==",
+        "sha256": "8970d09746c72a26055186a41375b4ccd88486491e98bf246937b173e40f8e16",
+        "archive": "artifacts/remotion-renderer-4.0.541.tgz"
+      },
+      "@remotion/bundler": {
+        "url": "https://registry.npmjs.org/@remotion/bundler/-/bundler-4.0.541.tgz",
+        "integrity": "sha512-NR6NYCfSvePA5k7N/RIz0nPl3qA+LoC1liDgiDIef+t1Wa5Y/K3oJ9IGQPR6nxKwtkdq6Q0iGMPwj1feeEaSZw==",
+        "sha256": "8b78edf8d4aed1ab60923a99fe13a7eacb267e4573f82141806173db609120ca",
+        "archive": "artifacts/remotion-bundler-4.0.541.tgz"
+      }
+    }
+  },
+  "browser": {
+    "kind": "chrome-headless-shell",
+    "version": "158.0.8127.2",
+    "variant": "remotion-v3",
+    "platform": "win-x64",
+    "url": "https://remotion.media/chromium-headless-shell-win-x64-158.0.8127.2.zip?clear",
+    "sha256": "58afb19b136b32c36a9b879cedde3d8a05d0f5cfb2e60b6f17b7c0301e10299a",
+    "verified": true,
+    "source": "https://github.com/remotion-dev/remotion/blob/v4.0.541/packages/renderer/src/browser/get-chrome-download-url.ts",
+    "archive": "artifacts/chromium-headless-shell-win-x64-158.0.8127.2.zip",
+    "verification": "SHA256 local del archivo HTTPS fijado; no extraído ni ejecutado"
+  },
+  "ffmpeg": {
+    "version": "9.0.2",
+    "executable_sha256": "589e50b766d251afdf181dd664d40bd94407e200b019989fd7468c7d118a28d0",
+    "ffprobe_sha256": "02264dfa4f56baaa31e443ece8aa16d397f6b008200e7fd184d22b9009e75fd3",
+    "verified": true,
+    "verification": "Hashes de archivos locales; la prueba funcional NVENC todavía está pendiente"
+  },
+  "license": {
+    "eligibility": "Free License: el usuario confirmó que es la única persona de la agencia; no requiere compra",
+    "source": "https://www.remotion.dev/docs/license/faq"
+  }
+}

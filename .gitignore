@@ -1,0 +1,35 @@
+# =============================================================================
+# .gitignore — Agencia Digital de Marketing AI
+# NUNCA commitear archivos con credenciales reales (.env) ni llaves privadas
+# =============================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cred
+*.pfx
+node_modules/
+.wrangler/
+.next/
+dist/
+build/
+__pycache__/
+*.pyc
+.DS_Store
+.tools/
+.ruff_cache/
+.pytest_cache/
+coverage/
+artifacts/
+# Copias de claves locales: nunca publicar en GitHub.
+claves/
+.ssh/
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.ppk
+*.pub
+# Llave pública de firma de APK que usa el ensayo de Alpine.
+!tests/fixtures/alpine-devel-6165ee59.rsa.pub

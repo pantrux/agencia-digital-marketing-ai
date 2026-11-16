@@ -1,0 +1,15 @@
+[Unit]
+Description=Broker loopback de Sofía para el titular
+After=openclaw-gateway.service
+BindsTo=openclaw-gateway.service
+
+[Service]
+Type=simple
+StateDirectory=agency-sofia-broker
+StateDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/bin/python3 -I -S -B %h/.local/share/agency-sofia-broker-v1/sofia_broker.py --hmac-file %h/.local/share/agency-sofia-broker-v1/worker-hmac --owner-profile-file %h/.local/share/agency-sofia-owner-pilot-20261114-v6/profile.json --state-dir %S/agency-sofia-broker
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=45s
+NoNewPrivileges=yes

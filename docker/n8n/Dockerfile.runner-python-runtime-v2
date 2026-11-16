@@ -1,0 +1,12 @@
+# El contexto runnerbase se fija al manifiesto Linux amd64 del runner V1.
+FROM runnerbase
+
+USER 0:0
+RUN --network=none --mount=type=bind,source=verify-runner-python-runtime.py,target=/verify-runner-python-runtime.py,ro \
+    /usr/local/bin/python3.13 -I -B /verify-runner-python-runtime.py remove-build-tools
+
+USER 1000:1000
+RUN --network=none --mount=type=bind,source=verify-runner-python-runtime.py,target=/verify-runner-python-runtime.py,ro \
+    set -eu; \
+    /usr/local/bin/python3.13 -I -B /verify-runner-python-runtime.py verify; \
+    /opt/runners/task-runner-python/.venv/bin/python -I -B -X disable_remote_debug /verify-runner-python-runtime.py verify

@@ -1,0 +1,13 @@
+[Unit]
+Description=Recuperar filtros de observabilidad de la agencia en DSM
+Wants=network-online.target
+After=network-online.target pkgctl-ContainerManager.service
+RequiresMountsFor=/volume2/agency-prometheus-private-v1
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+NoNewPrivileges=yes
+TimeoutStartSec=90s
+ExecStart=/usr/bin/python3 -I -B /volume2/agency-prometheus-private-v1/filter-operator-v1/nas_filter_recover.py recover --profile-sha256 @PROFILE_SHA256@

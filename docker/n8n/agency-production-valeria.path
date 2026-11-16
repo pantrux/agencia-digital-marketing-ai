@@ -1,0 +1,9 @@
+[Unit]
+Description=Activa a Valeria cuando se registra una estrategia o un dictamen
+
+[Path]
+PathChanged=/var/lib/agency-production-mateo
+PathChanged=/var/lib/agency-production-elena
+
+[Install]
+WantedBy=paths.target

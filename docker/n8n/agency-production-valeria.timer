@@ -1,0 +1,10 @@
+[Unit]
+Description=Genera la escaleta visual a partir de los briefs confirmados
+
+[Timer]
+OnBootSec=105s
+OnUnitInactiveSec=45s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

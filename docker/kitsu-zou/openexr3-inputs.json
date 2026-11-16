@@ -1,0 +1,2167 @@
+{
+  "binary_accepted": false,
+  "entries": {
+    "agency/provenance/libdeflate-dev-1.19-r10.spdx.json": {
+      "kind": "file",
+      "member": "var/lib/db/sbom/libdeflate-dev-1.19-r10.spdx.json",
+      "sha256": "196fe81b52c9951b1dd0a06cca00d21b9b9c2c9a2085055819f143717b090732",
+      "size": 5292,
+      "source": "libdeflate-dev"
+    },
+    "agency/provenance/libdeflate-static-1.19-r10.spdx.json": {
+      "kind": "file",
+      "member": "var/lib/db/sbom/libdeflate-static-1.19-r10.spdx.json",
+      "sha256": "af31c2b89718f9fc050088690efd7eb2a43be1dea528452034e124d5f2ac9e5c",
+      "size": 5343,
+      "source": "libdeflate-static"
+    },
+    "agency/provenance/openjph-dev-0.32.0-r0.spdx.json": {
+      "kind": "file",
+      "member": "var/lib/db/sbom/openjph-dev-0.32.0-r0.spdx.json",
+      "sha256": "6a878e1e91cb9af2c734fa17f235b24e2318262799af735c45919c46f6223926",
+      "size": 5279,
+      "source": "openjph-dev"
+    },
+    "usr/include/Imath/ImathBox.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathBox.h",
+      "sha256": "268c81a11d34975ba141f6308f7eb1a50005567d212436f65fef272f3cc1881c",
+      "size": 23720,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathBoxAlgo.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathBoxAlgo.h",
+      "sha256": "895d0a174e9f502d21c46dd64103aef8b4f19e9829227a75d0909b7283608d86",
+      "size": 23386,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathColor.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathColor.h",
+      "sha256": "12749fcab14cfbad2b487779f39c1974016282b0d7ee1edadb90270de3226323",
+      "size": 18953,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathColorAlgo.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathColorAlgo.h",
+      "sha256": "41dbad31b31704b56bd731ad7e1a7b717ab7af8660039807a610189ad84851e3",
+      "size": 7885,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathConfig.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathConfig.h",
+      "sha256": "94c0bbc3e10948a3a91f7b443dfcd6c22df59896b42f038fef1ddfbc429b74ce",
+      "size": 5935,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathEuler.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathEuler.h",
+      "sha256": "054429c66d7cf68c7434be05db0159c2dc8d868203e4660a15206649a70944fc",
+      "size": 27713,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathExport.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathExport.h",
+      "sha256": "5c2f253b5639f87e1156c355fb92f860b2f6bccefd25d6d36f432aec20b556f9",
+      "size": 2261,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathForward.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathForward.h",
+      "sha256": "a8aa97a86d722f1edfb151d127d3648c75e159fcdc1bb50bd4e2f5915b2f6f81",
+      "size": 2291,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathFrame.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathFrame.h",
+      "sha256": "96786bbc754361bb1a038c68c7b1fab1b568b416f82411ffd06928fd3d066a27",
+      "size": 5644,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathFrustum.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathFrustum.h",
+      "sha256": "4953e961aa7420e3e32868120bd6df1f346ef33a6d284f2cc1a420c8c5dd5867",
+      "size": 31191,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathFrustumTest.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathFrustumTest.h",
+      "sha256": "6e1487d0483167740b7b8eb56dde1df9be9d169ae40dc2db13cdf291dba0d8e9",
+      "size": 11800,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathFun.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathFun.h",
+      "sha256": "0080d4b0587a46434945e8e6728a6de5da19b2b071bb9a9de26653f31068f354",
+      "size": 5410,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathGL.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathGL.h",
+      "sha256": "f7131e968b4332feb6e3a356608159326a2c69e620b29e2c6b8d2f16ba732f97",
+      "size": 3878,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathGLU.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathGLU.h",
+      "sha256": "255fddb8175724db0a1740e7d3613816edf442310303d8379e884822abed16d6",
+      "size": 692,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathInt64.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathInt64.h",
+      "sha256": "5341ed509de9856f0ac902cd8f51aaa54d4b523542ff51e2c609a02b025a78fc",
+      "size": 1113,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathInterval.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathInterval.h",
+      "sha256": "efcac4b2d3a1edba0c7c00c98f11719f7b2f8b4adcbb5d80f8949721cb85f22f",
+      "size": 6861,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathLine.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathLine.h",
+      "sha256": "af4c1267933beb07443da1f342d64eb223d7484f2c3b494bc73ac7e404d30c29",
+      "size": 4446,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathLineAlgo.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathLineAlgo.h",
+      "sha256": "074d1f6dd1492b475d9108ab174621f2671e8a2df3650194691a165b5f8f5c5c",
+      "size": 5793,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathMath.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathMath.h",
+      "sha256": "881df04b109c123015ebc64844fba871a132609d155b75c5c1c21ff977f8efd8",
+      "size": 4894,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathMatrix.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathMatrix.h",
+      "sha256": "8f7eeb43f782f600f05675a07a1be0553aa66a22d02bddf0b5f6ea197bae6598",
+      "size": 135634,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathMatrixAlgo.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathMatrixAlgo.h",
+      "sha256": "46fe1e2d8697e9b23fd894e6d1b9162d554e3a8b08d8d6d831cb4837d375d489",
+      "size": 46900,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathNamespace.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathNamespace.h",
+      "sha256": "ea425dd299fe5610c41a922c88f902c9f119dfdf1158fb8cfd069e36bee7ff38",
+      "size": 2984,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathPlane.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathPlane.h",
+      "sha256": "c44b26bbada5df03355f0b3c30f24226f97ab19def70e951b3d212846c2bc4a1",
+      "size": 7134,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathPlatform.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathPlatform.h",
+      "sha256": "b116a009e02c9366fbdee28be81894ee1f14378533f304c7f20e095c2ceb1fd2",
+      "size": 2184,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathQuat.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathQuat.h",
+      "sha256": "f84e406744f45f386028d1a18e3cb6f6100b38cb6e3dcf65f7a506ac74765b92",
+      "size": 27172,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathRandom.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathRandom.h",
+      "sha256": "1c70939fc428d1fbffc93de71e43abf420b9c5e6f064afc80099662109c255bd",
+      "size": 6837,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathRoots.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathRoots.h",
+      "sha256": "f429515665fcc874da64b7e273d9b42e55570f3a241e1b9c9186b84ab81ff454",
+      "size": 5229,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathShear.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathShear.h",
+      "sha256": "cde14fc235b363c4b4c487181aa250c67086b11aa6bd52185c06642985da1f24",
+      "size": 18990,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathSphere.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathSphere.h",
+      "sha256": "9928366b8d2770bfbc40863b060f565d940d4e00beda6d5788928dc674074b63",
+      "size": 3641,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathTypeTraits.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathTypeTraits.h",
+      "sha256": "1fd7fda6e9cc007786111810e2bb55da01f2ae1e8353b892c2b165bc37eac134",
+      "size": 8175,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathVec.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathVec.h",
+      "sha256": "a63a7d441d37cbd7efb9ba007375902199847934e1cdc527cf27ff1e900c825f",
+      "size": 67193,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/ImathVecAlgo.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/ImathVecAlgo.h",
+      "sha256": "f29c8daa4649a97aab67f87a34e55a5e5bf84f773e9e1fff902a8a571f2ae740",
+      "size": 2581,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/half.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/half.h",
+      "sha256": "270139a0a36405338104807f3f772bc8eecfe7ceaaec432162be053e7242b789",
+      "size": 28803,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/halfFunction.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/halfFunction.h",
+      "sha256": "34e69b7ae713e126505575e471df4055f07d6b8d223eed9f8be67d24abc1e742",
+      "size": 3485,
+      "source": "imath-dev"
+    },
+    "usr/include/Imath/halfLimits.h": {
+      "kind": "file",
+      "member": "usr/include/Imath/halfLimits.h",
+      "sha256": "c0b12a6c005418f7160a016f18baacf16c8394113980f62c3baceede92dad76a",
+      "size": 642,
+      "source": "imath-dev"
+    },
+    "usr/include/OpenEXR/Iex.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/Iex.h",
+      "sha256": "f3e0330d8e4bae0214b95989f7fb4daa1d63cb7f3a9b2547919c3f925c25765d",
+      "size": 697,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexBaseExc.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexBaseExc.h",
+      "sha256": "a1f31977d01a7c606f1ececba38f5ee64ab1f8f921d4a921d9020dbb5874bd11",
+      "size": 9699,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexConfig.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexConfig.h",
+      "sha256": "73fbc209084e2dd38437ce9c603efef4d132d2bf381fdc02137b7a8aab1cf776",
+      "size": 646,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexErrnoExc.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexErrnoExc.h",
+      "sha256": "de4e8fcaa9931587393ba12d42c09e161dc0a9a77e871973e776471d278159c2",
+      "size": 8324,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexExport.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexExport.h",
+      "sha256": "ee770e15bc33fc6477e80d6dd620b8152c1bd3db64d6303808a9ce9aa5647021",
+      "size": 936,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexForward.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexForward.h",
+      "sha256": "cd15c411b0081c8568e203deb89fc229f2b2a3b7c7336274728fcb20c17d1494",
+      "size": 3526,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexMacros.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexMacros.h",
+      "sha256": "8254f62739dac5ea101069ce38d941511ffefe17f394d7c2f85ed42353876171",
+      "size": 5103,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexMathExc.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexMathExc.h",
+      "sha256": "28d376b1190211d6e82aa9b5e2320b798650870066f2458f0181fb4933f2ebdc",
+      "size": 842,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexMathFloatExc.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexMathFloatExc.h",
+      "sha256": "227b68d52edb70dd5b960b019a7ac3b32b525e132583190ef338a5d555320615",
+      "size": 2644,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexMathIeeeExc.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexMathIeeeExc.h",
+      "sha256": "22903861919d298453972fccb2d7f932699457668d26bdc178f2a9f3232854cb",
+      "size": 696,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexNamespace.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexNamespace.h",
+      "sha256": "3c5380dce1587f8134dccbc7f43118849ff4a6dd044e9549aba7c5636f879b1b",
+      "size": 2885,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IexThrowErrnoExc.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IexThrowErrnoExc.h",
+      "sha256": "cc64f45343d9ea91c68acdbd9541d8da1f7b57ef9f8ac7dd986902cf1ed70295",
+      "size": 1778,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IlmThread.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IlmThread.h",
+      "sha256": "e4741a38c9a7032bbc99323126c527187b766c3e9857f01d5719ba4961c66445",
+      "size": 3302,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IlmThreadConfig.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IlmThreadConfig.h",
+      "sha256": "7c49d490146bb0c53d1a76798baee4aac5ddab5a8b3ace7313559e13362df7ba",
+      "size": 1155,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IlmThreadExport.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IlmThreadExport.h",
+      "sha256": "00238b09bef528a1a8985108c69b14d66e2c62617a76270f0b7d22421f72d66b",
+      "size": 1152,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IlmThreadForward.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IlmThreadForward.h",
+      "sha256": "d22bd95e71560653f31dfa2cba8a1fb72338fdeb2ad7d82b34cf224f5a4a369f",
+      "size": 606,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IlmThreadMutex.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IlmThreadMutex.h",
+      "sha256": "aa07e599b032bad2887fd9d9c67428fe1e23ce2c9169d0fd30c9498f48339c16",
+      "size": 1869,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IlmThreadNamespace.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IlmThreadNamespace.h",
+      "sha256": "805747105ba8723e6fcd1e2b86c241a05e6ebbd76948b7cb68492cf1564c934d",
+      "size": 3118,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IlmThreadPool.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IlmThreadPool.h",
+      "sha256": "2404497a39e51873f61b80726e2714d685ef734d285868e9159630a342f1a9c5",
+      "size": 7169,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IlmThreadProcessGroup.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IlmThreadProcessGroup.h",
+      "sha256": "01857406559d60c64d40a1c4f53aeab3e89652ff560cbc074655f11d3212fc8e",
+      "size": 4197,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/IlmThreadSemaphore.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/IlmThreadSemaphore.h",
+      "sha256": "5301e80e9701e20c3d95c985626178af98580f879cefe45231e1e2dfa51b83e5",
+      "size": 2889,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfAcesFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfAcesFile.h",
+      "sha256": "9ce55c79a21f7016c8b4d062d5cd543cbaa576e36e3780fed29a9562a8b581ec",
+      "size": 10058,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfArray.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfArray.h",
+      "sha256": "893d9898829353f5f9af7fbdc851f97281d0f253090e41dda7ed7bfcffd7698b",
+      "size": 6742,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfAttribute.h",
+      "sha256": "d72b0f1610aba5c9cb9439f0ac782cc309fa5a04f7e812a21ddf8b839767fa4f",
+      "size": 10098,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfBoxAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfBoxAttribute.h",
+      "sha256": "29c5dfab31748bce170477ccea381694ef9666660274978a3e4a9d83dafdc4af",
+      "size": 950,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfBytesAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfBytesAttribute.h",
+      "sha256": "272b7ba721afa9e72d23ca06810f44a7b3f5f1826931ea9adf3e47e7dd59efec",
+      "size": 3848,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfCRgbaFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfCRgbaFile.h",
+      "sha256": "5fda0c1ce7039902af43e07bcd5ea5fb09aafa8873c257d57f5beb9b20c29f21",
+      "size": 10949,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfChannelList.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfChannelList.h",
+      "sha256": "078992be9aea7978c7f8ecf570eeb3c6d4189d81fc8609d7660edfff43e47e3c",
+      "size": 13450,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfChannelListAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfChannelListAttribute.h",
+      "sha256": "edca7b0645121f98bb7dcf192a4e6275f1b0559c176c0c77fe28eb1e92a0cff8",
+      "size": 855,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfCheckFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfCheckFile.h",
+      "sha256": "3ed160af6d0b98081d0fc65e1e767f0837c28d549512ba94d44ea56056dc4ce0",
+      "size": 1685,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfChromaticities.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfChromaticities.h",
+      "sha256": "393fd71802b979196f1b7b9c2bbacce9f2dec601a40d0c6c36f067b7b49b431f",
+      "size": 4551,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfChromaticitiesAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfChromaticitiesAttribute.h",
+      "sha256": "5f28666e5f3a0fb5f0a22f6e20857eaec6dd3fb24cb2ebb81313f5072bbbdc00",
+      "size": 826,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfColorMetadata.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfColorMetadata.h",
+      "sha256": "33102dd43e5c6249ee035376c4b88bf64b24e8c8f8b89a9e7d903d19e34ca1b5",
+      "size": 4519,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfCompositeDeepScanLine.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfCompositeDeepScanLine.h",
+      "sha256": "2896309507b9bfdc8af27dabb84dfaef2c68b3d892f4be5ac00793cb641064cd",
+      "size": 4428,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfCompression.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfCompression.h",
+      "sha256": "2452fb629017fe8ef947ec2843b2b3deb05e6560655e47949a5cf59ad8a13a26",
+      "size": 3210,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfCompressionAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfCompressionAttribute.h",
+      "sha256": "46f3052241d3acdb57f016addb037fc0061c3ca7cf91538f4802a5055542ba16",
+      "size": 802,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfCompressor.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfCompressor.h",
+      "sha256": "506664f743fd4e0f20917786fd9d56c75018b0f54d7f6118f1fa1935c2bc3e52",
+      "size": 8819,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfContext.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfContext.h",
+      "sha256": "c0d326daa7356e2f505221419ea01c7529cb55be470754427529203af17928e1",
+      "size": 2943,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfContextInit.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfContextInit.h",
+      "sha256": "3541e50c9fc93c500f2c4086fc7168b7c62f88d94dcaff62de8b70ff45e39504",
+      "size": 4455,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfConvert.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfConvert.h",
+      "sha256": "433a8c41dbb739c3cf4d6277d724aa7ce00ce29c11d3d31fefc30c6c1ff3b433",
+      "size": 1776,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepCompositing.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepCompositing.h",
+      "sha256": "98586872ee51ca35e4c313a2665e641e5662e1489e1c5cf2f746f71e105d7e66",
+      "size": 4014,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepFrameBuffer.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepFrameBuffer.h",
+      "sha256": "a10e8f9e055f32a2ed87ebcbba963f5989544ce16474c0085b698355545afc43",
+      "size": 7236,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepImage.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepImage.h",
+      "sha256": "0deffa97e664f2f6fd8e5f3d0ef04506cf07ca75a76b76123c331c03898f2c13",
+      "size": 1729,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepImageChannel.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepImageChannel.h",
+      "sha256": "bc904b47adeb55540b5ce14a5ca6167d8c4a4e77825d87d80af6dc38248d53e3",
+      "size": 7966,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepImageIO.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepImageIO.h",
+      "sha256": "f8ff581eba53a12afbcd419752aa4ad871941c4af36e0e908b48b83cb74e6979",
+      "size": 5450,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepImageLevel.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepImageLevel.h",
+      "sha256": "d78f95e79acc833cb236e966bda80e0907d681a876d2cfa4bce9a173fd3c89fd",
+      "size": 9613,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepImageState.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepImageState.h",
+      "sha256": "3d14bb7ef7b51619df744033b92319d5f4cff0f14030a8b71b53471f633946de",
+      "size": 2112,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepImageStateAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepImageStateAttribute.h",
+      "sha256": "c58f89c790b8c86a15853bb3c579e2d6bc90e2f4134ca8d7cb8b144bad0a2071",
+      "size": 851,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepScanLineInputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepScanLineInputFile.h",
+      "sha256": "ce4819b158c3a08f5edb6134b9880a7ad2ce777223687d6e399168aeb0ad7849",
+      "size": 9254,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepScanLineInputPart.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepScanLineInputPart.h",
+      "sha256": "e0182c83c3fc197e17819467ef93230845918dc66bb6b26a112b94ef03a36f06",
+      "size": 5092,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepScanLineOutputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepScanLineOutputFile.h",
+      "sha256": "8d93c042fbe1767480cb209dfed40fe5f51ba0eced4142fef639ca78f07cca27",
+      "size": 8154,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepScanLineOutputPart.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepScanLineOutputPart.h",
+      "sha256": "d27b935da609b47e694c50228a5612db025e0c5e39faa398c2222dd523380769",
+      "size": 4888,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepTiledInputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepTiledInputFile.h",
+      "sha256": "89f505daba90dc9c0b07e0c8ce56d8e65f9315fbdc97b91b580f8ac05ce853da",
+      "size": 13754,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepTiledInputPart.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepTiledInputPart.h",
+      "sha256": "6f92fa3401f71b9b8992415f613603c7407220948937bb0a928d62ea76f66516",
+      "size": 11552,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepTiledOutputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepTiledOutputFile.h",
+      "sha256": "984abef20d94f4877fb83c962639777fe8d719fd9873bbaacb95ed1c7757daf0",
+      "size": 16644,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDeepTiledOutputPart.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDeepTiledOutputPart.h",
+      "sha256": "0f370a4dce9df143a393710d114718a3791dc9e2b58e10d8b72efe3d91fa26a7",
+      "size": 13270,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfDoubleAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfDoubleAttribute.h",
+      "sha256": "1a2aeb5073e2045479c9519f7ad2b10713b5f144a288cff9f0c089c9e7ff7108",
+      "size": 690,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfEnvmap.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfEnvmap.h",
+      "sha256": "3557d1b0ccfb08caacb25ec973be040f4e6a882ef3276b51fc5339a3b2278c31",
+      "size": 9662,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfEnvmapAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfEnvmapAttribute.h",
+      "sha256": "9f0f1b52246043b661db549c385bdead1a37778c367325993f2bf1d46128ab63",
+      "size": 781,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfExport.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfExport.h",
+      "sha256": "55d7d48c2c709525dd9680c62a2cbfddd7ca81b4349262a93e20d4992665fb8e",
+      "size": 2194,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfFlatImage.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfFlatImage.h",
+      "sha256": "c660df3548ca9ee301de97b269523049389a29be103298ceeaa059e4a0b76160",
+      "size": 1725,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfFlatImageChannel.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfFlatImageChannel.h",
+      "sha256": "b62cf6ae9ad36b9d048c1d6d317af8841c56a23e1241a37cf80910af5e078339",
+      "size": 6245,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfFlatImageIO.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfFlatImageIO.h",
+      "sha256": "05eadc187dbdcaaa0051cecff84a708521e9e5df98e5c5506ae8d2bdf2649a10",
+      "size": 5424,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfFlatImageLevel.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfFlatImageLevel.h",
+      "sha256": "e8d2a2f3a0047e08ad23fb38ef2467cb626da97fad657c9a93b6f25fb477d476",
+      "size": 8615,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfFloatAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfFloatAttribute.h",
+      "sha256": "f6ca257294ccd6ad4484e468c0b25f9fcb7dc168b57184dde955c414a7ee2e46",
+      "size": 710,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfFloatVectorAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfFloatVectorAttribute.h",
+      "sha256": "0a58f8829dbd92035356d59a30096289f8cb702696c57e0cce4356d204446719",
+      "size": 871,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfForward.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfForward.h",
+      "sha256": "1ab3d566544a45a9ce406ac0370f5e9cc5e96d1bc711386e88750428fb35d09a",
+      "size": 2821,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfFrameBuffer.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfFrameBuffer.h",
+      "sha256": "346d0e4ab4755657b1f662bb591c1bee92854770d45850686fa5817cda15963b",
+      "size": 9800,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfFramesPerSecond.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfFramesPerSecond.h",
+      "sha256": "c10bb4773fc0b3eee4ceb4345ffa7fe9aea8551638dc633070318b596d23bbb9",
+      "size": 2248,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfGenericInputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfGenericInputFile.h",
+      "sha256": "6d7b9fb830b11456bbedce5e4958ba4912292a0bb1b6f6ce885bc6554fe0ad9e",
+      "size": 594,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfGenericOutputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfGenericOutputFile.h",
+      "sha256": "8a270e49332a0c6d331e3b224bd64f936909427a820506d7cb63098ec47666ec",
+      "size": 832,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfHTCompressor.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfHTCompressor.h",
+      "sha256": "01aa053690f5b1a4fd6436aaabff16605f78f85a8e8fcf3ed3396abb1e99f3ec",
+      "size": 999,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfHeader.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfHeader.h",
+      "sha256": "5d45971424f5120b4b07073625baad89f767de2b8ad452ebf83bc9bac8f2e94e",
+      "size": 20144,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfHuf.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfHuf.h",
+      "sha256": "61d7dfbd1e13dbd4fdc0f00be6c7269edfe48c6ba1cb90ef603f5b8c12f38e5c",
+      "size": 1285,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfIDManifest.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfIDManifest.h",
+      "sha256": "1cb7981ee1740ca464361040a8624815839493f65ba91a6b110ccda5f3a97ce7",
+      "size": 14297,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfIDManifestAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfIDManifestAttribute.h",
+      "sha256": "12cddedd4ba650e471512fd56c61d093dc9a9d4a41d061efbc8d8844b0e551ec",
+      "size": 816,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfIO.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfIO.h",
+      "sha256": "459a15a7b9c501f57d9a1d337af38b55747ab9188ec890a37e2732a44c71a38e",
+      "size": 8524,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfImage.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfImage.h",
+      "sha256": "c39bd2327c7586c77e65cbbf145d2037a7bb71e602d07527050c346a84a591d8",
+      "size": 11909,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfImageChannel.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfImageChannel.h",
+      "sha256": "372c8e8a95604bd448a6aeb35e38509504cdd92d147607488f6fed344d9b1a21",
+      "size": 2763,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfImageChannelRenaming.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfImageChannelRenaming.h",
+      "sha256": "64348a094d59aecd48f099958a8b15aed7e093a5292b5b4fbd68804350af7254",
+      "size": 1475,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfImageDataWindow.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfImageDataWindow.h",
+      "sha256": "087cb3fe549e7accf806e8a6402dc0dc31e318f2fa5d199dde5be76b76ef0d66",
+      "size": 1115,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfImageIO.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfImageIO.h",
+      "sha256": "5be445fa07f5e445f40a4f6e2365c5aa87b5e1c9eaf39ca1e00264ad1e8a6e7d",
+      "size": 2607,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfImageLevel.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfImageLevel.h",
+      "sha256": "ac9433a290f7151da81a61eb59a65ca0c87c6edf717e0781d1afb593f5281aba",
+      "size": 2584,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfInputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfInputFile.h",
+      "sha256": "ca508ab94338268762e8129cd8d01782956d674ee7a3e18131e083f09dcce74b",
+      "size": 10786,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfInputPart.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfInputPart.h",
+      "sha256": "b2209c157e3a144b8c5544f9156daa35d3503480a4f2ff733c6e3616c9adc601",
+      "size": 1914,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfInt64.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfInt64.h",
+      "sha256": "57f83047c8c84ca5054c8c4d0989fd927de513b18fd183845999aed983fa4433",
+      "size": 769,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfIntAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfIntAttribute.h",
+      "sha256": "f11e54d65d71d5a9af5ecaf851dd2d24bf8117e9e1ee1f1cdd49eb3e3c27afec",
+      "size": 696,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfKeyCode.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfKeyCode.h",
+      "sha256": "18c38118915da87c47b13ddfb8bf15adb82bd189a94b8cf630742317326dc5fd",
+      "size": 3689,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfKeyCodeAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfKeyCodeAttribute.h",
+      "sha256": "2a7a5ad1acbd55cad39a04918795b8fc207c8c1f353921cda2a4e6c61d9aaf12",
+      "size": 823,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfLineOrder.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfLineOrder.h",
+      "sha256": "f29dfe20f30146943bda31a74f73932493664c178898af1d8ca3f1d1013f6848",
+      "size": 824,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfLineOrderAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfLineOrderAttribute.h",
+      "sha256": "228f6ef688c89561c4e364caf58b0b24759e1b0117a4819ac6f95815b31c64a3",
+      "size": 839,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfLut.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfLut.h",
+      "sha256": "bc443d556cc9614996fab5212ab70755fe581e60f24748d5849dba9014906259",
+      "size": 3798,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfMatrixAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfMatrixAttribute.h",
+      "sha256": "98a94f2093cca563fcddcd24173b6fa8c58b3227227832703d1d0e3f4403b4d6",
+      "size": 1541,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfMisc.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfMisc.h",
+      "sha256": "c0479d2abc1a634cabbc3aae253c47b106f9c5714c59ec469a49c8a8667c03d7",
+      "size": 14818,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfMultiPartInputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfMultiPartInputFile.h",
+      "sha256": "19ea88f4fa091395d0370cdb77852e40a9ba2e2bf1f43dc48b07eed7a4ad458b",
+      "size": 3607,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfMultiPartOutputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfMultiPartOutputFile.h",
+      "sha256": "a510e94c7d2271448e9df3b1118b1648f990b1b1aacf98b98908420dccc7075f",
+      "size": 2735,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfMultiView.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfMultiView.h",
+      "sha256": "917f20336bace29c0fe0a38fdf87988df6b5bdfc61ad986c026e0f2a5973c225",
+      "size": 4551,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfName.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfName.h",
+      "sha256": "2666de613d43c17eb42f4967aadb0110cec8302750167c774b7c4ebd5f121132",
+      "size": 2740,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfNamespace.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfNamespace.h",
+      "sha256": "92510bdc014fe38726cba6f9016483059649383b2dcd54553f93a4173c617bf0",
+      "size": 3021,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfOpaqueAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfOpaqueAttribute.h",
+      "sha256": "8695ecdba2fd0ac0e02173b173e9bd26b6328879a6fc6a3f44da230823ff4cda",
+      "size": 2298,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfOutputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfOutputFile.h",
+      "sha256": "b046bae290b594fb42dbba6a66174b9c042e80ef379aba69d97150b92d2764a8",
+      "size": 8471,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfOutputPart.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfOutputPart.h",
+      "sha256": "240bbe1cc554cd64bd6874181291c09a3969a8584b2fc41794ff4b2a818a8491",
+      "size": 1293,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfPartHelper.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfPartHelper.h",
+      "sha256": "d44b3ecadcbd756e0c526e49976e37ae5a46acd797de9e85f1ae2bdc5666c81c",
+      "size": 7224,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfPartType.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfPartType.h",
+      "sha256": "5a56eab28e4bdbaa62c16858d0ac254e01d2afa903fae12ad42bdeedb05450c9",
+      "size": 778,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfPixelType.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfPixelType.h",
+      "sha256": "3f71ded7b7475ddf93349a1abaff34e315f48abcf7a5a025bae78f0f599f9bd8",
+      "size": 729,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfPreviewImage.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfPreviewImage.h",
+      "sha256": "363f537648468cff61cf94ed9ffbb5efdb93116b36beafa6c0db53395927b7cf",
+      "size": 3395,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfPreviewImageAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfPreviewImageAttribute.h",
+      "sha256": "2b15c8c4e60f0ecc769c487caec601421ca473895644a12ee0e33a0e0d16f813",
+      "size": 863,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfRational.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfRational.h",
+      "sha256": "7a61cb806b0e11e4117a8e45c465f2fb92a333c76d87ad3fe75664a5dea5c1e8",
+      "size": 1569,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfRationalAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfRationalAttribute.h",
+      "sha256": "05185d5b05c4720deeb7c4b1779c19f08704c147eae0153b99922e8955798a11",
+      "size": 778,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfRgba.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfRgba.h",
+      "sha256": "51d799fff34e749dd2dec0810890956bf7339e130aed90691b552cf85cf9d79f",
+      "size": 1328,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfRgbaFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfRgbaFile.h",
+      "sha256": "144ecc8592c5373d88b43b0ece22d29701bdf24473bf77030e04f06f42cb4a89",
+      "size": 14969,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfRgbaYca.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfRgbaYca.h",
+      "sha256": "9265f610979c0faab3a8a285633896649b6ce8a21481e1337f1442a8fd5a766d",
+      "size": 6727,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfSampleCountChannel.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfSampleCountChannel.h",
+      "sha256": "48db1297d802a1c65ed6d67215c099b7bfcf134338bfe1d45acd2da680bff561",
+      "size": 10191,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfStandardAttributes.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfStandardAttributes.h",
+      "sha256": "ff9a51c9a513108b631429e54583469e0c38a50320845683a19a3cef1b40775c",
+      "size": 28892,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfStdIO.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfStdIO.h",
+      "sha256": "0bb795988bd64d3ec6f7638081730815b934c3ebb65332a3cfdacb16e6c1201a",
+      "size": 5519,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfStringAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfStringAttribute.h",
+      "sha256": "e6170d8773bfaa6f34db6b917752f0769618b7621ba80adeb15d16e6b3cb29c1",
+      "size": 746,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfStringVectorAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfStringVectorAttribute.h",
+      "sha256": "fbc76e1086949f0d2b39a67d982b4f01496d096b78c6d7bfb0378d5dd87babb3",
+      "size": 938,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTestFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTestFile.h",
+      "sha256": "941890a2bc4342c0c6f4d2206af1641d2adafe93ddd2b8f29c799920c4f8a9a6",
+      "size": 1608,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfThreading.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfThreading.h",
+      "sha256": "b9dac77475035572a8b50d36cc06be8d39d2f6cd3a7dd08c8d0c4bf0630cfb63",
+      "size": 2637,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTileDescription.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTileDescription.h",
+      "sha256": "419b4c999cc25e28fc9a0035f25b67e97eadaf14312893fce013f96358dfd3d0",
+      "size": 1568,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTileDescriptionAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTileDescriptionAttribute.h",
+      "sha256": "bcc87115fd5cd9affd8c81563e5497361ea8c676ee4de02a702dd3d133609ff9",
+      "size": 884,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTiledInputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTiledInputFile.h",
+      "sha256": "a1c4d2f3b779d5ceaec9902d7bcc73290cff625224b8fb50a8710deb696bb3d6",
+      "size": 12405,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTiledInputPart.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTiledInputPart.h",
+      "sha256": "85b784b6eef558ad7373b24c888b4e9d93661d290350fb63f86e346f53faf984",
+      "size": 2733,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTiledOutputFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTiledOutputFile.h",
+      "sha256": "f8f5999dcb8e7081d5785e2a1276f0ae9456aaa7d5a3f81602c078e11142fa22",
+      "size": 16985,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTiledOutputPart.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTiledOutputPart.h",
+      "sha256": "59e6b454cbcd1e83a9acc315adb4d34ab49b1b8df1f8bc512604a1b026ae2b14",
+      "size": 2729,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTiledRgbaFile.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTiledRgbaFile.h",
+      "sha256": "a1145eaed436a3c95f96c5d0f5ad0561bc1960b094e823e49ecfed18109918a6",
+      "size": 17228,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTimeCode.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTimeCode.h",
+      "sha256": "e01eeaae5a99b18ef9a29004f589bd660cb22ff4434833236b3ab7777f6a32f2",
+      "size": 6054,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfTimeCodeAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfTimeCodeAttribute.h",
+      "sha256": "be7ff25c23cdb7f32b6b0be29b13e93452589d5a25dfe46c78ea1582cbc1ec01",
+      "size": 830,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfUtilExport.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfUtilExport.h",
+      "sha256": "d6f4706021e2ce596787bdf0c15fceff0a26b1cff3625cbb708d528f1c3ac7f5",
+      "size": 2157,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfVecAttribute.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfVecAttribute.h",
+      "sha256": "5e3439b9069a9f07895e887a7f31cffd915d9f8586faa2c917cd03289385f6c6",
+      "size": 1912,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfVersion.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfVersion.h",
+      "sha256": "c8222c346f714407e63791eddee48b76e69fa9b767ebf96f96f7758a7869383b",
+      "size": 2995,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfWav.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfWav.h",
+      "sha256": "de43721b9ecc75325e3ea15c2c405776cc6734c95bce2f1ef103ab9561f54faf",
+      "size": 1140,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/ImfXdr.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/ImfXdr.h",
+      "sha256": "e5305600925ad11011bdb9b0eb65f9c6f65cbc7676058c45c3f64c83b5ae8d95",
+      "size": 15244,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/OpenEXRConfig.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/OpenEXRConfig.h",
+      "sha256": "267cc4080b07c3a15febcffc2395ed1ba6d2558d20e5b1c23d57f9324953ccd3",
+      "size": 6869,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr.h",
+      "sha256": "91cd41fc6aaee4e34e9b96bace107820e43d22eeb11c85670cc65e038a873dcf",
+      "size": 556,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_attr.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_attr.h",
+      "sha256": "0941d52600ef8373a25514dc18f3a4c8fe45eb6f5f96ac76ac15b526a4496ac8",
+      "size": 17819,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_base.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_base.h",
+      "sha256": "5a7f843fea5c7699850cdd7c0a35176a76b47cef99c58cea7b9405de09ea60d7",
+      "size": 7442,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_chunkio.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_chunkio.h",
+      "sha256": "092768e246279b59d6e3008c184e377123c0e8b908dcdfce252463052b9a5c41",
+      "size": 5789,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_coding.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_coding.h",
+      "sha256": "ab3d8a0b0b9831c728f5a094c74ecb5168a0af6c6f6e29fea4e925ab073cc047",
+      "size": 4421,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_color_metadata.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_color_metadata.h",
+      "sha256": "8dc9abe1cc692d0d463895e814403ac163f4b5edaa260534ebe7f16accf27e25",
+      "size": 9643,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_compression.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_compression.h",
+      "sha256": "a99f375f19c66da2be9d2fe26d9f1237244bfb4202c96af2857e7e0525b3ae63",
+      "size": 4577,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_config.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_config.h",
+      "sha256": "522c070924cd32b08be7370fe5d476a735a249546e63d32c81bfd695e3d5ddb6",
+      "size": 1196,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_context.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_context.h",
+      "sha256": "04f4f2cd865b69ca2e941a74e8507db3f0785375b15a290806f68b8605cef974",
+      "size": 22565,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_debug.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_debug.h",
+      "sha256": "b887e027b84267871b27c0ff5c8a54b9068f891e70be5bb9175568e39b569641",
+      "size": 480,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_decode.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_decode.h",
+      "sha256": "c01d6529a7b509b71ca68633888103f6816fd5376bd806c39f8121f0397f0904",
+      "size": 13346,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_encode.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_encode.h",
+      "sha256": "f67e6cc08cd10d9d0a09ab3ba4b451b212593bd83e0a0c9416069193657967f7",
+      "size": 12803,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_errors.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_errors.h",
+      "sha256": "1d8b514e0c47209a56563b1dd72d59b6d2827643c1f0181892c180d1612f1880",
+      "size": 2376,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_part.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_part.h",
+      "sha256": "6301e79f8fedcb2c85f0e41c8fe5806e4283de3b2285861b522176b09f6f7f2e",
+      "size": 31212,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_std_attr.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_std_attr.h",
+      "sha256": "56585b3f0e015c8a326e6d098d21e5b1a338f7bf557098fbba7b8ca7ea337fcf",
+      "size": 879,
+      "source": "openexr-dev"
+    },
+    "usr/include/OpenEXR/openexr_version.h": {
+      "kind": "file",
+      "member": "usr/include/OpenEXR/openexr_version.h",
+      "sha256": "1a07ba8bc71ff7080050e40469e6dabe3d8a41d08998acba8d9a1abdc9963b2b",
+      "size": 425,
+      "source": "openexr-dev"
+    },
+    "usr/include/libdeflate.h": {
+      "kind": "file",
+      "member": "usr/include/libdeflate.h",
+      "sha256": "627d6418a1ba704da808d675639f27d09cee609678788a16b89a819cd2c7299d",
+      "size": 17098,
+      "source": "libdeflate-dev"
+    },
+    "usr/include/openjph/ojph_arch.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_arch.h",
+      "sha256": "5daed44e698cf71bab377cf66e9c559267054e04ec6e5dec3816c5c8dc358487",
+      "size": 16879,
+      "source": "openjph-dev"
+    },
+    "usr/include/openjph/ojph_arg.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_arg.h",
+      "sha256": "cdb40fba261b621d3b582c646e020b0d60c26391bf86ba9fa20c30dd1719377d",
+      "size": 8808,
+      "source": "openjph-dev"
+    },
+    "usr/include/openjph/ojph_base.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_base.h",
+      "sha256": "c096ac696e18f11971fc9436363aedce27c23f4a4491753d3f2ce8c7deaceca3",
+      "size": 2891,
+      "source": "openjph-dev"
+    },
+    "usr/include/openjph/ojph_codestream.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_codestream.h",
+      "sha256": "b4793dc3aa15c45ccc4fc46334aea1057f1c16ccd0ce7fa4d5182c66d6c82682",
+      "size": 15640,
+      "source": "openjph-dev"
+    },
+    "usr/include/openjph/ojph_defs.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_defs.h",
+      "sha256": "3c93de27665c314635be569d527d1fd5e9653ad91585e637bdc4409c1d7e3adc",
+      "size": 3256,
+      "source": "openjph-dev"
+    },
+    "usr/include/openjph/ojph_file.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_file.h",
+      "sha256": "6d5bc480982a12093f94643fb93336b149780fa41a1a4a47ff13bd6bfdbda88d",
+      "size": 10908,
+      "source": "openjph-dev"
+    },
+    "usr/include/openjph/ojph_mem.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_mem.h",
+      "sha256": "42f4cdba5e6c890700afda9bd7c33427fbf8a2f3e77c2635d29439746fcac4eb",
+      "size": 8798,
+      "source": "openjph-dev"
+    },
+    "usr/include/openjph/ojph_message.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_message.h",
+      "sha256": "ecf8b79547dcf1f5124741c3df57233d39ecf4b0e926c1ddab11795d18f56e33",
+      "size": 11319,
+      "source": "openjph-dev"
+    },
+    "usr/include/openjph/ojph_params.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_params.h",
+      "sha256": "4c1e56f81031d0cadb81cd117591666ab74fb28e04debd3774a0ce4589263d86",
+      "size": 17398,
+      "source": "openjph-dev"
+    },
+    "usr/include/openjph/ojph_version.h": {
+      "kind": "file",
+      "member": "usr/include/openjph/ojph_version.h",
+      "sha256": "f6937e4f728237b0df5f429af937a8f1f0dcf076fde6a66067696ebb83f32ce6",
+      "size": 1962,
+      "source": "openjph-dev"
+    },
+    "usr/lib/cmake/Imath/ImathConfig.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/Imath/ImathConfig.cmake",
+      "sha256": "218f64b76126554cd47898dd46d28cab8d86e675a35961dce1dae8656d434641",
+      "size": 2074,
+      "source": "imath-dev"
+    },
+    "usr/lib/cmake/Imath/ImathConfigVersion.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/Imath/ImathConfigVersion.cmake",
+      "sha256": "4e7e5006ccdf64080e1825839ade54efb3a96bbdd638170ca60ae402304d5db3",
+      "size": 2762,
+      "source": "imath-dev"
+    },
+    "usr/lib/cmake/Imath/ImathTargets-release.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/Imath/ImathTargets-release.cmake",
+      "sha256": "3b0f7abb7ccf5cf01aefe9d775c426d59cbae24037d92568a9fff069132e4752",
+      "size": 856,
+      "source": "imath-dev"
+    },
+    "usr/lib/cmake/Imath/ImathTargets.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/Imath/ImathTargets.cmake",
+      "sha256": "8c67a72d7228c8ec552f3b74a4f5a9bac32389b8fbf7c93b298438e14d456761",
+      "size": 4937,
+      "source": "imath-dev"
+    },
+    "usr/lib/cmake/OpenEXR/OpenEXRConfig.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/OpenEXR/OpenEXRConfig.cmake",
+      "sha256": "e9fb7dd012d425a5ad3e0b41860c16cf0970a57a729aac46e25f3d4aa386fb48",
+      "size": 2568,
+      "source": "openexr-dev"
+    },
+    "usr/lib/cmake/OpenEXR/OpenEXRConfigVersion.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/OpenEXR/OpenEXRConfigVersion.cmake",
+      "sha256": "a7f888bfe533f95bfbc7165a1385cb2d0124a24431fc6be8f2f2c70bde75733e",
+      "size": 2762,
+      "source": "openexr-dev"
+    },
+    "usr/lib/cmake/OpenEXR/OpenEXRTargets-release.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/OpenEXR/OpenEXRTargets-release.cmake",
+      "sha256": "45b3d8b421ef2721b0c2853ee440a4e7afbeccd245088586f8efbd88cfe64147",
+      "size": 3030,
+      "source": "openexr-dev"
+    },
+    "usr/lib/cmake/OpenEXR/OpenEXRTargets.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/OpenEXR/OpenEXRTargets.cmake",
+      "sha256": "27c16352b1f6a3f1ba62b398f89154702195fa92959a0006a676093d5b3df935",
+      "size": 6917,
+      "source": "openexr-dev"
+    },
+    "usr/lib/cmake/libdeflate/libdeflate-config-version.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/libdeflate/libdeflate-config-version.cmake",
+      "sha256": "ca096a6e808fc3f6581d443581b2bd070bfe932dd7fdd28a2d8b8325abad39c8",
+      "size": 1860,
+      "source": "libdeflate-dev"
+    },
+    "usr/lib/cmake/libdeflate/libdeflate-config.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/libdeflate/libdeflate-config.cmake",
+      "sha256": "0a6d18d8d74bb811eca8186bebd586ed4aa62bf099d0dd373167ab99c219d6b6",
+      "size": 1317,
+      "source": "libdeflate-dev"
+    },
+    "usr/lib/cmake/libdeflate/libdeflate-targets-release.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/libdeflate/libdeflate-targets-release.cmake",
+      "sha256": "56ac0c3879e774b02fe688b9e4d52cc48e5a48b9ac9175048b6558831dbff212",
+      "size": 1460,
+      "source": "libdeflate-dev"
+    },
+    "usr/lib/cmake/libdeflate/libdeflate-targets.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/libdeflate/libdeflate-targets.cmake",
+      "sha256": "a459504485a92ac90ee31a06a1e21f5aa66e007b2997abca2e439339084667b3",
+      "size": 4840,
+      "source": "libdeflate-dev"
+    },
+    "usr/lib/cmake/openjph/openjph-config-version.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/openjph/openjph-config-version.cmake",
+      "sha256": "ff45a8431186dcece43bc11b701f4543e493a3c1c4f0a46e9571463ef5913c05",
+      "size": 3678,
+      "source": "openjph-dev"
+    },
+    "usr/lib/cmake/openjph/openjph-config.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/openjph/openjph-config.cmake",
+      "sha256": "e561c26b518c47d74decca5e6663a81c168c42c8ff367f586d10881b68bc06cc",
+      "size": 1344,
+      "source": "openjph-dev"
+    },
+    "usr/lib/cmake/openjph/openjph-targets-release.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/openjph/openjph-targets-release.cmake",
+      "sha256": "a9df6704875a0fe9826d828fbb184877e58f478bf661661f58dc2d4e1dedda70",
+      "size": 823,
+      "source": "openjph-dev"
+    },
+    "usr/lib/cmake/openjph/openjph-targets.cmake": {
+      "kind": "file",
+      "member": "usr/lib/cmake/openjph/openjph-targets.cmake",
+      "sha256": "176e8059009979f4aba39ec31397712ad84379cf26e8ca3b38c32536117db60d",
+      "size": 4504,
+      "source": "openjph-dev"
+    },
+    "usr/lib/libIex-3_5.so.34": {
+      "kind": "symlink",
+      "member": "usr/lib/libIex-3_5.so.34",
+      "source": "openexr-libiex",
+      "target": "libIex-3_5.so.34.3.5.3"
+    },
+    "usr/lib/libIex-3_5.so.34.3.5.3": {
+      "kind": "file",
+      "member": "usr/lib/libIex-3_5.so.34.3.5.3",
+      "sha256": "a6ddd7b3348a01c85368c44b61cc8194670e02424f43f58c1e1c99c6663d5019",
+      "size": 818208,
+      "source": "openexr-libiex"
+    },
+    "usr/lib/libIlmThread-3_5.so.34": {
+      "kind": "symlink",
+      "member": "usr/lib/libIlmThread-3_5.so.34",
+      "source": "openexr-libilmthread",
+      "target": "libIlmThread-3_5.so.34.3.5.3"
+    },
+    "usr/lib/libIlmThread-3_5.so.34.3.5.3": {
+      "kind": "file",
+      "member": "usr/lib/libIlmThread-3_5.so.34.3.5.3",
+      "sha256": "c7df945050b835fc579b38cfd31f31e1887c92e4ba15eafc3049cc7ebc1ffe3a",
+      "size": 70136,
+      "source": "openexr-libilmthread"
+    },
+    "usr/lib/libImath-3_2.so.30": {
+      "kind": "symlink",
+      "member": "usr/lib/libImath-3_2.so.30",
+      "source": "imath",
+      "target": "libImath-3_2.so.30.3.2.3"
+    },
+    "usr/lib/libImath-3_2.so.30.3.2.3": {
+      "kind": "file",
+      "member": "usr/lib/libImath-3_2.so.30.3.2.3",
+      "sha256": "74e0720911285f39a6fb63ea346d415f6c2ff625977efddef3b0749ce8ef96ce",
+      "size": 347568,
+      "source": "imath"
+    },
+    "usr/lib/libOpenEXR-3_5.so.34": {
+      "kind": "symlink",
+      "member": "usr/lib/libOpenEXR-3_5.so.34",
+      "source": "openexr-libopenexr",
+      "target": "libOpenEXR-3_5.so.34.3.5.3"
+    },
+    "usr/lib/libOpenEXR-3_5.so.34.3.5.3": {
+      "kind": "file",
+      "member": "usr/lib/libOpenEXR-3_5.so.34.3.5.3",
+      "sha256": "d6f2c2ee923a9fe1a03517cff9ca827427f5065f07b0e7c8127c245c61713780",
+      "size": 1882248,
+      "source": "openexr-libopenexr"
+    },
+    "usr/lib/libOpenEXRCore-3_5.so.34": {
+      "kind": "symlink",
+      "member": "usr/lib/libOpenEXRCore-3_5.so.34",
+      "source": "openexr-libopenexrcore",
+      "target": "libOpenEXRCore-3_5.so.34.3.5.3"
+    },
+    "usr/lib/libOpenEXRCore-3_5.so.34.3.5.3": {
+      "kind": "file",
+      "member": "usr/lib/libOpenEXRCore-3_5.so.34.3.5.3",
+      "sha256": "778d170826bd6dda034456ad0ee4e0d9e0e81c6d2f9f5193fd48b60b1aea420f",
+      "size": 1554416,
+      "source": "openexr-libopenexrcore"
+    },
+    "usr/lib/libOpenEXRUtil-3_5.so.34": {
+      "kind": "symlink",
+      "member": "usr/lib/libOpenEXRUtil-3_5.so.34",
+      "source": "openexr-libopenexrutil",
+      "target": "libOpenEXRUtil-3_5.so.34.3.5.3"
+    },
+    "usr/lib/libOpenEXRUtil-3_5.so.34.3.5.3": {
+      "kind": "file",
+      "member": "usr/lib/libOpenEXRUtil-3_5.so.34.3.5.3",
+      "sha256": "28da0592b7a1530edd497e846bffc2d52b18465b381910aafc63188cef312a4c",
+      "size": 324528,
+      "source": "openexr-libopenexrutil"
+    },
+    "usr/lib/libdeflate.a": {
+      "kind": "file",
+      "member": "usr/lib/libdeflate.a",
+      "sha256": "65326b6dfe914334cbdb0c9c1ce32127c8ea5e4a26b72ba54b4d63ececf11681",
+      "size": 99340,
+      "source": "libdeflate-static"
+    },
+    "usr/lib/libdeflate.so": {
+      "kind": "symlink",
+      "member": "usr/lib/libdeflate.so",
+      "source": "libdeflate-dev",
+      "target": "libdeflate.so.0"
+    },
+    "usr/lib/libdeflate.so.0": {
+      "kind": "file",
+      "member": "usr/lib/libdeflate.so.0",
+      "sha256": "dfdb938f749dfaa51943ae175fd7440be1926af1b411a3dafd255ad4d73800df",
+      "size": 89072,
+      "source": "libdeflate-libs"
+    },
+    "usr/lib/libopenjph.so": {
+      "kind": "symlink",
+      "member": "usr/lib/libopenjph.so",
+      "source": "openjph-dev",
+      "target": "libopenjph.so.0.32"
+    },
+    "usr/lib/libopenjph.so.0.32": {
+      "kind": "symlink",
+      "member": "usr/lib/libopenjph.so.0.32",
+      "source": "libopenjph0.32",
+      "target": "libopenjph.so.0.32.0"
+    },
+    "usr/lib/libopenjph.so.0.32.0": {
+      "kind": "file",
+      "member": "usr/lib/libopenjph.so.0.32.0",
+      "sha256": "989778c7ee597305c44009dae03d9e03945e882a4da312325f567bf4c65eeb80",
+      "size": 678880,
+      "source": "libopenjph0.32"
+    },
+    "usr/lib/libpng16.so.16": {
+      "kind": "symlink",
+      "member": "usr/lib/libpng16.so.16",
+      "source": "libpng16-16",
+      "target": "libpng16.so.16.59.0"
+    },
+    "usr/lib/libpng16.so.16.59.0": {
+      "kind": "file",
+      "member": "usr/lib/libpng16.so.16.59.0",
+      "sha256": "2c5dc6dd330c706356b872762292c826c398bf0e724f65d3d650528df3cf28d8",
+      "size": 263552,
+      "source": "libpng16-16"
+    },
+    "usr/lib/libstdc++.so.6": {
+      "kind": "symlink",
+      "member": "usr/lib/libstdc++.so.6",
+      "source": "libstdc++",
+      "target": "libstdc++.so.6.0.36"
+    },
+    "usr/lib/libstdc++.so.6.0.36": {
+      "kind": "file",
+      "member": "usr/lib/libstdc++.so.6.0.36",
+      "sha256": "b1d6a0d12cf06b035ad9b73ad163fb4ce7e2c386a872c74e728eb5548021efa1",
+      "size": 3542776,
+      "source": "libstdc++"
+    },
+    "usr/lib/libstdc++.so.6.0.36-gdb.py": {
+      "kind": "file",
+      "member": "usr/lib/libstdc++.so.6.0.36-gdb.py",
+      "sha256": "ec78b521663d8f18c301230dee5d4c950d04b3c07a872b068ad67bbc5bb5893f",
+      "size": 2927,
+      "source": "libstdc++"
+    },
+    "usr/lib/pkgconfig/Imath.pc": {
+      "kind": "file",
+      "member": "usr/lib/pkgconfig/Imath.pc",
+      "sha256": "4fea2df345b950d5b31cf3a4877c2902529f070795ef726d65e52f72f8bb9a9b",
+      "size": 417,
+      "source": "imath-dev"
+    },
+    "usr/lib/pkgconfig/OpenEXR.pc": {
+      "kind": "file",
+      "member": "usr/lib/pkgconfig/OpenEXR.pc",
+      "sha256": "3e845c2bc5eed64122c8c08f0645d90b24ba2a400b6984160dc30ff70970f496",
+      "size": 578,
+      "source": "openexr-dev"
+    },
+    "usr/lib/pkgconfig/libdeflate.pc": {
+      "kind": "file",
+      "member": "usr/lib/pkgconfig/libdeflate.pc",
+      "sha256": "80ad46d887d02fa587e1758a43d8618b40957a6eb67b71c07383c4118b7071f6",
+      "size": 760,
+      "source": "libdeflate-dev"
+    },
+    "usr/lib/pkgconfig/openjph.pc": {
+      "kind": "file",
+      "member": "usr/lib/pkgconfig/openjph.pc",
+      "sha256": "be8773679f8ea8c4d60aafe825fed11bf3b538c2430b1120de1737c77a9b1bfa",
+      "size": 226,
+      "source": "openjph-dev"
+    }
+  },
+  "frozen_kit_preserved": "755ea032b52a767fc6ed7e844161407c7b1fd6981c2f5f98768e801c9d821667",
+  "index": {
+    "key_path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\wolfi-signing.rsa.pub",
+    "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\wolfi-APKINDEX.tar.gz",
+    "public_signing_digest": "f0031424cf46f7db780ce63a45f0fd6aa6f85f601e6bb3b7a91fe3d4d5b7d2cc",
+    "sha256": "9b27ab69add838665af44c9aa304a0dd910af90f2cd9e191e52e0b585a3ce2fd"
+  },
+  "openexr_version": "3.5.3",
+  "output_root": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-openexr3-inputs-v1",
+  "owner": "agencia-digital-marketing-ai:opencv-openexr3-inputs:v1",
+  "platform": "linux/amd64",
+  "refs": {
+    "dev_inspection": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-openexr-metadata-inspection-v1.json",
+      "sha256": "b6435b37dc95beddda0a96132cc257a1f5b1babd4eae10f2994280598f1d6a69"
+    },
+    "elf_reader": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\docker\\postgres-immich\\final_image_remote.py",
+      "sha256": "9e0a282940bd7585b6953b43dbc3f02df9bf01bb9f775e5a7a4eb1172ed4fa49"
+    },
+    "historical_sdk_sca": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v2.receipt.json",
+      "sha256": "2ce0c511193cc5be38d902f07c4f9282e619686229d213a8a597384280750ae0"
+    },
+    "native_verifier": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\docker\\postgres-immich\\native_inputs.py",
+      "sha256": "b00b1a1a1822b13ed145128209664a15f3efa781b39cd850d0d63bcc0666192b"
+    },
+    "old_recipe": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\docker\\kitsu-zou\\build-opencv-minimal.sh",
+      "sha256": "fc3341fa0c8c20ad7bc2ab9b858f127cd0e0ec76b233f05273ef0df2d45aed7f"
+    },
+    "original_manifest": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\docker\\kitsu-zou\\opencv-minimal-artifacts.json",
+      "sha256": "c44452916dfeca1c58eec70ec8fed546a88b7543ee4c3c57ac80608460076eca"
+    },
+    "packager": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\docker\\kitsu-zou\\package_opencv_minimal.py",
+      "sha256": "831a28043da1de203bae7845244e90efd548da4cd75f707d1358d33288b2b9d9"
+    },
+    "recovery_remote": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\docker\\kitsu-zou\\opencv_build_recovery_remote.py",
+      "sha256": "09e28a43b7ba8911b08146f1fd06e7a0ddaa597de1630d354abc8f79d0c0efbd"
+    },
+    "sdk_audit": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-audit-v1-profile.json",
+      "sha256": "747a33d04bf5238ccc374cc3ac7cd3b1f49050bf9df5cb668d4191cc851001e1"
+    },
+    "sdk_capture": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v1.capture.json",
+      "sha256": "fbdb485a006e697b498a26a57981e8909daa59b67df427a785998763dff659d3"
+    },
+    "sdk_profile": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\docker\\kitsu-zou\\opencv-minimal-sdk-profile.json",
+      "sha256": "aa4d28b1ac14c23ceae011fbf22e36a8060ec8e086af0da64aaa4d3ffe785640"
+    },
+    "static_inspection": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-openexr-static-inspection-v1.json",
+      "sha256": "acaf50a76102d233a8c24b14d2ca8428c02f3fb32c3b1ddccc12cf4325a26f6d"
+    }
+  },
+  "required_sca_scope": {
+    "expected_apk_identities": 94,
+    "expected_total_components": 95,
+    "historical_2ce_receipt_covers_new_inputs": false,
+    "installed_sdk_apk_count": 89,
+    "installed_snapshot_capture_sha256": "fbdb485a006e697b498a26a57981e8909daa59b67df427a785998763dff659d3",
+    "installed_snapshot_live_reinspected": false,
+    "installed_snapshot_receipt_sha256": "c20649f245a93b1dec1e309e1fc9bdb64513be46508016454ba939d319300b87",
+    "new_inputs_sca_verified": false,
+    "numpy": {
+      "name": "numpy",
+      "original_manifest_ref": "c44452916dfeca1c58eec70ec8fed546a88b7543ee4c3c57ac80608460076eca",
+      "scope": "headers-from-existing-mounted-wheel",
+      "version": "2.4.6",
+      "wheel_sha256": "90f9849678c75fe7afa2d348ac842c168b0a4d3d61919687216dfc547976d853"
+    },
+    "partial_apk_inputs": [
+      {
+        "archive_sha256": "7c5f634b0615b8fd9f6cfedbd41154995b137bdf93483cb456fcaede414f61cc",
+        "installed": false,
+        "name": "imath-dev",
+        "scope": "partial-headers-and-metadata",
+        "version": "3.2.3-r2"
+      },
+      {
+        "archive_sha256": "df487a106cef2daa793adc5dfbf58c9459db46e5f877ae3f4958405352a0cd35",
+        "installed": false,
+        "name": "openexr-dev",
+        "scope": "partial-headers-and-metadata",
+        "version": "3.5.3-r0"
+      },
+      {
+        "archive_sha256": "99f8627ca991a0439e0813043bfd4b59e5371f376593859ad715e034c9060c33",
+        "installed": false,
+        "name": "libdeflate-dev",
+        "scope": "partial-headers-and-metadata",
+        "version": "1.19-r10"
+      },
+      {
+        "archive_sha256": "53c855b870f8417e48537a7a9cf96dac888004defb3c464a6bb6d139ba456deb",
+        "installed": false,
+        "name": "openjph-dev",
+        "scope": "partial-headers-and-metadata",
+        "version": "0.32.0-r0"
+      },
+      {
+        "archive_sha256": "ec17d371abbcbbd25e3e4592732ecbbe409a9f6d4c277a215baa59140dd7ff67",
+        "installed": false,
+        "name": "libdeflate-static",
+        "scope": "static-build-data-only",
+        "version": "1.19-r10"
+      }
+    ],
+    "required_before_cmake_probe": true,
+    "sdk_packages_changed_by_preparer": false
+  },
+  "runtime_applied": false,
+  "runtime_work_proposed": "/work/openexr3-attempt-v2",
+  "schema_version": 1,
+  "sdk_executed": false,
+  "sources": {
+    "imath": {
+      "bytes": 291397,
+      "license": "BSD-3-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\imath-3.2.3-r2.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1mYg5u5P4u8UIUgVG/tdc5L5vUVI=",
+        "D": "so:libc.so.6 so:libm.so.6 so:libstdc++.so.6",
+        "I": "381574",
+        "L": "BSD-3-Clause",
+        "P": "imath",
+        "S": "291397",
+        "T": "C++ and python library of 2D and 3D vector, matrix, and math operations for computer graphics",
+        "V": "3.2.3-r2",
+        "c": "4cd41f2320a048e26dd6981e8014b6214d63700c",
+        "m": "wolfi",
+        "o": "imath",
+        "p": "so-ver:libImath-3_2.so.30=3.2.3-r2 so:libImath-3_2.so.30=30",
+        "t": "1791601205"
+      },
+      "sha256": "db4a417a28a4718171e567d5d15f1c792b65aa03964d91aca226324d741aae5c",
+      "version": "3.2.3-r2"
+    },
+    "imath-dev": {
+      "bytes": 178074,
+      "license": "BSD-3-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\imath-dev-3.2.3-r2.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1cYDLSGZr8EHHIM4J1AqNdRVGhLM=",
+        "D": "imath so:libImath-3_2.so.30 so:libPyImath_Python3_13-3_2.so.30",
+        "I": "1080912",
+        "L": "BSD-3-Clause",
+        "P": "imath-dev",
+        "S": "178074",
+        "T": "imath dev",
+        "V": "3.2.3-r2",
+        "c": "4cd41f2320a048e26dd6981e8014b6214d63700c",
+        "m": "wolfi",
+        "o": "imath",
+        "p": "pc:Imath=3.2.3-r2 pc:PyImath=3.2.3-r2",
+        "t": "1791601205"
+      },
+      "sha256": "7c5f634b0615b8fd9f6cfedbd41154995b137bdf93483cb456fcaede414f61cc",
+      "version": "3.2.3-r2"
+    },
+    "libdeflate-dev": {
+      "bytes": 17520,
+      "license": "MIT",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\cache\\phase4-sources\\libdeflate-dev-1.19-r10.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1p+GJY49+VF2hbhxvlLsUiNrdLNE=",
+        "D": "so:libdeflate.so.0",
+        "I": "77698",
+        "L": "MIT",
+        "P": "libdeflate-dev",
+        "S": "17520",
+        "T": "libdeflate dev",
+        "V": "1.19-r10",
+        "c": "436728c87608f53d0e9132ce4a1bfc014d2bf3cd",
+        "m": "wolfi",
+        "o": "libdeflate",
+        "p": "pc:libdeflate=1.19-r10",
+        "t": "1791641378"
+      },
+      "sha256": "99f8627ca991a0439e0813043bfd4b59e5371f376593859ad715e034c9060c33",
+      "version": "1.19-r10"
+    },
+    "libdeflate-libs": {
+      "bytes": 57769,
+      "license": "MIT",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\libdeflate-libs-1.19-r10.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1PSvuGUTvFfxCeGG1LXkLqfvWiDI=",
+        "D": "so:libc.so.6",
+        "I": "123065",
+        "L": "MIT",
+        "P": "libdeflate-libs",
+        "S": "57769",
+        "T": "libdeflate shared libraries",
+        "V": "1.19-r10",
+        "c": "436728c87608f53d0e9132ce4a1bfc014d2bf3cd",
+        "m": "wolfi",
+        "o": "libdeflate",
+        "p": "so-ver:libdeflate.so.0=1.19-r10 so:libdeflate.so.0=0",
+        "t": "1791641378"
+      },
+      "sha256": "ab38b6c710aaca3d06b9ccb2f30d16c462ad1fb650db48d50e5eb7c0c0d3ce29",
+      "version": "1.19-r10"
+    },
+    "libdeflate-static": {
+      "bytes": 59095,
+      "license": "MIT",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\cache\\phase4-sources\\libdeflate-static-1.19-r10.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1LuO/vlqXlaB4bHFJZ5+nkianxwU=",
+        "I": "133355",
+        "L": "MIT",
+        "P": "libdeflate-static",
+        "S": "59095",
+        "T": "libdeflate static",
+        "V": "1.19-r10",
+        "c": "436728c87608f53d0e9132ce4a1bfc014d2bf3cd",
+        "m": "wolfi",
+        "o": "libdeflate",
+        "t": "1791641378"
+      },
+      "sha256": "ec17d371abbcbbd25e3e4592732ecbbe409a9f6d4c277a215baa59140dd7ff67",
+      "version": "1.19-r10"
+    },
+    "libopenjph0.32": {
+      "bytes": 268185,
+      "license": "BSD-2-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\libopenjph0.32-0.32.0-r0.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1a4N4sEWtGI0B50K/E2Tu8oTsm6Y=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6 so:libgcc_s.so.1 so:libm.so.6 so:libstdc++.so.6",
+        "I": "712884",
+        "L": "BSD-2-Clause",
+        "P": "libopenjph0.32",
+        "S": "268185",
+        "T": "${{package.name} libraries",
+        "V": "0.32.0-r0",
+        "c": "87dd9efbe01249cc2ba62d39a8dd691d1a16538d",
+        "m": "wolfi",
+        "o": "openjph",
+        "p": "so-ver:libopenjph.so.0.32=0.32.0-r0 so:libopenjph.so.0.32=0.32",
+        "t": "1789658288"
+      },
+      "sha256": "fa2543424239e1930227852ba3c7b4c3f8887b8727ce13cc2faea75c53ff0c52",
+      "version": "0.32.0-r0"
+    },
+    "libpng16-16": {
+      "bytes": 153195,
+      "license": "libpng-2.0",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\libpng16-16-1.6.59-r2.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1GAy6XXVGon6aTiTZSpblWvGsyTA=",
+        "D": "so:libc.so.6 so:libm.so.6 so:libz.so.1",
+        "I": "297871",
+        "L": "libpng-2.0",
+        "P": "libpng16-16",
+        "S": "153195",
+        "T": "Portable Network Graphics library",
+        "V": "1.6.59-r2",
+        "c": "b9898dbb7125f3678bc8c6cd9e7a43d9d9d2c518",
+        "m": "wolfi",
+        "o": "libpng",
+        "p": "so-ver:libpng16.so.16=1.6.59-r2 so:libpng16.so.16=16",
+        "t": "1793905898"
+      },
+      "sha256": "ec6af7e0b784f87743ebe3e481eeb011e7d42c43aa4db76d23fabe96b5afb680",
+      "version": "1.6.59-r2"
+    },
+    "libstdc++": {
+      "bytes": 1267168,
+      "license": "GPL-3.0-or-later WITH GCC-exception-3.1",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\libstdc++-16.2.0-r2.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1TDYeh0Iq9Fjbp5cPck+zZfmDn14=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6 so:libgcc_s.so.1 so:libm.so.6",
+        "I": "3580046",
+        "L": "GPL-3.0-or-later WITH GCC-exception-3.1",
+        "P": "libstdc++",
+        "S": "1267168",
+        "T": "",
+        "V": "16.2.0-r2",
+        "c": "1a8a06e57ab63d92834a9467dd0eaa5d54ade3b0",
+        "m": "wolfi",
+        "o": "gcc",
+        "p": "libstdc++-16=16.2.0-r2 so-ver:libstdc++.so.6=16.2.0-r2 so:libstdc++.so.6=6",
+        "t": "1793036444"
+      },
+      "sha256": "91d46dc63af715208b8d1424909f4df7e30cbc2321afaa9dcd412476e0297ebd",
+      "version": "16.2.0-r2"
+    },
+    "openexr-dev": {
+      "bytes": 194153,
+      "license": "BSD-3-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\openexr-dev-3.5.3-r0.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1C6A149Yog2IeaDUwbQ/nMjKzoQU=",
+        "D": "openexr pc:Imath pc:libdeflate pc:openjph so:libIex-3_5.so.34 so:libIlmThread-3_5.so.34 so:libOpenEXR-3_5.so.34 so:libOpenEXRCore-3_5.so.34 so:libOpenEXRUtil-3_5.so.34",
+        "I": "857420",
+        "L": "BSD-3-Clause",
+        "P": "openexr-dev",
+        "S": "194153",
+        "T": "openexr dev",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "pc:OpenEXR=3.5.3-r0",
+        "t": "1793416744"
+      },
+      "sha256": "df487a106cef2daa793adc5dfbf58c9459db46e5f877ae3f4958405352a0cd35",
+      "version": "3.5.3-r0"
+    },
+    "openexr-libiex": {
+      "bytes": 185144,
+      "license": "BSD-3-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\openexr-libiex-3.5.3-r0.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1SAnazof6OFYD7Q6okf4eOU+CEkw=",
+        "D": "so:libc.so.6 so:libgcc_s.so.1 so:libstdc++.so.6",
+        "I": "852297",
+        "L": "BSD-3-Clause",
+        "P": "openexr-libiex",
+        "S": "185144",
+        "T": "openexr libiex",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "so-ver:libIex-3_5.so.34=3.5.3-r0 so:libIex-3_5.so.34=34",
+        "t": "1793416744"
+      },
+      "sha256": "71000163616cfc26220b2e3601eb4115b3ed0e9fbb59104542b9aee64be25944",
+      "version": "3.5.3-r0"
+    },
+    "openexr-libilmthread": {
+      "bytes": 38162,
+      "license": "BSD-3-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\openexr-libilmthread-3.5.3-r0.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1CntS9FWFm77JAJw6RouJDmhPf98=",
+        "D": "so:libIex-3_5.so.34 so:libc.so.6 so:libgcc_s.so.1 so:libstdc++.so.6",
+        "I": "104333",
+        "L": "BSD-3-Clause",
+        "P": "openexr-libilmthread",
+        "S": "38162",
+        "T": "openexr libilmthread",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "so-ver:libIlmThread-3_5.so.34=3.5.3-r0 so:libIlmThread-3_5.so.34=34",
+        "t": "1793416744"
+      },
+      "sha256": "e19aa82887d780ea3469b9d539553d718584ffd5ee88bd4a2554fbd2591a0343",
+      "version": "3.5.3-r0"
+    },
+    "openexr-libopenexr": {
+      "bytes": 680497,
+      "license": "BSD-3-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\openexr-libopenexr-3.5.3-r0.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1V5p79F7yNI316eEQYYS+tk5irk0=",
+        "D": "so:libIex-3_5.so.34 so:libIlmThread-3_5.so.34 so:libImath-3_2.so.30 so:libOpenEXRCore-3_5.so.34 so:libc.so.6 so:libgcc_s.so.1 so:libm.so.6 so:libstdc++.so.6",
+        "I": "1916409",
+        "L": "BSD-3-Clause",
+        "P": "openexr-libopenexr",
+        "S": "680497",
+        "T": "openexr libopenexr",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "so-ver:libOpenEXR-3_5.so.34=3.5.3-r0 so:libOpenEXR-3_5.so.34=34",
+        "t": "1793416744"
+      },
+      "sha256": "868edec4ef266ddd3b41848f189a2cd20e32565a150b83c18d90152249ad933a",
+      "version": "3.5.3-r0"
+    },
+    "openexr-libopenexrcore": {
+      "bytes": 667274,
+      "license": "BSD-3-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\openexr-libopenexrcore-3.5.3-r0.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1dc3ENq9OadDaIrQYUF8ZJUzVk8E=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6 so:libdeflate.so.0 so:libgcc_s.so.1 so:libm.so.6 so:libopenjph.so.0.32 so:libstdc++.so.6",
+        "I": "1588649",
+        "L": "BSD-3-Clause",
+        "P": "openexr-libopenexrcore",
+        "S": "667274",
+        "T": "openexr libopenexrcore",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "so-ver:libOpenEXRCore-3_5.so.34=3.5.3-r0 so:libOpenEXRCore-3_5.so.34=34",
+        "t": "1793416744"
+      },
+      "sha256": "bb00831805787e8f9d27b2340fd60245125f774d5c78374155e680d74c47e911",
+      "version": "3.5.3-r0"
+    },
+    "openexr-libopenexrutil": {
+      "bytes": 123636,
+      "license": "BSD-3-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-opencv-sdk-v1\\kit-755ea032b52a767f\\data\\apks\\openexr-libopenexrutil-3.5.3-r0.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1GTC8GRDZvIDY9mQ5LWqANLKebAo=",
+        "D": "so:libIex-3_5.so.34 so:libOpenEXR-3_5.so.34 so:libOpenEXRCore-3_5.so.34 so:libc.so.6 so:libgcc_s.so.1 so:libstdc++.so.6",
+        "I": "358761",
+        "L": "BSD-3-Clause",
+        "P": "openexr-libopenexrutil",
+        "S": "123636",
+        "T": "openexr libopenexrutil",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "so-ver:libOpenEXRUtil-3_5.so.34=3.5.3-r0 so:libOpenEXRUtil-3_5.so.34=34",
+        "t": "1793416744"
+      },
+      "sha256": "a5a6a9e335627eab3c5a81d3c55f23d9f4bea5d191f75d4dce7c592a48636db6",
+      "version": "3.5.3-r0"
+    },
+    "openjph-dev": {
+      "bytes": 33470,
+      "license": "BSD-2-Clause",
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\cache\\phase4-sources\\openjph-dev-0.32.0-r0.apk",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1AqVPhLkYc7Ix0FBoQVJ8s100RkU=",
+        "D": "so:libopenjph.so.0.32",
+        "I": "162883",
+        "L": "BSD-2-Clause",
+        "P": "openjph-dev",
+        "S": "33470",
+        "T": "openjph development libraries and headers",
+        "V": "0.32.0-r0",
+        "c": "87dd9efbe01249cc2ba62d39a8dd691d1a16538d",
+        "m": "wolfi",
+        "o": "openjph",
+        "p": "pc:openjph=0.32.0-r0",
+        "t": "1789658288"
+      },
+      "sha256": "53c855b870f8417e48537a7a9cf96dac888004defb3c464a6bb6d139ba456deb",
+      "version": "0.32.0-r0"
+    }
+  },
+  "static_build_data_only": [
+    "usr/lib/libdeflate.a"
+  ],
+  "targets": {
+    "Imath::Imath": "usr/lib/libImath-3_2.so.30.3.2.3",
+    "OpenEXR::Iex": "usr/lib/libIex-3_5.so.34.3.5.3",
+    "OpenEXR::IlmThread": "usr/lib/libIlmThread-3_5.so.34.3.5.3",
+    "OpenEXR::OpenEXR": "usr/lib/libOpenEXR-3_5.so.34.3.5.3",
+    "OpenEXR::OpenEXRCore": "usr/lib/libOpenEXRCore-3_5.so.34.3.5.3",
+    "libdeflate::libdeflate_shared": "usr/lib/libdeflate.so.0",
+    "libdeflate::libdeflate_static": "usr/lib/libdeflate.a",
+    "openjph": "usr/lib/libopenjph.so.0.32.0"
+  }
+}

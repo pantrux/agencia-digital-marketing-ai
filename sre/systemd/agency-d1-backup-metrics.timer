@@ -1,0 +1,11 @@
+[Unit]
+Description=Seguimiento de la última copia diaria exigible de D1
+
+[Timer]
+OnCalendar=*:1/5
+AccuracySec=15s
+Persistent=true
+Unit=agency-d1-backup-metrics.service
+
+[Install]
+WantedBy=timers.target

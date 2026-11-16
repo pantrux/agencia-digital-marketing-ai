@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "purpose": "Inventario del SDK detenido; SCA y aprobación Root pendientes.",
+  "base_manifest_sha256": "c908ada03479b540f808ca3d3bf426ae012cae8097c355b3d672d066465fb54a",
+  "base_config_sha256": "22fdd47fd045fefc8c744ff00f801c6efe0e99cab9eb67e1751712760974316c",
+  "inputs": {
+    "capture": {
+      "path": ".tools/evidence/phase4-postgres-immich-stopped-sdk-apk-readonly-v1.json",
+      "sha256": "7fec880c695b0f25e95a218c01892f5f228d86e87cd048ad6c69178c7867a18d",
+      "maximum_bytes": 1048576
+    },
+    "sdk_lock": {
+      "path": ".tools/postgres-immich-build/native-inputs-8d5a521ef8b2827f/native-sdk-lock.json",
+      "sha256": "a805dd0dd8bae497bf8326e48f1edecbce72e3588d857d314330b90638c1cd41",
+      "maximum_bytes": 1048576
+    },
+    "base_installed": {
+      "path": ".tools/postgres-immich-build/apk-sdk-inspection/base-installed",
+      "sha256": "af1be6395c8850e28ddc34c3de8839c47de7aee1611380fa75c380cb9f75a72f",
+      "maximum_bytes": 1048576
+    },
+    "base_archive": {
+      "path": ".tools/cache/phase4-built-images/postgres-apps-c908ada03479b540.tar",
+      "sha256": "a4da25a508d05ee0f3b90511915446d81c8f75c3dfe74c8cb9b0cf1e1da8a71d",
+      "maximum_bytes": 134217728
+    },
+    "rust_channel": {
+      "path": ".tools/cache/phase4-sources/rust-beta-2026-11-05.toml",
+      "sha256": "325df53718c60181d663c7196f251f4ba9bac44ef2616896d1e33e8396a562db",
+      "maximum_bytes": 1048576
+    },
+    "formatter_inspection": {
+      "path": ".tools/postgres-immich-build/rustfmt-inputs-v1/inspection-receipt.json",
+      "sha256": "20a4ff06abc4be930a8121f1b18310a65187c83f7813ea62a35370073f7a3a0b",
+      "maximum_bytes": 1048576
+    },
+    "compile_profile": {
+      "path": ".tools/postgres-immich-build/compile-v3-profile.json",
+      "sha256": "bffefb81179fd767d640faf106965ba7d465e90c3a789b4e7800b988a0152153",
+      "maximum_bytes": 1048576
+    }
+  },
+  "primary_research": {
+    "checked_date": "2026-11-06",
+    "distribution_manifest_url": "https://static.rust-lang.org/dist/2026-11-05/channel-rust-beta.toml",
+    "distribution_commit": "01ddda61fada79bbc835476209518a6f68322984",
+    "security_policy": "https://rust-lang.org/policies/security/",
+    "channels": "https://rust-lang.github.io/rustup/concepts/channels.html",
+    "rustsec_scope": "https://rustsec.org/",
+    "official_announcements_reviewed": "https://blog.rust-lang.org/",
+    "classification": "Procedencia de distribución beta fijada y revisión específica de avisos; no declaración universal de ausencia de vulnerabilidades.",
+    "known_advisories_reviewed": [
+      {
+        "id": "CVE-2026-33056",
+        "source": "https://blog.rust-lang.org/2026/03/21/cve-2026-33056/",
+        "component": "Cargo: extracción de crates / permisos de directorios",
+        "official_fix_distribution": "Rust 1.94.1",
+        "classification": "La distribución 1.100 beta es posterior al piso corregido declarado por upstream; inferencia por línea de distribución, no reproducción del defecto ni auditoría de cada dependencia de Cargo."
+      },
+      {
+        "id": "CVE-2026-5222",
+        "source": "https://blog.rust-lang.org/2026/05/25/cve-2026-5222/",
+        "component": "Cargo: normalización de URL sparse / credenciales",
+        "official_severity": "LOW",
+        "official_fix_distribution": "Rust 1.96",
+        "classification": "Fuera del intervalo de distribuciones afectadas indicado por upstream; el build cerrado no usa red/credenciales de registro. Esto no sustituye comprobar la procedencia de sus bytes."
+      },
+      {
+        "id": "CVE-2026-5223",
+        "source": "https://blog.rust-lang.org/2026/05/25/cve-2026-5223/",
+        "component": "Cargo: enlaces simbólicos en crates de registros alternativos",
+        "official_severity": "MEDIUM",
+        "official_fix_distribution": "Rust 1.96.0",
+        "classification": "Fuera del intervalo anterior a 1.96 declarado por upstream. Vendor ya autenticado y nuevo target no acreditan por sí solos todo el compilador."
+      }
+    ],
+    "trivy_decoder": "https://raw.githubusercontent.com/aquasecurity/trivy/v0.76.2/pkg/sbom/io/decode.go",
+    "trivy_cyclonedx": "https://raw.githubusercontent.com/aquasecurity/trivy/v0.76.2/pkg/sbom/cyclonedx/unmarshal.go",
+    "purl_apk": "https://github.com/package-url/purl-spec/blob/main/types/apk-definition.json"
+  },
+  "proposed_database": {
+    "cache_path": ".tools/trivy-cache-current-20261106",
+    "expected_updated_at": "2026-11-06T12:55:02.577403897Z",
+    "expected_next_update": "2026-11-07T12:55:02.577403513Z",
+    "scanner_version": "0.76.2",
+    "use_requires_root_release_of_shared_cache": true,
+    "actual_scan_performed": false
+  },
+  "limitations": [
+    "Esta unidad no ejecuta Trivy, SDK, SSH, SQL, contenedores ni lee .env.",
+    "La captura acredita el SDK detenido y la DB APK, no una nueva exportación de todos sus ELF.",
+    "45 paquetes de la base más 65 agregados deben cotejarse contra los 110 observados; no se infiere el total desde base_reused.",
+    "El Q1 es identidad del control APK; no se presenta como SHA256 del archivo APK completo.",
+    "La licencia y origen vacíos del metapaquete .postgresql-rundeps se conservan sin inventarlos.",
+    "RustSec/OSV crates.io auditan crates identificados; rustc, rust-std, Cargo CLI y rustfmt de esta distribución no se convierten en crates o APK ficticios.",
+    "Fingerprints de Rust y formatter provienen de recibos previos fijados; esta unidad no reejecuta versiones ni reexporta binarios actuales.",
+    "Rust es beta, no estable: la aprobación Root será para la operación cerrada concreta y no congela soporte de seguridad futuro.",
+    "LLVM, dependencias internas de la distribución y bibliotecas manuales/árboles SQLite históricos no quedan certificados por un escaneo APK sin hallazgos.",
+    "La candidata runtime 96c conserva su historia y no se declara limpia por el inventario del SDK ni por los dos crates corregidos."
+  ]
+}

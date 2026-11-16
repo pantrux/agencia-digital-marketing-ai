@@ -1,0 +1,97 @@
+# Reconstrucción aislada de VectorChord
+
+El controlador prepara un perfil pequeño por referencias para reutilizar el SDK propio detenido `f042555d8eabccbc31cb2b73d2ad349aa89b5ce92050862254bf832178f73a7d`. Corrige sólo anyhow 1.0.103 y crossbeam-epoch 0.9.20 mediante el vendor alternativo ya materializado por Root. No cambia los controladores congelados ni los árboles/output originales. SQLite 3.54.1 y pgvector se verifican y copian como bytes; no se vuelven a compilar.
+
+Esta entrega contiene código y pruebas controladas. No acredita recepción remota, reinicio, compilación, pruebas Rust, imagen nueva ni SQL de aceptación. Root debe revisar el perfil/pins y reservar CPU/RAM secuencialmente antes de cualquier operación.
+
+## Plan sin leer la bóveda
+
+Desde el workspace:
+
+```powershell
+python docker/postgres-immich/security_rebuild.py plan
+```
+
+Lee únicamente código y evidencia fijados. No lee `.env`, conecta por SSH, ejecuta SDK ni crea directorios remotos. El perfil incluye paths/SHA/tamaños y referencias a los recibos previos; conserva el historial grande en sus archivos originales.
+
+Publicación exclusiva del perfil en la raíz local privada ya respaldada:
+
+```powershell
+python docker/postgres-immich/security_rebuild.py plan --output '.tools/postgres-immich-security-inputs-v1/security-rebuild-v2.profile.json'
+```
+
+El archivo debe estar ausente. Después de revisar código/perfil, Root puede respaldar los campos del perfil mediante la opción explícita:
+
+```powershell
+python docker/postgres-immich/security_rebuild.py plan --root-update-vault
+```
+
+Ese modo exige que el perfil físico coincida antes de actualizar punteros. El agente que prepara esta unidad no invoca el actualizador ni el CLI operacional.
+
+Los campos usan el prefijo `MEDIA_POSTGRES_IMMICH_SECURITY_REBUILD_`: `OWNER`, `CID`, `PROFILE_PATH`, `PROFILE_SHA256`, `LOCAL_SOURCE_SHA256`, `REMOTE_SOURCE_SHA256`, `RECIPE_SOURCE_SHA256` y `STAGING_PATH`, `CONTROL_PATH`, `WORK_PATH`, `OUTPUT_PATH`. No se guarda una copia completa del perfil ni credenciales en esos recibos. El updater original, fijado por SHA, conserva los tres comentarios por variable y la comparación concurrente del master.
+
+## Transiciones explícitas
+
+Cada llamada operacional requiere perfil fijo, SHA externo y `--root-update-vault`. Sustituir el hash público por el respaldado:
+
+```text
+python docker/postgres-immich/security_rebuild.py <modo> --expected-profile-sha256 <SHA_RESPALDADO> --root-update-vault
+```
+
+| Modo | Acción y requisito |
+| --- | --- |
+| `receive` | Recibe 11 archivos declarados como UID1000 en staging nuevo; valida tamaños/SHA/EOF antes de escribir. No arranca el SDK. |
+| `prepare` | Verifica recibo de recepción, host/layout y todos los bytes; promueve copias a nuevo control SSD root:0700. Captura daemon e identidad del CID detenido. |
+| `restart` | Exige prepare respaldado y mismo CID/creación/imagen/configuración detenido. Arranca sólo ese SDK; registra época y cgroup real. |
+| `materialize` | Exige restart respaldado. Crea `/work/.security-rebuild-v1` ausente, copia fuente a `source/`, cambia sólo lock/config de la copia y extrae vendor a `vendor/`. Crea cargo-home/home/tmp/target/harness privados nuevos. |
+| `graph` | Ejecuta árboles Cargo cerrados offline/frozen. Exige misma selección/features que el baseline autenticado, salvo las dos versiones corregidas. |
+| `regression` | Exige graph respaldado y revisión literal de Root; ejecuta harness funcional de dos pruebas y comprueba nombres, contador y salida real. |
+| `build` | Exige graph/regression respaldados y revisados. Ejecuta sólo xtask build, con target y salida nuevos. |
+| `catalog` | Verifica artefactos generados, SQLite dinámica y SQL/control, y produce runtime-root nuevo reutilizando archivos anteriores verificados. No ejecuta SQL. |
+| `stop` | Independiente de inputs, derivado y recibos de build. Exige control SSD/prepare respaldado, daemon y nacimiento del CID propio. Parada por CID completo, sin búsquedas por nombre/PID ni eliminación de contenedores. |
+
+Después de graph, Root debe respaldar `GRAPH_REVIEW_STATUS=PG16_SIMD_INIT_CONFIRMED_SECURITY_UPGRADES_ONLY` antes de regression/build. No existe avance automático de todas las etapas. Cada recibo local se publica EXCL y se respalda como `<MODO>_RECEIPT_PATH`/`<MODO>_RECEIPT_SHA256` antes de otra llamada.
+
+Antes de restart y de todas las etapas posteriores del SDK, se exige además `SDK_SCA_APPROVED=true`, `SDK_SCA_RECEIPT_PATH` y `SDK_SCA_RECEIPT_SHA256`, bajo el mismo prefijo. El lector comprueba el archivo físico y su SHA antes de abrir SSH. El remoto vuelve a comprobar el recibo y su vigencia antes de actuar. Receive/prepare pueden preparar datos con el SDK detenido; stop queda exento para no impedir la limpieza por evidencia vencida.
+
+El recibo SCA es JSON público de aprobación específica, máximo 64 KiB. Su esquema cerrado exige: `schema_version=1`, `root_approved=true`, `cid`, `created`, `apk_database_sha256`, `apk_package_count=110`, `apk_exact_coverage=true`, `formatter_sha256`, `driver_sha256`, `sdk_state_receipt_sha256` (RECOVER fc334…), `high_critical_count` real, `coverage_scope`, `reports` (lista de path/SHA), `scanned_at_utc` y `db_metadata` (Version2, UpdatedAt/NextUpdate). La fecha debe corresponder a esa DB y NextUpdate debe seguir vigente. No se sustituye una ausencia de CVSS por cero ni se decide automáticamente una excepción: la aprobación y evaluación específica de los resultados corresponde a Root.
+
+La evidencia histórica vencida no habilita ese gate. Para preparar el inventario actual sin arrancar SDK, Root puede leer del CID detenido la DB APK y verificar su SHA `9dd4902449589bccb94034a7e5fd51d280ecd9bee7d7adb7521412b34c07aded`, enumerar exactamente los 110 paquetes y analizar ese inventario con la DB vigente. Debe cubrir por separado los bytes de rustfmt `bc01859…` y su driver `626e0c…`, con sus fuentes/procedencia y límites de cobertura explícitos. Un escáner que detecte cero paquetes del formatter no lo certifica. Esta unidad sólo impone el gate y propone esas entradas; no crea ni ejecuta un auditor nuevo ni afirma SDK limpio.
+
+`stop` carga únicamente su perfil, código de control y prepare respaldado, sin revalidar NAS, DB, vendor o outputs exitosos. Puede coexistir con la operación detenida: no espera el flock de build. Las demás etapas usan un lock no bloqueante y marcadores exclusivos; no reintentan ni adoptan parciales.
+
+## Fuentes, entornos y presupuestos
+
+La carga de helpers congelados usa sus bytes después de verificar SHA; no ejecuta `.pyc` ni modifica globals/API de esos helpers. Se reutilizan el conector SSH, operaciones por descriptor, validador Docker/cgroup, recolector POSIX y prueba ELF/SQLite originales. Los verificadores históricos que escribían en namespaces viejos no se invocan.
+
+El CLI operacional de Root lee directamente el master `.env` con parser canónico fijado, ACL nativa fijada y límite explícito de **8 MiB**. No genera otro archivo de credenciales. `connect(values)` es el original congelado: destino .85, identidad/pin Ed25519 exactos, Paramiko 5.1.0, sin agente ni fallback de claves. El secreto SSH queda en memoria del conector; no se serializa en perfil, argv, stdout ni recibos.
+
+Los procesos Cargo reciben un entorno desde cero. RUSTC/CARGO/RUSTDOC apuntan al SDK fijo, RUSTFMT al aumento acreditado; wrappers, runners, flags heredados, proxies y credenciales están ausentes. Se conservan explícitamente `RUSTC_BOOTSTRAP=1`, flags PG16/musl/rpath del perfil anterior y SQLite dinámica. El CARGO_TARGET_DIR es nuevo y no reutiliza objetos compilados anteriores.
+
+El nuevo `.cargo/config.toml` apunta exclusivamente a `/work/.security-rebuild-v1/vendor` y activa offline; las invocaciones usan `--frozen --offline`. El parser nuevo admite sólo `source/` bajo ese workspace exacto. Únicamente el baseline antiguo ya autenticado adapta su prefijo para compararse; el grafo real nunca se normaliza para esconder rutas ajenas.
+
+El SDK conserva red none, 4 CPU/12 GiB/256 PID y jobs=2. Presupuestos por modo: receive180 s, prepare120 s, restart60 s, materialize/graph/regression300 s, build1800 s, catalog180 s, stop20 s. La alarma de operación reserva veinte segundos de limpieza tras las etapas que pueden ejecutar el SDK. El recolector POSIX congelado limita cada salida a 4 MiB, conserva el grupo propio hasta recogerlo y mata sus hijos al terminar; un latido SSH perdido interrumpe la operación. La limpieza del contenedor usa el CID acreditado y verifica stopped, sin certificarlo si falla.
+
+La recepción y el reempaquetado/hash local no son pruebas de velocidad de compilación. Los límites no prometen resolver esperas de disco/kernel imposibles de interrumpir instantáneamente; cualquier fallo conserva evidencia propia y no produce aceptación ficticia.
+
+## Alcance del harness
+
+Se generan fuentes/manifest/lock propios bajo `regression/`, con **cuatro paquetes**: harness, anyhow 1.0.103, crossbeam-epoch 0.9.20 y crossbeam-utils 0.8.21 ya vendorizado. Los dos crates corregidos son dependencias por path fuera del workspace del harness, de modo que sus dev-dependencies no se añaden a la clausura. No se ejecuta cargo update, tidy ni descarga de faltantes; si el lock propuesto no es aceptado por Cargo frozen, se detiene para revisar, sin inventar un resultado positivo.
+
+El caso epoch reproduce `format_null` oficial con Atomic/Shared, tanto sized como slice. El caso anyhow prueba mutación del contexto mediante downcast_mut y su resultado observable. **No demuestra ausencia de UB de aliasing ni rojo/verde Miri**: no hay Miri acreditado y no se instala. El recibo conserva `anyhow_ub_miri_proven=false`, aunque la prueba funcional pase. La corrección de esa propiedad se apoya además en el parche/fingerprint oficial y el aviso de versión, con revisión específica de Root.
+
+Se exige exactamente una línea completa para cada una de las dos pruebas aprobadas y un único resumen positivo completo, con cero fallidas/ignoradas. Se rechazan prefijos, sufijos, duplicados, pruebas adicionales, controles, UTF-8 inválido y cualquier registro FAILED o de fallos contradictorio. Se admiten saltos LF/CRLF y los mensajes normales de compilación. No basta exit0 ni un harness de cero pruebas. Las licencias MIT/Apache-2.0 de los crates quedan en el vendor; los casos derivados del upstream conservan su atribución en la fuente generada.
+
+La revisión v2 corrige esa aceptación de registros: conserva copias byte a byte de las cinco fuentes, perfil, freeze y plan Linux v1 en `.tools/evidence/postgres-immich-security-rebuild-before-v2/`. El perfil v1 permanece intacto y el CLI publica exclusivamente `security-rebuild-v2.profile.json`; el owner y los namespaces operativos originales permanecen fijados, todavía sin usar por esta unidad. Root debe revisar y respaldar el nuevo perfil/SHA antes de cualquier operación.
+
+## Verificaciones de esta entrega
+
+```powershell
+python -W error::ResourceWarning -m unittest discover -s tests -p test_postgres_immich_security_rebuild.py -v
+python -m ruff check docker/postgres-immich/security_rebuild.py docker/postgres-immich/security_rebuild_remote.py tests/test_postgres_immich_security_rebuild.py
+python -m ruff format --check docker/postgres-immich/security_rebuild.py docker/postgres-immich/security_rebuild_remote.py tests/test_postgres_immich_security_rebuild.py
+```
+
+Las pruebas portables usan fixtures/mocks sin conexiones. Las pruebas dir_fd/flock se omiten honestamente en Windows y requieren Linux real antes de certificar esa frontera. Ninguna prueba Python ejecuta el harness Rust o un SDK. La aceptación SQL y la nueva imagen siguen pendientes de compilación, catálogo, SCA y aprobación posteriores.
+
+Para la aceptación Linux, el árbol mínimo contiene los dos módulos Python de esta unidad, `tests/test_postgres_immich_security_rebuild.py` y el parser canónico `scripts/ci/check_env.py` fijado. Se puede ejecutar bajo un nuevo `control/security-rebuild-tests-v2` con owner propio y Python host, bytecode desactivado y ResourceWarnings estrictos. No necesita receta, credenciales, `.env` real, SDK ni restart. Root recibirá un inventario separado con los cuatro SHA finales antes de crear ese namespace. Los seis casos nuevos del validador se suman a los veinte anteriores; las dos pruebas dir_fd/flock siguen pendientes de Linux real.

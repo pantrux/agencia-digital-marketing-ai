@@ -1,0 +1,15 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# Reparar imágenes que ya incorporan la compilación sin cambiar su contenido.
+USER 0:0
+RUN --network=none /bin/bash -euc '\
+    server=/usr/src/app/server; \
+    plugin=$(readlink -f "$server/node_modules/@immich/plugin-sdk"); \
+    [[ "$plugin" == "$server/node_modules/.pnpm/"*"/node_modules/@immich/plugin-sdk" ]]; \
+    [[ -d "$server/dist" && ! -L "$server/dist" && -d "$plugin/dist" && ! -L "$plugin/dist" ]]; \
+    [[ $(find "$server/dist" -type f | wc -l) -eq 1378 ]]; \
+    [[ $(find "$plugin/dist" -type f | wc -l) -eq 7 ]]; \
+    find "$server/dist" "$plugin/dist" -type d -exec chmod 0755 {} +'
+
+USER 1000:1000

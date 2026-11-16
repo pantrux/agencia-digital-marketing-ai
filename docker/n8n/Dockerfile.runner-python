@@ -1,0 +1,20 @@
+FROM docker.io/library/python:3.13.18-alpine3.24@sha256:d76f585fb0d5107dd47143da5e61554fd9cae656a30f3470f815cb8475769b6a AS build
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_INDEX=1 PYTHONDONTWRITEBYTECODE=1
+COPY wheels/ /input/wheels/
+COPY build.requirements runtime.requirements /input/
+COPY source/ /input/source/
+
+RUN --network=none python -c 'import platform, sys; assert sys.version_info[:3] == (3, 13, 18) and platform.machine() == "x86_64"' \
+    && python -m pip --isolated install --no-index --no-deps --require-hashes --find-links=/input/wheels -r /input/build.requirements \
+    && python -m pip --isolated wheel --no-index --no-deps --no-build-isolation --wheel-dir=/built /input/source
+
+RUN --network=none python -m venv --copies --without-pip /opt/runners/task-runner-python/.venv \
+    && python -m pip --isolated --python /opt/runners/task-runner-python/.venv/bin/python install --no-index --no-deps --require-hashes --find-links=/input/wheels -r /input/runtime.requirements \
+    && python -m pip --isolated --python /opt/runners/task-runner-python/.venv/bin/python install --no-index --no-deps /built/task_runner_python-0.1.0-py3-none-any.whl \
+    && /opt/runners/task-runner-python/.venv/bin/python -I -B -X disable_remote_debug -c 'from importlib.metadata import distributions; from importlib.util import find_spec; import websockets.speedups; assert find_spec("src.main") is not None; assert {d.metadata["Name"].lower().replace("_", "-"): d.version for d in distributions()} == {"task-runner-python": "0.1.0", "certifi": "2026.10.23", "sentry-sdk": "2.35.2", "urllib3": "2.8.0", "websockets": "15.0.1"}'
+
+FROM scratch AS payload
+COPY --from=build /opt/runners/task-runner-python/.venv/ /opt/runners/task-runner-python/.venv/
+COPY LICENSE.md /opt/runners/task-runner-python/LICENSE.md
+USER 1000:1000

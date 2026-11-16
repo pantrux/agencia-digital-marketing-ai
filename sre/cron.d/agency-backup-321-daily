@@ -1,0 +1,3 @@
+# Instalar en /etc/cron.d/ en vm-media-01 (UTC).
+SHELL=/bin/sh
+30 * * * * root if [ "$(TZ=America/Santiago /usr/bin/date +\%H)" = 03 ]; then /usr/bin/systemctl start --no-block agency-backup-321-daily.service; fi

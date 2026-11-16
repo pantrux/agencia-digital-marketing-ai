@@ -1,0 +1,128 @@
+name: agency-moneyprinter-functional
+
+x-runtime: &runtime
+  image: ghcr.io/harry0703/moneyprinterturbo@sha256:2547b9b5ba2577bd00e1508ef52497226c776b56f344767466d795b7c0ea4c1d
+  platform: linux/amd64
+  pull_policy: never
+  user: "33:33"
+  working_dir: /MoneyPrinterTurbo
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  init: true
+  restart: "no"
+  cpus: "1.0"
+  mem_limit: 1g
+  memswap_limit: 1g
+  pids_limit: 96
+  dns: ["127.0.0.1"]
+  labels:
+    agency.owner: agencia-digital-marketing-ai:moneyprinter-functional:v1
+  environment:
+    MPT_HOME: /run/mpt
+    PYTHONDONTWRITEBYTECODE: "1"
+    PYTHONNOUSERSITE: "1"
+    PYTHONPYCACHEPREFIX: /tmp/mpt-pycache
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,noexec,size=64m,uid=33,gid=33,mode=0700
+    - /var/www:rw,nosuid,nodev,noexec,size=16m,uid=33,gid=33,mode=0700
+  networks: [speaches]
+  logging:
+    driver: local
+    options: {max-size: "10m", max-file: "2"}
+
+x-overlay:
+  - &subtitle
+    type: bind
+    source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_INPUT_ROOT:?Falta la raíz de insumos}/overlay/app/services/subtitle.py
+    target: /MoneyPrinterTurbo/app/services/subtitle.py
+    read_only: true
+    bind: {create_host_path: false}
+  - &task
+    type: bind
+    source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_INPUT_ROOT:?Falta la raíz de insumos}/overlay/app/services/task.py
+    target: /MoneyPrinterTurbo/app/services/task.py
+    read_only: true
+    bind: {create_host_path: false}
+  - &provider
+    type: bind
+    source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_INPUT_ROOT:?Falta la raíz de insumos}/overlay/app/services/agency_speaches.py
+    target: /MoneyPrinterTurbo/app/services/agency_speaches.py
+    read_only: true
+    bind: {create_host_path: false}
+  - &client
+    type: bind
+    source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_INPUT_ROOT:?Falta la raíz de insumos}/overlay/speaches_client.py
+    target: /MoneyPrinterTurbo/speaches_client.py
+    read_only: true
+    bind: {create_host_path: false}
+  - &contract
+    type: bind
+    source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_INPUT_ROOT:?Falta la raíz de insumos}/overlay/speaches_contract.py
+    target: /MoneyPrinterTurbo/speaches_contract.py
+    read_only: true
+    bind: {create_host_path: false}
+  - &notice
+    type: bind
+    source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_INPUT_ROOT:?Falta la raíz de insumos}/overlay/LICENSE.agency-speaches.txt
+    target: /MoneyPrinterTurbo/LICENSE.agency-speaches.txt
+    read_only: true
+    bind: {create_host_path: false}
+  - &token
+    type: bind
+    source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_INPUT_ROOT:?Falta la raíz de insumos}/secrets/speaches.bearer
+    target: /run/secrets/moneyprinter-speaches
+    read_only: true
+    bind: {create_host_path: false}
+
+services:
+  ui:
+    <<: *runtime
+    command:
+      - /usr/local/bin/streamlit
+      - run
+      - /MoneyPrinterTurbo/webui/Main.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+    ports: ["127.0.0.1:8501:8501"]
+    volumes:
+      - *subtitle
+      - *task
+      - *provider
+      - *client
+      - *contract
+      - *notice
+      - *token
+      - type: bind
+        source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_INPUT_ROOT:?Falta la raíz de insumos}/overlay/webui/Main.py
+        target: /MoneyPrinterTurbo/webui/Main.py
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_STATE_ROOT:?Falta la raíz de estado}/ui
+        target: /run/mpt
+        bind: {create_host_path: false}
+
+  api:
+    <<: *runtime
+    command: [/usr/local/bin/python3.11, -B, /MoneyPrinterTurbo/main.py]
+    expose: ["8080"]
+    volumes:
+      - *subtitle
+      - *task
+      - *provider
+      - *client
+      - *contract
+      - *notice
+      - *token
+      - type: bind
+        source: ${MEDIA_MONEYPRINTER_FUNCTIONAL_STATE_ROOT:?Falta la raíz de estado}/api
+        target: /run/mpt
+        bind: {create_host_path: false}
+
+networks:
+  speaches:
+    external: true
+    name: ${MEDIA_MONEYPRINTER_FUNCTIONAL_NETWORK_NAME:?Falta la red privada aprobada}

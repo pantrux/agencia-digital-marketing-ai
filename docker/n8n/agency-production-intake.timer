@@ -1,0 +1,10 @@
+[Unit]
+Description=Recepción periódica de órdenes de n8n en OpenClaw
+
+[Timer]
+OnBootSec=50s
+OnUnitInactiveSec=10s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,2 @@
+# Dependencia de la auditoría; instalar en un entorno aislado cuando corresponda.
+paramiko==5.1.0

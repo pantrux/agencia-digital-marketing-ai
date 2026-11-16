@@ -1,0 +1,26 @@
+[Unit]
+Description=Cotejo de los recibos diarios de D1 en Synology y R2
+Wants=network-online.target
+After=network-online.target
+ConditionHost=vm-media-01
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 -I -B /usr/local/lib/agency-studio-latency/d1_backup_metrics.py
+LoadCredential=nas-ca:/opt/media-platform/observability-nas-v1/collector-tls/server-ca.pem
+LoadCredential=nas-client:/opt/media-platform/observability-nas-v1/collector-tls/client.pem
+LoadCredential=nas-key:/opt/media-platform/observability-nas-v1/collector-tls/client.key
+TimeoutStartSec=20s
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ReadOnlyPaths=/var/lib/media-platform/backup-d1-clock-v1/journal
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=64M
+TasksMax=8

@@ -1,0 +1,13 @@
+# Root enlaza pythonruntime al OCI local de la captura física respaldada.
+FROM pythonruntime
+USER 0:0
+WORKDIR /opt/zou
+COPY --chown=0:0 --chmod=0555 launch_zou.py /opt/zou/launch_zou.py
+# El índice firmado y las diez identidades residen sólo en el bind RO de build.
+RUN --network=none --mount=type=bind,source=.,target=/inputs,ro ["/usr/bin/python3.12", "-I", "-S", "-B", "/opt/zou/launch_zou.py", "install-apks"]
+RUN --network=none ["/usr/bin/ldconfig"]
+RUN --network=none --mount=type=bind,source=.,target=/inputs,ro ["/usr/bin/python3.12", "-I", "-S", "-B", "/opt/zou/launch_zou.py", "install-wheels"]
+ENV PSYCOPG_IMPL=python PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1
+ENV LD_LIBRARY_PATH=/usr/lib64:/usr/lib HOME=/var/lib/zou
+USER 1000:1000
+CMD ["/usr/bin/python3.12", "-I", "-S", "-B", "/opt/zou/launch_zou.py", "api"]

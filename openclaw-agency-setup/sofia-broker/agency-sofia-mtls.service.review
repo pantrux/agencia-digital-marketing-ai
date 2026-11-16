@@ -1,0 +1,35 @@
+[Unit]
+Description=Ingreso mTLS de NPM para el piloto privado de Sofía
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+ExecStart=/usr/bin/python3 -I -S -B /opt/agency-sofia/sofia_mtls_proxy.py
+LoadCredential=profile.json:/etc/agency-sofia-mtls-v1/profile.json
+LoadCredential=server.pem:/etc/agency-sofia-mtls-v1/server.pem
+LoadCredential=server.key:/etc/agency-sofia-mtls-v1/server.key
+LoadCredential=client-ca.pem:/etc/agency-sofia-mtls-v1/client-ca.pem
+UMask=0077
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=50s
+ProtectHome=yes
+ProtectSystem=strict
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectProc=invisible
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+IPAddressDeny=any
+IPAddressAllow=192.168.0.8/32
+IPAddressAllow=127.0.0.1/32
+
+[Install]
+WantedBy=multi-user.target

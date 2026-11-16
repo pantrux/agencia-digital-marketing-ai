@@ -1,0 +1,25 @@
+[Unit]
+Description=n8n privado y runners de la agencia
+Wants=network-online.target
+Requires=docker.service
+After=network-online.target docker.service nftables.service netfilter-persistent.service agency-observability-nas.service agency-moneyprinter-lan.service agency-supoclip-private.service
+PartOf=docker.service
+RequiresMountsFor=/opt/media-platform/n8n-private-v1 /var/lib/docker /var/lib/media-platform
+StartLimitIntervalSec=600
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/media-platform/n8n-private-v1
+ExecStart=/usr/bin/python3 -I -S -B /opt/media-platform/n8n-private-v1/private_lifecycle.py start
+ExecStop=/usr/bin/python3 -I -S -B /opt/media-platform/n8n-private-v1/private_lifecycle.py stop
+TimeoutStartSec=300s
+TimeoutStopSec=120s
+Restart=on-failure
+RestartSec=15s
+UMask=0077
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

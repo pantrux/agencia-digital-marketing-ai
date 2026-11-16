@@ -1,0 +1,11 @@
+[Unit]
+Description=Medición cada cinco minutos de la sonoridad en Studio
+
+[Timer]
+OnCalendar=*:2/5
+AccuracySec=15s
+Persistent=true
+Unit=agency-studio-render-audio-metrics.service
+
+[Install]
+WantedBy=timers.target

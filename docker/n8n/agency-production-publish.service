@@ -1,0 +1,25 @@
+[Unit]
+Description=Publicación en Studio de la entrega verificada
+Wants=network-online.target agency-production-delivery.service
+After=network-online.target agency-production-delivery.service
+RequiresMountsFor=/mnt/producciones
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-publish
+StateDirectoryMode=0700
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+LoadCredential=assignments:/etc/agency-production-handoff/delivery-assignments.json
+LoadCredential=r2:/etc/agency-production-handoff/publication-r2.json
+LoadCredential=hmac:/etc/agency-production-handoff/publication-hmac
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_publish.py %d/profile %d/assignments %d/r2 %d/hmac /var/lib/agency-production-publish --pending
+TimeoutStartSec=24min
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

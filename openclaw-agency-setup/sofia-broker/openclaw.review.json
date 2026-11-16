@@ -1,0 +1,88 @@
+{
+  "agents": {
+    "ownership": "explicit",
+    "defaults": {
+      "workspace": "/var/lib/agency-sofia-gateway/workspace",
+      "model": { "primary": "openai/gpt-6.1-terra", "fallbacks": [] },
+      "models": {
+        "openai/gpt-6.1-terra": { "agentRuntime": { "id": "codex" }, "codeMode": false }
+      },
+      "skipBootstrap": true,
+      "skills": [],
+      "heartbeat": { "agentId": "agency-account", "every": "0m" },
+      "systemAgent": { "agentId": "agency-account" },
+      "timeoutSeconds": 25,
+      "maxConcurrent": 1
+    },
+    "entries": {
+      "agency-account": {
+        "name": "Sofía",
+        "default": true,
+        "workspace": "/var/lib/agency-sofia-gateway/workspace",
+        "agentDir": "/var/lib/agency-sofia-gateway/state/agents/agency-account/agent",
+        "identity": { "name": "Sofía" },
+        "tools": { "deny": ["*"] }
+      }
+    }
+  },
+  "tools": {
+    "deny": ["*"],
+    "exec": { "mode": "deny" },
+    "elevated": { "enabled": false },
+    "codeMode": false,
+    "web": { "search": { "enabled": false }, "fetch": { "enabled": false } }
+  },
+  "commands": {
+    "native": false, "nativeSkills": false, "text": false, "bash": false,
+    "config": false, "debug": false, "restart": false, "mcp": false, "plugins": false
+  },
+  "browser": { "enabled": false },
+  "cron": { "enabled": false },
+  "hooks": { "enabled": false, "internal": { "enabled": false } },
+  "discovery": { "mdns": { "mode": "off" } },
+  "plugins": {
+    "allow": ["openai", "codex"],
+    "slots": { "memory": "none" },
+    "entries": {
+      "openai": { "enabled": true },
+      "codex": {
+        "enabled": true,
+        "config": {
+          "sessionCatalog": { "enabled": false },
+          "supervision": { "enabled": false },
+          "computerUse": { "enabled": false, "autoInstall": false },
+          "codexPlugins": { "enabled": false },
+          "appServer": {
+            "transport": "stdio",
+            "homeScope": "agent",
+            "requestTimeoutMs": 10000,
+            "sandbox": "read-only",
+            "approvalPolicy": "never",
+            "loopDetectionPreToolUseRelay": false,
+            "cyberFailover": { "mode": "off" }
+          }
+        }
+      }
+    }
+  },
+  "gateway": {
+    "mode": "local", "bind": "loopback", "port": 3108,
+    "auth": { "mode": "token", "token": { "source": "file", "provider": "broker-token", "id": "value" } },
+    "controlUi": { "enabled": false },
+    "uploads": { "enabled": false },
+    "cliAgents": { "enabled": false },
+    "terminal": { "enabled": false },
+    "reload": { "mode": "off" },
+    "tailscale": { "mode": "off" },
+    "nodes": { "browser": { "mode": "off" }, "pairing": { "autoApproveLocal": false } },
+    "http": { "endpoints": {
+      "chatCompletions": { "enabled": false },
+      "responses": { "enabled": true, "maxUrlParts": 0, "files": { "allowUrl": false }, "images": { "allowUrl": false } }
+    } }
+  },
+  "secrets": {
+    "providers": {
+      "broker-token": { "source": "file", "mode": "singleValue", "path": "/etc/agency-sofia/credentials/gateway/gateway-token" }
+    }
+  }
+}

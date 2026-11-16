@@ -1,0 +1,23 @@
+[Unit]
+Description=Immich privado con filtro LAN y GPU
+Wants=network-online.target
+Requires=docker.service
+After=network-online.target docker.service nftables.service netfilter-persistent.service agency-observability-nas.service agency-moneyprinter-lan.service agency-supoclip-private.service agency-n8n-private.service
+PartOf=docker.service
+RequiresMountsFor=/mnt/producciones /opt/media-platform/immich-lan-v1 /var/lib/media-platform/immich-lan-v1 /var/lib/docker
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/bin/python3 -I -S -B /opt/media-platform/immich-lan-v1/lan_guard.py start
+ExecStop=/usr/bin/python3 -I -S -B /opt/media-platform/immich-lan-v1/lan_guard.py stop
+Restart=on-failure
+RestartSec=45s
+TimeoutStartSec=650s
+TimeoutStopSec=360s
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,60 @@
+{
+  "id": "agency-audiovisual-mcp",
+  "name": "MCP audiovisual de la agencia",
+  "description": "Herramientas de producción para los roles de la agencia.",
+  "contracts": {
+    "tools": [
+      "mcp_immich_broll__buscar_broll",
+      "mcp_media_inspector__inspeccionar_medio",
+      "mcp_media_inspector__transcribir_audio",
+      "mcp_remotion_gpu__generar_stills",
+      "mcp_remotion_gpu__renderizar_master",
+      "mcp_kitsu_review__consultar_revision",
+      "mcp_kitsu_review__crear_entregable",
+      "mcp_kitsu_review__preparar_revision",
+      "mcp_kitsu_review__adjuntar_revision"
+    ]
+  },
+  "toolMetadata": {
+    "mcp_immich_broll__buscar_broll": {
+      "optional": true
+    },
+    "mcp_media_inspector__inspeccionar_medio": {
+      "optional": true
+    },
+    "mcp_media_inspector__transcribir_audio": {
+      "optional": true
+    },
+    "mcp_remotion_gpu__generar_stills": {
+      "optional": true
+    },
+    "mcp_remotion_gpu__renderizar_master": {
+      "optional": true
+    },
+    "mcp_kitsu_review__consultar_revision": {
+      "optional": true
+    },
+    "mcp_kitsu_review__crear_entregable": {
+      "optional": true
+    },
+    "mcp_kitsu_review__preparar_revision": {
+      "optional": true
+    },
+    "mcp_kitsu_review__adjuntar_revision": {
+      "optional": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "runtimeRoot"
+    ],
+    "properties": {
+      "runtimeRoot": {
+        "type": "string",
+        "minLength": 2
+      }
+    }
+  }
+}

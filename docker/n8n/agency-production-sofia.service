@@ -1,0 +1,19 @@
+[Unit]
+Description=Brief preliminar de Sofía para las nuevas producciones de Studio
+After=agency-production-intake.service
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-sofia
+StateDirectoryMode=0700
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_sofia.py %d/profile /var/lib/agency-production-sofia
+TimeoutStartSec=7min
+ProtectSystem=full
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

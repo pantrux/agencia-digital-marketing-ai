@@ -1,0 +1,22 @@
+[Unit]
+Description=Preparación de proyectos firmados de Studio en Synology
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/volume2/producciones
+
+[Service]
+Type=simple
+User=1024
+Group=100
+UMask=0077
+ExecStart=/usr/bin/python3 -I -S -B /usr/local/etc/agency-r2-project-v5/sync_nas_entry.py /usr/local/etc/agency-r2-project-v5/profile.json serve
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

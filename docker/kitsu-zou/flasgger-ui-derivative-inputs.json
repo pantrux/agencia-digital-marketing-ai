@@ -1,0 +1,521 @@
+{
+  "access_helper": {
+    "path": "sre/backup_tools_access.py",
+    "sha256": "ae1c6d5e2fbd4550c78d7ea5857b4b4b203a92e2739f9334c831730a1b8cec3b"
+  },
+  "before_sca_receipt": {
+    "path": ".tools/evidence/phase4-kitsu-swagger-embedded-js-sca-v2/receipt.json",
+    "sha256": "64b2e90028d91566ea5475f38710c5caa5af314e30a05e6ece344b87c1c1ef7f"
+  },
+  "embedded_bundles_fully_identified": false,
+  "kind": "flasgger-ui3-local-derivative",
+  "original": {
+    "bytes": 3865358,
+    "license": "MIT",
+    "members": {
+      "flasgger-0.9.7.1.dist-info/METADATA": {
+        "bytes": 29870,
+        "sha256": "5339c53f0a0d8b7b089e3b9e78075b847c16a78fcbff7b3558a80171e7f17f2d"
+      },
+      "flasgger-0.9.7.1.dist-info/RECORD": {
+        "bytes": 9466,
+        "sha256": "9f9904532be3b4f51a0f9aae6bf58b66652f018e419e48f83fc62f940626c0cb"
+      },
+      "flasgger-0.9.7.1.dist-info/WHEEL": {
+        "bytes": 109,
+        "sha256": "52f960d9a36510a76296cc85489b75417e667b47846c28d0cd1de765e164bf2e"
+      },
+      "flasgger-0.9.7.1.dist-info/entry_points.txt": {
+        "bytes": 77,
+        "sha256": "0c6b5ded4f6131b11f28a79319496745a529872e59e006bc1b5ead5244279ab8"
+      },
+      "flasgger-0.9.7.1.dist-info/licenses/LICENSE": {
+        "bytes": 1078,
+        "sha256": "7529b7aaaa0b0ec1dc57943878e71e421e0047e1f75fdb56593806499b17f005"
+      },
+      "flasgger-0.9.7.1.dist-info/top_level.txt": {
+        "bytes": 9,
+        "sha256": "f923a9399412b8930410690a2fdc45630d1aede07db0f976a71b39e3407a7f60"
+      },
+      "flasgger/.DS_Store": {
+        "bytes": 6148,
+        "sha256": "361565259fc67a7d165f6d87ccf11d5a2a5c44e9e237f52ca1989b49142ecc00"
+      },
+      "flasgger/__init__.py": {
+        "bytes": 544,
+        "sha256": "73fd418a2d9275da906bf62a62e4a637bc138cf4a44687189f5e4aa4f0a71fbb"
+      },
+      "flasgger/base.py": {
+        "bytes": 33148,
+        "sha256": "bbc3741d655568f8ba48de873bd1c87510a081190603133d86407ad013815928"
+      },
+      "flasgger/commands.py": {
+        "bytes": 1222,
+        "sha256": "dffe691a8f0939fcc326af3b187ef9368360bcb98c322a9da5c37827189a804b"
+      },
+      "flasgger/compatible.py": {
+        "bytes": 820,
+        "sha256": "3b1fda33973c897ed8a013e2d75399d848e6c5ce010610ead531b7e8537c48a1"
+      },
+      "flasgger/constants.py": {
+        "bytes": 519,
+        "sha256": "4b54e3f258646d6f8fdb9ecb9a7618c86181b6fe01b609eba7797663bd4b3f44"
+      },
+      "flasgger/marshmallow_apispec.py": {
+        "bytes": 4795,
+        "sha256": "66c1939a5c8494b21bf4cb39a1847e46596c08e9bcd3cd9075fc666341361c09"
+      },
+      "flasgger/ui2/static/css/print.css": {
+        "bytes": 41666,
+        "sha256": "66540a982717b42ff3259ea8ed890d0750cd195423f3a34d594dc1d12a417a60"
+      },
+      "flasgger/ui2/static/css/reset.css": {
+        "bytes": 773,
+        "sha256": "44193155efb3084168f8a3a0e0ee5a18038d7e3948a60f53e3de13a3a5f98fec"
+      },
+      "flasgger/ui2/static/css/screen.css": {
+        "bytes": 43644,
+        "sha256": "fa76424e68dd2227cac969b908fefe8cd73fbee02b9cd018a3507601dbd77e4f"
+      },
+      "flasgger/ui2/static/css/style.css": {
+        "bytes": 3488,
+        "sha256": "fa175e5cd5e5a839fee206986438dfc9b065d34042f2ad51b565bb81da322103"
+      },
+      "flasgger/ui2/static/css/typography.css": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "flasgger/ui2/static/fonts/DroidSans-Bold.ttf": {
+        "bytes": 42480,
+        "sha256": "2a68a4d9b6ab0c60aae58e47ce87b184f74ade60d6a8497cfe8559482b88bfa3"
+      },
+      "flasgger/ui2/static/fonts/DroidSans.ttf": {
+        "bytes": 41028,
+        "sha256": "df341854c6d4b88c1c8473cc04af438956da40fbd85b64698cdd43665ac9aa0d"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.eot": {
+        "bytes": 22922,
+        "sha256": "ba2a3058b3ab3d7a5729f54dd398e5ce4d5e345fbb77d6df939a48eeb0a0a405"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.svg": {
+        "bytes": 73575,
+        "sha256": "570ae5e1fa4082fab59a209d7e9bca992ccfaee14f4011ea09514e3405e2ee66"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.ttf": {
+        "bytes": 40513,
+        "sha256": "906879cca01b9490fe3800cbd918968fbd8591810fe09a275ad9bd6726f1e455"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.woff": {
+        "bytes": 25992,
+        "sha256": "8e6db22091fd17d6711f40ad5b730e62303d453f26b90a58e260527f80214563"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.woff2": {
+        "bytes": 11480,
+        "sha256": "a95409a01d48816fc30d7503148c288892c1a2d3a183b33795d37f36dd227d64"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.eot": {
+        "bytes": 22008,
+        "sha256": "24b05fc9497ecd81ed9ba994e274d7935ec7c3370ac1e9d92e656ad73219b9d2"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.svg": {
+        "bytes": 72148,
+        "sha256": "ca9c852e4306217818f20cd2847c046e50ce976df3d898b17fb38d15006b3120"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.ttf": {
+        "bytes": 39069,
+        "sha256": "a51b461237788c61281647edd357abc1d92241d4441af358365013f84f5a5c9c"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.woff": {
+        "bytes": 24868,
+        "sha256": "47cc1a64d936d8b3faa2abc6b04e81d3b85ea0839cdf6666db91780f0f14ea96"
+      },
+      "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.woff2": {
+        "bytes": 11304,
+        "sha256": "4599d1d373747b40571804eda2b7d1a9d6c40f194c9cd9f92d45eda7e94b8c6a"
+      },
+      "flasgger/ui2/static/images/collapse.gif": {
+        "bytes": 69,
+        "sha256": "282ca0d9489ebfef424a53b605839484ef9eb88767231dab352aec300a6f310f"
+      },
+      "flasgger/ui2/static/images/expand.gif": {
+        "bytes": 73,
+        "sha256": "b131e9b75b43cab0e6f4408f07b0da74581622d29a020bac559e42d0448510cd"
+      },
+      "flasgger/ui2/static/images/explorer_icons.png": {
+        "bytes": 5115,
+        "sha256": "d910d26f3a2a1d3cfad0646d085bbd9b603dbab522a2f123cb4491c8fbad5fc0"
+      },
+      "flasgger/ui2/static/images/favicon-16x16.png": {
+        "bytes": 445,
+        "sha256": "0c687c6737476780510f5f474e833be45478a6ba9d0984d42d9df61325d0838d"
+      },
+      "flasgger/ui2/static/images/favicon-32x32.png": {
+        "bytes": 1141,
+        "sha256": "16058a65628324ecdb3db99e9420898b536e250f15894a4a7ed05baf16a957ba"
+      },
+      "flasgger/ui2/static/images/favicon.ico": {
+        "bytes": 5430,
+        "sha256": "ddf19896c48eaaec5ff0d295ca97e0b24587f8fe2304b076a570d5ffc6a4bb3c"
+      },
+      "flasgger/ui2/static/images/logo_small.png": {
+        "bytes": 455,
+        "sha256": "08d1e32cbdbd6356ee744ec61f22f1055ff2769a3937d14cd562f1be0218d6cf"
+      },
+      "flasgger/ui2/static/images/pet_store_api.png": {
+        "bytes": 631,
+        "sha256": "f33e7b1a1d7462a18ae0fcc8b181248db0faf2ec81c3745fa36f4b25f6021823"
+      },
+      "flasgger/ui2/static/images/throbber.gif": {
+        "bytes": 9257,
+        "sha256": "8ee91ceb10dcdf1c87635ff1a1ebe25818612fd9a07cb2dfca79928c3b86d9dc"
+      },
+      "flasgger/ui2/static/images/wordnik_api.png": {
+        "bytes": 670,
+        "sha256": "2f545776c192d6b73e0853e97cc73deed63b3f9f0e21790de691a61ac7bc2eca"
+      },
+      "flasgger/ui2/static/index.html": {
+        "bytes": 4335,
+        "sha256": "7e32a8eee93b0436f6424da9d857afc07c0e619c4dd99b3d6ee11d0f69da04d6"
+      },
+      "flasgger/ui2/static/lang/ca.js": {
+        "bytes": 2395,
+        "sha256": "7da7535d16f17a09eb7372e35d292b4b4137e885d869d7f628ebdda2e9cdebfe"
+      },
+      "flasgger/ui2/static/lang/el.js": {
+        "bytes": 3470,
+        "sha256": "793d42140eabce8c5850f0b0554a554d9fed6590c68b90cfb90a364b91f55fda"
+      },
+      "flasgger/ui2/static/lang/en.js": {
+        "bytes": 2342,
+        "sha256": "e438117585e168d74365cc3ecf570028429dcbc4642b4881be2f636d40d70f94"
+      },
+      "flasgger/ui2/static/lang/es.js": {
+        "bytes": 2464,
+        "sha256": "faa07490a406a864d1ecc04cd1eb2b474622f7fa9a2c054ed2b0649457587555"
+      },
+      "flasgger/ui2/static/lang/fr.js": {
+        "bytes": 2503,
+        "sha256": "eca2a5e6afff3ebb9f7c63e98b981c58dd6969660322336e18adc38f626dba97"
+      },
+      "flasgger/ui2/static/lang/geo.js": {
+        "bytes": 3856,
+        "sha256": "a1c49f926648113c9ab52cf1b0c3a887985c4b1a028977f626d1c6fc10d395cf"
+      },
+      "flasgger/ui2/static/lang/it.js": {
+        "bytes": 2432,
+        "sha256": "0ef3a9d1c5e45f675ebf36006e591e921cc5b446c9d7266584ad67209d2beeec"
+      },
+      "flasgger/ui2/static/lang/ja.js": {
+        "bytes": 2721,
+        "sha256": "57d8e7213a79c3ddb5e120814d65b6de3d5298519ca7f06f875ed87ffabb7ef6"
+      },
+      "flasgger/ui2/static/lang/ko-kr.js": {
+        "bytes": 2320,
+        "sha256": "7ac29bdec244e82331814b32fcddb9a5c0467eceaf511a7a8e4e82997e803dbd"
+      },
+      "flasgger/ui2/static/lang/pl.js": {
+        "bytes": 2298,
+        "sha256": "b6853a3d820dfb1831b95950479fdd8c5d8cabbb5faa7ae710878d6c047c31fc"
+      },
+      "flasgger/ui2/static/lang/pt.js": {
+        "bytes": 2314,
+        "sha256": "f52067367cd70203e726b6f2c957dfdafd3f3eb1821e973867c93b70abe003b1"
+      },
+      "flasgger/ui2/static/lang/ru.js": {
+        "bytes": 3100,
+        "sha256": "eea0e168a330f78f14a49953c55a8ddc3beaf9aba7d277a70f0843e12e9755f6"
+      },
+      "flasgger/ui2/static/lang/tr.js": {
+        "bytes": 2286,
+        "sha256": "2c1f42a57860ecf8e70e2a5706748131940eb43b730d72913053ffaa2c511993"
+      },
+      "flasgger/ui2/static/lang/translator.js": {
+        "bytes": 1421,
+        "sha256": "457ba9b83d81780958ed1d93fa5f49e491db7c9a25cd5e9663e12a61068ec645"
+      },
+      "flasgger/ui2/static/lang/zh-cn.js": {
+        "bytes": 2203,
+        "sha256": "43d7136af215f9bef1ed533efc7a32ec6215230e0ded34b4653c58add6eaeecd"
+      },
+      "flasgger/ui2/static/lib/backbone-min.js": {
+        "bytes": 19371,
+        "sha256": "7e789cb0bbb4f421e0fdcfa00764aa2d0f4c0b9611a2cc4af9203fc306b65251"
+      },
+      "flasgger/ui2/static/lib/es5-shim.js": {
+        "bytes": 22724,
+        "sha256": "2fd7d28de142910c92633457c4138bdff216f48e626556223da7a54e5625c146"
+      },
+      "flasgger/ui2/static/lib/handlebars-4.0.5.js": {
+        "bytes": 71504,
+        "sha256": "3d26847980d7db1b86b543cd8454c898db6a5e4e13dbad273abf524da30393d7"
+      },
+      "flasgger/ui2/static/lib/highlight.9.1.0.pack.js": {
+        "bytes": 10962,
+        "sha256": "b792235fdf2e881d80754db8afb4d23987599d738fc9122df253f44f16fc5890"
+      },
+      "flasgger/ui2/static/lib/highlight.9.1.0.pack_extended.js": {
+        "bytes": 310,
+        "sha256": "3159e21c886950f1447aeb6541c069ebd8efca6f305e1d522a6c4b221a80f4d3"
+      },
+      "flasgger/ui2/static/lib/jquery-1.8.0.min.js": {
+        "bytes": 92032,
+        "sha256": "33558bca53e7d0081c95808d5783159338237e843178dc04eb36a23a839705ac"
+      },
+      "flasgger/ui2/static/lib/jquery.ba-bbq.min.js": {
+        "bytes": 3518,
+        "sha256": "b49cb88dc510ab66a6ddfe489b930c414b61cc35d2efd5ff56efe1859b59e69e"
+      },
+      "flasgger/ui2/static/lib/jquery.slideto.min.js": {
+        "bytes": 365,
+        "sha256": "11683b1e56d501375b93e23b19c7bbaaf61375df9e8dfbb5cf7ff576b01110ad"
+      },
+      "flasgger/ui2/static/lib/jquery.wiggle.min.js": {
+        "bytes": 536,
+        "sha256": "18b6a8a1cbb93b9d512c3b6c36eb7f53f6db872ba4460166188985e093ddb7d7"
+      },
+      "flasgger/ui2/static/lib/js-yaml.min.js": {
+        "bytes": 43510,
+        "sha256": "a339f23d867be74d503aa6b277be5e537f786e9c5a405679ffce3c23ec2ec565"
+      },
+      "flasgger/ui2/static/lib/jsoneditor.min.js": {
+        "bytes": 129835,
+        "sha256": "e8fdcb9e3783fd03fd22c931ff92b8de8a784dc57d79014d3d59f46eeacdde11"
+      },
+      "flasgger/ui2/static/lib/lodash.min.js": {
+        "bytes": 51894,
+        "sha256": "29721156bc37d1e301cdbbbb039f827fdd6da1e9a7d60380889b7798ab48290f"
+      },
+      "flasgger/ui2/static/lib/marked.js": {
+        "bytes": 15724,
+        "sha256": "77b9d6ecfdd31f3ea986e078fb290aa7fb78540ba77e3fac2b9b10ee81a2c2aa"
+      },
+      "flasgger/ui2/static/lib/object-assign-pollyfill.js": {
+        "bytes": 349,
+        "sha256": "d44a990c4feff19176d12f6325ebe772c8272e05a9b8324fa99b6e57c118e809"
+      },
+      "flasgger/ui2/static/lib/sanitize-html.min.js": {
+        "bytes": 130418,
+        "sha256": "4bf3098a853c471f7bc461f5d0d0a0b607e7e96ccfe192264884745e6f231511"
+      },
+      "flasgger/ui2/static/lib/swagger-oauth.js": {
+        "bytes": 7061,
+        "sha256": "b977e3da4529648853b0ff07469624cb6ee11167822a7f34fd8b67300e2d25d7"
+      },
+      "flasgger/ui2/static/o2c.html": {
+        "bytes": 479,
+        "sha256": "c4297e2662b730a75e97451e05563ea4aadbbba93af9f0f70a57921b125025ba"
+      },
+      "flasgger/ui2/static/swagger-ui.js": {
+        "bytes": 2708212,
+        "sha256": "27fa97450de294fac974a6e543bf3d85334e33cb2d7c6593ff2269d105ffa653"
+      },
+      "flasgger/ui2/static/swagger-ui.min.js": {
+        "bytes": 453854,
+        "sha256": "23d05e54aeff545cbdb2e39eeefac3859da3cf54d85fb1a3bbeadfec370560b7"
+      },
+      "flasgger/ui2/templates/flasgger/index.html": {
+        "bytes": 7263,
+        "sha256": "b8cec8d5bff2f3457c5c3bf5e54d30a7114501a8b8fac03f21302efa4bbd8cba"
+      },
+      "flasgger/ui2/templates/flasgger/index_old.html": {
+        "bytes": 6222,
+        "sha256": "aa85a81ea8582fdb2b4e9c5cfb7c4c0cba4080d3e50af1d0e4604f2306b6f1d6"
+      },
+      "flasgger/ui2/templates/flasgger/o2c.html": {
+        "bytes": 479,
+        "sha256": "c4297e2662b730a75e97451e05563ea4aadbbba93af9f0f70a57921b125025ba"
+      },
+      "flasgger/ui3/static/favicon-16x16.png": {
+        "bytes": 665,
+        "sha256": "af24ad604dd7b3bcda8f975ab973075f4a2f70a4087944a12f8ef8b63a3e07c2"
+      },
+      "flasgger/ui3/static/favicon-32x32.png": {
+        "bytes": 628,
+        "sha256": "3ed612f41e050ca5e7000cad6f1cbe7e7da39f65fca99c02e99e6591056e5837"
+      },
+      "flasgger/ui3/static/lib/jquery.min.js": {
+        "bytes": 85578,
+        "sha256": "05b85d96f41fff14d8f608dad03ab71e2c1017c2da0914d7c59291bad7a54f8e"
+      },
+      "flasgger/ui3/static/lib/jquery.min.map": {
+        "bytes": 129572,
+        "sha256": "94a00cc7a13928d8b3aeb3dae8c06888688165559555a89335a7f6492c29cfd3"
+      },
+      "flasgger/ui3/static/swagger-ui-bundle.js": {
+        "bytes": 1002172,
+        "sha256": "43b91101b9ebcfd63273a614fc3d3398753f95be2010637247f632349a3a05f0"
+      },
+      "flasgger/ui3/static/swagger-ui-bundle.js.map": {
+        "bytes": 4277142,
+        "sha256": "ae229a26b4f0e47042fb3fd58fd96b01cf42476f46151ae3e8d25dcac5f5086d"
+      },
+      "flasgger/ui3/static/swagger-ui-standalone-preset.js": {
+        "bytes": 310590,
+        "sha256": "52549c31efec068ee86f97e4d3de80d5b9d66e4bd9bd69ebeca618ba2397b3c2"
+      },
+      "flasgger/ui3/static/swagger-ui-standalone-preset.js.map": {
+        "bytes": 1381697,
+        "sha256": "37253191deab2c973285c5a328c8b4e41a33c59b653a50aac4acebbeec2dd193"
+      },
+      "flasgger/ui3/static/swagger-ui.css": {
+        "bytes": 142690,
+        "sha256": "8f359bfd9f806589888024980eb0f4448dc6e516f5b903518bdf4aa5c8aeaec2"
+      },
+      "flasgger/ui3/static/swagger-ui.css.map": {
+        "bytes": 280799,
+        "sha256": "2c2dd74db35333a32a877cedd19092b90378ba98a2f9508d1cdda345a17fc0e9"
+      },
+      "flasgger/ui3/static/swagger-ui.js": {
+        "bytes": 399813,
+        "sha256": "f577b938c112818e6a97a8549d3b6a9ed04ab4a44c3e5148a71a5a5be11ef902"
+      },
+      "flasgger/ui3/static/swagger-ui.js.map": {
+        "bytes": 1322743,
+        "sha256": "26b98e77e9a1294831438285858889c9155911ee2d895f1394925ef9493b6912"
+      },
+      "flasgger/ui3/templates/flasgger/body_scripts.html": {
+        "bytes": 176,
+        "sha256": "408bc06a829abd96882881b842f016bf8db58e4914bf20c705902aa271f0fc49"
+      },
+      "flasgger/ui3/templates/flasgger/custom_head.html": {
+        "bytes": 108,
+        "sha256": "ae4bd00ef86a265af9e53903bd11390b4563d7878bfd92b485b1331fbb5d6dad"
+      },
+      "flasgger/ui3/templates/flasgger/footer.html": {
+        "bytes": 384,
+        "sha256": "33ab641d66e8e1f9b55e1ea158f4b2a2dd4010510b89b58bd71cdc65d030bdf2"
+      },
+      "flasgger/ui3/templates/flasgger/head.html": {
+        "bytes": 659,
+        "sha256": "0aaee9311855344ae0ef36f0a0f86bd7239db7ede0d9b52d776290124e5e88dc"
+      },
+      "flasgger/ui3/templates/flasgger/index.html": {
+        "bytes": 1152,
+        "sha256": "ad473f60a46912f73964291da51df68b8c953567f37339eabb74643c78aff7da"
+      },
+      "flasgger/ui3/templates/flasgger/oauth2-redirect.html": {
+        "bytes": 2388,
+        "sha256": "9a53fa6ef1fe7219a682c87799b39d522e51a278d20ad4a8e9a88364bee90cee"
+      },
+      "flasgger/ui3/templates/flasgger/swagger.html": {
+        "bytes": 2535,
+        "sha256": "6a08e3289ecaec5eb9ee65e90346e8e06e3833ec45d0f232032295f8408be500"
+      },
+      "flasgger/ui3/templates/flasgger/top.html": {
+        "bytes": 168,
+        "sha256": "622c1cc51648d92ddf7f10bbb1a88e3b63b4ccfedc7c1eb4933c4a328f7b20cc"
+      },
+      "flasgger/utils.py": {
+        "bytes": 35825,
+        "sha256": "084adb54b1a136f128e514c06420df290c39ca756283a5f438da59f93aa68193"
+      }
+    },
+    "path": ".tools/kitsu-zou-build-flasgger-v2/wheels/flasgger-0.9.7.1-py2.py3-none-any.whl",
+    "sdist_sha256": "ca098e10bfbb12f047acc6299cc70a33851943a746e550d86e65e60d4df245fb",
+    "sha256": "ee71b3e30ed15c59274d72a27277ae258378a7f28dc50ac17a4526d343c4618f"
+  },
+  "output": {
+    "filename": "flasgger-0.9.7.1+agency1-py2.py3-none-any.whl",
+    "local_version": "0.9.7.1+agency1",
+    "marker": ".agency-flasgger-ui-owner.json",
+    "root_relative": ".tools/kitsu-zou-flasgger-ui-v1"
+  },
+  "owner": "agencia-digital-marketing-ai:flasgger-ui-derivative:v1",
+  "patch_members": {
+    "flasgger-0.9.7.1.dist-info/METADATA": {
+      "after": "117be2f5281265ce15b1b7b3932c49e0233c2b41054c44baa3e8bac68faab138",
+      "before": "5339c53f0a0d8b7b089e3b9e78075b847c16a78fcbff7b3558a80171e7f17f2d"
+    },
+    "flasgger/__init__.py": {
+      "after": "66f003c35c84717a26d85b452316e55a90f4225e564815c08614068ffbd9e51b",
+      "before": "73fd418a2d9275da906bf62a62e4a637bc138cf4a44687189f5e4aa4f0a71fbb"
+    },
+    "flasgger/base.py": {
+      "after": "81a1665ca846afd3fca4bb4ce64ba5676a5eb5d46cce5508db64818e36a2498d",
+      "before": "bbc3741d655568f8ba48de873bd1c87510a081190603133d86407ad013815928"
+    },
+    "flasgger/ui3/templates/flasgger/body_scripts.html": {
+      "after": "65b7e566be3d78b6085a0d7bf138373dedcccd0337541e372c49580afbea4463",
+      "before": "408bc06a829abd96882881b842f016bf8db58e4914bf20c705902aa271f0fc49"
+    },
+    "flasgger/ui3/templates/flasgger/head.html": {
+      "after": "228e570286734a3d5fc16406cca16cf81e20d25c7977dec96fbd5e84c80b0465",
+      "before": "0aaee9311855344ae0ef36f0a0f86bd7239db7ede0d9b52d776290124e5e88dc"
+    },
+    "flasgger/ui3/templates/flasgger/swagger.html": {
+      "after": "0b74f0df17d44410015b8632a310ab6ddb21cddee3667816136fd48a2b506ea0",
+      "before": "6a08e3289ecaec5eb9ee65e90346e8e06e3833ec45d0f232032295f8408be500"
+    }
+  },
+  "removed_members": [
+    "flasgger/ui2/static/index.html",
+    "flasgger/ui2/static/o2c.html",
+    "flasgger/ui2/static/swagger-ui.js",
+    "flasgger/ui2/static/swagger-ui.min.js",
+    "flasgger/ui2/static/css/print.css",
+    "flasgger/ui2/static/css/reset.css",
+    "flasgger/ui2/static/css/screen.css",
+    "flasgger/ui2/static/css/style.css",
+    "flasgger/ui2/static/css/typography.css",
+    "flasgger/ui2/static/fonts/DroidSans-Bold.ttf",
+    "flasgger/ui2/static/fonts/DroidSans.ttf",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.eot",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.svg",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.ttf",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.woff",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-700.woff2",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.eot",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.svg",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.ttf",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.woff",
+    "flasgger/ui2/static/fonts/droid-sans-v6-latin-regular.woff2",
+    "flasgger/ui2/static/images/collapse.gif",
+    "flasgger/ui2/static/images/expand.gif",
+    "flasgger/ui2/static/images/explorer_icons.png",
+    "flasgger/ui2/static/images/favicon-16x16.png",
+    "flasgger/ui2/static/images/favicon-32x32.png",
+    "flasgger/ui2/static/images/favicon.ico",
+    "flasgger/ui2/static/images/logo_small.png",
+    "flasgger/ui2/static/images/pet_store_api.png",
+    "flasgger/ui2/static/images/throbber.gif",
+    "flasgger/ui2/static/images/wordnik_api.png",
+    "flasgger/ui2/static/lang/ca.js",
+    "flasgger/ui2/static/lang/el.js",
+    "flasgger/ui2/static/lang/en.js",
+    "flasgger/ui2/static/lang/es.js",
+    "flasgger/ui2/static/lang/fr.js",
+    "flasgger/ui2/static/lang/geo.js",
+    "flasgger/ui2/static/lang/it.js",
+    "flasgger/ui2/static/lang/ja.js",
+    "flasgger/ui2/static/lang/ko-kr.js",
+    "flasgger/ui2/static/lang/pl.js",
+    "flasgger/ui2/static/lang/pt.js",
+    "flasgger/ui2/static/lang/ru.js",
+    "flasgger/ui2/static/lang/tr.js",
+    "flasgger/ui2/static/lang/translator.js",
+    "flasgger/ui2/static/lang/zh-cn.js",
+    "flasgger/ui2/static/lib/backbone-min.js",
+    "flasgger/ui2/static/lib/es5-shim.js",
+    "flasgger/ui2/static/lib/handlebars-4.0.5.js",
+    "flasgger/ui2/static/lib/highlight.9.1.0.pack.js",
+    "flasgger/ui2/static/lib/highlight.9.1.0.pack_extended.js",
+    "flasgger/ui2/static/lib/jquery-1.8.0.min.js",
+    "flasgger/ui2/static/lib/jquery.ba-bbq.min.js",
+    "flasgger/ui2/static/lib/jquery.slideto.min.js",
+    "flasgger/ui2/static/lib/jquery.wiggle.min.js",
+    "flasgger/ui2/static/lib/js-yaml.min.js",
+    "flasgger/ui2/static/lib/jsoneditor.min.js",
+    "flasgger/ui2/static/lib/lodash.min.js",
+    "flasgger/ui2/static/lib/marked.js",
+    "flasgger/ui2/static/lib/object-assign-pollyfill.js",
+    "flasgger/ui2/static/lib/sanitize-html.min.js",
+    "flasgger/ui2/static/lib/swagger-oauth.js",
+    "flasgger/ui2/templates/flasgger/index.html",
+    "flasgger/ui2/templates/flasgger/index_old.html",
+    "flasgger/ui2/templates/flasgger/o2c.html",
+    "flasgger/ui3/static/lib/jquery.min.js",
+    "flasgger/ui3/static/lib/jquery.min.map"
+  ],
+  "runtime_approved": false,
+  "schema_version": 1
+}

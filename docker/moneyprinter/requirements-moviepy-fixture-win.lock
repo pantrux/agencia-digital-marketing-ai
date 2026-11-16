@@ -1,0 +1,11 @@
+# Fixture CPython 3.12 Windows amd64. No es el lock de MoneyPrinter para Linux.
+colorama==0.4.6 --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
+decorator==5.2.1 --hash=sha256:d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a
+imageio==2.37.2 --hash=sha256:ad9adfb20335d718c03de457358ed69f141021a333c40a53e57273d8a5bd0b9b
+imageio-ffmpeg==0.6.0 --hash=sha256:02fa47c83703c37df6bfe4896aab339013f62bf02c5ebf2dce6da56af04ffc0a
+moviepy==2.2.1+agency1 --hash=sha256:0d912ce2121a7e409d385d7336f0911638af9285dc5ab8722155c90bd497e984
+numpy==2.4.6 --hash=sha256:d8e8286dd7cea7895157318d1b91cdacac64c479f3cbc8dce548331728484751
+pillow==13.0.0 --hash=sha256:ff3fe9eb621fbb9db4c4be33ab946f6bac5f98ab50ca8d3260503653656c961b
+proglog==0.1.12 --hash=sha256:ccaafce51e80a81c65dc907a460c07ccb8ec1f78dc660cfd8f9ec3a22f01b84c
+python-dotenv==1.2.2 --hash=sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a
+tqdm==4.67.3 --hash=sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf

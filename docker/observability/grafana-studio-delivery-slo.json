@@ -1,0 +1,93 @@
+{
+  "id": null,
+  "uid": "agency-studio-delivery-slo",
+  "title": "Studio · Latencia de entrega",
+  "schemaVersion": 41,
+  "version": 0,
+  "tags": ["agencia", "studio", "sre"],
+  "timezone": "America/Santiago",
+  "refresh": "5m",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Muestras de 60 s en producción",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_delivery_30d_reel_samples{job=\"agency-studio-delivery\",cohorte=\"portal_produccion\"}[6m])", "instant": true, "range": false }],
+      "options": { "colorMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "p95 de producción desde el brief",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_delivery_30d_brief_p95_seconds{job=\"agency-studio-delivery\",cohorte=\"portal_produccion\"}[6m]) and on(cohorte) (last_over_time(studio_delivery_30d_reel_samples{job=\"agency-studio-delivery\"}[6m])>0)", "instant": true, "range": false }],
+      "fieldConfig": { "defaults": { "unit": "s", "noValue": "Sin muestras", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 360 }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Entregas en menos de 6 min · ensayo",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [
+        { "refId": "A", "expr": "last_over_time(studio_delivery_30d_reel_under_target{job=\"agency-studio-delivery\",cohorte=\"portal_ensayo\"}[6m])", "legendFormat": "En plazo", "instant": true, "range": false },
+        { "refId": "B", "expr": "last_over_time(studio_delivery_30d_reel_samples{job=\"agency-studio-delivery\",cohorte=\"portal_ensayo\"}[6m])", "legendFormat": "Total", "instant": true, "range": false }
+      ],
+      "options": { "colorMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Antigüedad de la medición",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "time()-last_over_time(studio_delivery_report_unixtime_seconds{job=\"agency-studio-delivery\"}[1h])", "instant": true, "range": false }],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 360 }, { "color": "red", "value": 600 }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "p95 de entrega en la ventana móvil de 30 días",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [
+        { "refId": "A", "expr": "last_over_time(studio_delivery_30d_brief_p95_seconds{job=\"agency-studio-delivery\",cohorte=~\"portal_produccion|portal_ensayo|portal_sandbox\"}[6m]) and on(cohorte) (last_over_time(studio_delivery_30d_reel_samples{job=\"agency-studio-delivery\"}[6m])>0)", "legendFormat": "Desde brief · {{cohorte}}" },
+        { "refId": "B", "expr": "last_over_time(studio_delivery_30d_reservation_p95_seconds{job=\"agency-studio-delivery\"}[6m]) and on(cohorte) (last_over_time(studio_delivery_30d_reel_samples{job=\"agency-studio-delivery\"}[6m])>0)", "legendFormat": "Desde reserva · {{cohorte}}" },
+        { "refId": "C", "expr": "last_over_time(studio_delivery_target_seconds{job=\"agency-studio-delivery\"}[6m])", "legendFormat": "Objetivo desde brief" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "min": 0, "custom": { "showPoints": "always", "pointSize": 4 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Pedidos completados y duración verificada",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [
+        { "refId": "A", "expr": "last_over_time(studio_delivery_30d_completed{job=\"agency-studio-delivery\"}[6m])", "legendFormat": "Completados · {{cohorte}}" },
+        { "refId": "B", "expr": "last_over_time(studio_delivery_30d_duration_verified{job=\"agency-studio-delivery\"}[6m])", "legendFormat": "Cotejados · {{cohorte}}" }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 0, "min": 0, "custom": { "showPoints": "always", "pointSize": 4 } }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Pedidos demorados, en revisión y cancelados",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [
+        { "refId": "A", "expr": "last_over_time(studio_delivery_30d_pending_overdue{job=\"agency-studio-delivery\"}[6m])", "legendFormat": "Demorados · {{cohorte}}" },
+        { "refId": "B", "expr": "last_over_time(studio_delivery_30d_manual_review{job=\"agency-studio-delivery\"}[6m])", "legendFormat": "Revisión · {{cohorte}}" },
+        { "refId": "C", "expr": "last_over_time(studio_delivery_30d_cancelled{job=\"agency-studio-delivery\"}[6m])", "legendFormat": "Cancelados · {{cohorte}}" }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 0, "min": 0, "custom": { "showPoints": "always", "pointSize": 4 } }, "overrides": [] }
+    }
+  ]
+}

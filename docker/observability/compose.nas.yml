@@ -1,0 +1,125 @@
+name: agency-observability-nas-v1
+
+x-restricted: &restricted
+  platform: linux/amd64
+  pull_policy: never
+  restart: "no"
+  user: "65534:65534"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 64
+  networks: [metrics]
+  labels:
+    agency.owner: agencia-digital-marketing-ai:observability-nas:v1
+  logging:
+    driver: local
+    options:
+      max-size: "1m"
+      max-file: "2"
+
+services:
+  otel-collector:
+    <<: *restricted
+    image: "${AGENCY_OBS_OTEL_IMAGE:?Indica la imagen local acreditada del Collector}"
+    user: "61210:61210"
+    command: ["--config=/etc/agency-otel.yaml"]
+    cpus: 0.50
+    mem_limit: 192m
+    memswap_limit: 192m
+    networks:
+      metrics: {}
+      egress:
+        ipv4_address: "${AGENCY_OBS_EGRESS_IPV4:?Indica la IP privada reservada del Collector}"
+        gw_priority: 1
+    volumes:
+      - type: bind
+        source: ./otel-collector.nas.yml
+        target: /etc/agency-otel.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./collector-tls
+        target: /run/agency-otel-tls
+        read_only: true
+        bind:
+          create_host_path: false
+
+  node-exporter:
+    <<: *restricted
+    image: "${AGENCY_OBS_NODE_IMAGE:?Indica la imagen local acreditada de node-exporter}"
+    command:
+      - --path.procfs=/host-proc
+      - --path.sysfs=/host-sys
+      - --collector.disable-defaults
+      - --collector.cpu
+      - --collector.meminfo
+      - --collector.loadavg
+    cpus: 0.25
+    mem_limit: 64m
+    memswap_limit: 64m
+    volumes:
+      - type: bind
+        source: /proc/stat
+        target: /host-proc/stat
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /proc/meminfo
+        target: /host-proc/meminfo
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /proc/loadavg
+        target: /host-proc/loadavg
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /sys/devices/system/cpu
+        target: /host-sys/devices/system/cpu
+        read_only: true
+        bind:
+          create_host_path: false
+
+  cadvisor:
+    <<: *restricted
+    image: "${AGENCY_OBS_CADVISOR_IMAGE:?Indica la imagen local acreditada de cAdvisor}"
+    command:
+      - --docker_only=true
+      - --raw_cgroup_prefix_whitelist=/system.slice/docker-
+      - --disable_root_cgroup_stats=true
+      - --store_container_labels=false
+      - --enable_metrics=cpu,memory
+      - --housekeeping_interval=15s
+      - --global_housekeeping_interval=15s
+      - --max_procs=1
+      - --profiling=false
+    cgroup: host
+    cpus: 0.25
+    mem_limit: 128m
+    memswap_limit: 128m
+    volumes:
+      - type: bind
+        source: /sys/fs/cgroup
+        target: /sys/fs/cgroup
+        read_only: true
+        bind:
+          create_host_path: false
+
+networks:
+  metrics:
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+  egress:
+    driver: bridge
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.name: br-aobsoutv1
+    ipam:
+      config:
+        - subnet: "${AGENCY_OBS_EGRESS_SUBNET:?Indica una subred privada reservada sin solapamiento}"

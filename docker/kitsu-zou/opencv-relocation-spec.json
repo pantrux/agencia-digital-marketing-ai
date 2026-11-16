@@ -1,0 +1,90 @@
+{
+  "input_marker_sha256": "250051cd9556e013267cbeed5ace8057c383b2b98aeb70c194a266557f4f154b",
+  "input_receipt_sha256": "0a7a51e8b6178de8fbe717df453710c1404b77cd59a1fa0819cef76961735a04",
+  "input_relative": ".tools/backup-source-build/opencv-relocation-inputs-v1",
+  "inputs": {
+    "LICENSE": {
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "size": 11358
+    },
+    "build/CMakeCache.txt": {
+      "sha256": "ec15947a87da198b64d261b1b4c75f993da89e4970c2c9631f13a1d3b048ca05",
+      "size": 118925
+    },
+    "build/opencv2/cvconfig.h": {
+      "sha256": "c08da97658f06109100e0537701e0c7576da369273f6cf7e66b25e91edc84165",
+      "size": 3269
+    },
+    "build/opencv2/opencv_modules.hpp": {
+      "sha256": "20ccbecec7bf05445ff110fc7ea0db6fc70b5b39d28a004ae9616e2ba69b0233",
+      "size": 427
+    },
+    "manifest-approved.json": {
+      "sha256": "1207f5840f3d663775ee54fd377688ef00081681a1a50952df61c5d1ee01cd3a",
+      "size": 203011
+    },
+    "stage/cv2.cpython-312-x86_64-linux-gnu.so": {
+      "sha256": "f03c69c6850b3d4b79b41848f013dbc30c8468b60052ae28f76de33390daeef9",
+      "size": 2308952
+    },
+    "stage/lib/libopencv_core.so.4.13.0": {
+      "sha256": "496c3e2422aae9a07207c2d6c459f7fcee3eaf1447798cef2cffdb0591dea5b3",
+      "size": 5675096
+    },
+    "stage/lib/libopencv_imgcodecs.so.4.13.0": {
+      "sha256": "0deae7af49d02b64642a09d8caef3aba6785206d3470ae45df0d07a29d8546fb",
+      "size": 443096
+    },
+    "stage/lib/libopencv_imgproc.so.4.13.0": {
+      "sha256": "ad35a5bcce551574dc9b9ba432087abe621a09d9a54d06a10f4f97741f9128e1",
+      "size": 9183832
+    }
+  },
+  "openexr_directory": "/overlay/usr/lib/cmake/OpenEXR",
+  "output_relative": ".tools/backup-source-build/opencv-relocated-wheel-v1",
+  "owner": "agencia-digital-marketing-ai:opencv-relocated-wheel:v1",
+  "parent_marker": ".agency-backup-build-owner",
+  "parent_owner": "agencia-digital-marketing-ai:backup-source-build:v1",
+  "patches": {
+    "stage/cv2.cpython-312-x86_64-linux-gnu.so": {
+      "interval": [
+        58234,
+        58251
+      ],
+      "sha256_after": "e91ef1901f5567f385959046a57267a18dfb836dd795605d460bc95b46ae4f10"
+    },
+    "stage/lib/libopencv_imgcodecs.so.4.13.0": {
+      "interval": [
+        21186,
+        21203
+      ],
+      "sha256_after": "cfc465b962b09320835466a3a7c7511b584b1499d3ea488787a58dc4a6bf7e82"
+    }
+  },
+  "runtime_verified": false,
+  "schema_version": 1,
+  "security_approved": false,
+  "source_capture": {
+    "cid": "ea3bd813653b4b61cf205bd4d78c231123d28e87103d951ce4e558e1311e5184",
+    "created": "2026-11-06T19:40:06.925944618Z",
+    "pid": 0,
+    "running": false,
+    "started_at": "2026-11-06T19:52:25.331606029Z",
+    "status": "exited"
+  },
+  "sources": {
+    "acl_reader": {
+      "path": "sre/backup_tools_access.py",
+      "sha256": "ae1c6d5e2fbd4550c78d7ea5857b4b4b203a92e2739f9334c831730a1b8cec3b"
+    },
+    "elf_parser": {
+      "path": "docker/postgres-immich/final_image_remote.py",
+      "sha256": "9e0a282940bd7585b6953b43dbc3f02df9bf01bb9f775e5a7a4eb1172ed4fa49"
+    },
+    "packager": {
+      "path": "docker/kitsu-zou/package_opencv_minimal.py",
+      "sha256": "831a28043da1de203bae7845244e90efd548da4cd75f707d1358d33288b2b9d9"
+    }
+  },
+  "wheel_execution_authorized": false
+}

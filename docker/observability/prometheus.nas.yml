@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 1m
+scrape_configs: []
+rule_files:
+  - prometheus.nas.rules.yml
+storage:
+  tsdb:
+    retention:
+      time: 35d
+      size: 2GB

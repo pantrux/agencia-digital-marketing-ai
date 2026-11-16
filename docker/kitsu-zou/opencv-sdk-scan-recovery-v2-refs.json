@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "kind": "opencv-sdk-scan-recovery-v2",
+  "original_plan": {
+    "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-audit-v1-profile.json",
+    "sha256": "747a33d04bf5238ccc374cc3ac7cd3b1f49050bf9df5cb668d4191cc851001e1"
+  },
+  "capture": {
+    "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v1.capture.json",
+    "sha256": "fbdb485a006e697b498a26a57981e8909daa59b67df427a785998763dff659d3"
+  },
+  "failure_diagnostic": {
+    "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-scan-preflight-failure-v1.json",
+    "sha256": "86a602ab3b66a68cc9fd1360a50ad2d0f2ee48b76cb6ecfc2fe4240a177a4503"
+  },
+  "original_scanner_sha256": "1455c74e1dd547d1fb0068b681f67c0de1208a46bdd6d1a9acd6f060c511c01e",
+  "original_sbom_sha256": "183d7db164ed11d14406f36d8c22b3ac70179ed1512f5f29ec34547f8b3fd8d6",
+  "original_reader_sha256": "4d46898d6700d5858bc778a3ddb68acc0c0f2d44b923a35c9c681a789fa18dd2",
+  "archive_sha256": "52ecd3e45a5ea7477ed07bd12ba4ada56347ea84690b672174f7bf8b450c260c",
+  "report_prefix": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v2",
+  "original_scan_failed_preflight": true,
+  "original_native_job_started": false,
+  "capture_repeated": false,
+  "original_report_prefix": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v1",
+  "previous_recovery": {
+    "source_sha256": "9ce903e38ebab3a33d19d1c27bfc5eeacd5717d964bbb0850089f32c6421335d",
+    "profile": {
+      "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-scan-recovery-v1-profile.json",
+      "sha256": "c377f4767343698e3cba640451c958a25fb080251fde821d017247b08a4a475d"
+    },
+    "outputs": {
+      "sbom": {
+        "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v1.cdx.json",
+        "sha256": "ad84c63cc3c496bdd4ba43b5b55dc91a72c364f86dbfc18cc702144b62c22cc9"
+      },
+      "report": {
+        "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v1.trivy.json",
+        "sha256": "1a932c939ea48fd0a0726a332f5bbc0365892d084e80f4fea62b034246ca871c"
+      },
+      "stdout": {
+        "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v1.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v1.stderr.log",
+        "sha256": "b8fd25fcb1562666360e4343cb2d98628f5a00fd6d999a7a7346285e58266246"
+      },
+      "intent": {
+        "path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\phase4-zou-opencv-sdk-installed-755ea032b52a767f-v1.scan-recovery-intent.json",
+        "sha256": "c8f0de414bf9b094031f9fb33e8d2c3f63b331d6f6b359e8195e46ea90ef7d70"
+      }
+    },
+    "scan_executed": true,
+    "accepted": false,
+    "reported_os": {
+      "Family": "none",
+      "Name": ""
+    },
+    "reported_apk": 0,
+    "reported_numpy": 1
+  }
+}

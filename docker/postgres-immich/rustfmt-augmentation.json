@@ -1,0 +1,40 @@
+{
+  "archive_url": "https://static.rust-lang.org/dist/2026-11-05/rustfmt-beta-x86_64-unknown-linux-musl.tar.xz",
+  "archive_sha256": "6780fae76a43c0f7df06406813909697d2dc08445179260d73c8fb6b6ef4180d",
+  "archive_size": 2938832,
+  "rust_channel_manifest_sha256": "325df53718c60181d663c7196f251f4ba9bac44ef2616896d1e33e8396a562db",
+  "rust_commit": "01ddda61fada79bbc835476209518a6f68322984",
+  "rustfmt_version": "1.11.0-beta.10",
+  "files_to_copy": {
+    "bin/rustfmt": {
+      "sha256": "bc01859cf8d5b93e912b62d711500a30a19da8ad2fe52ba7c2d1c5efb67b1c3f",
+      "size": 7114584
+    },
+    "share/doc/rustfmt/LICENSE-APACHE": {
+      "sha256": "092c8e82c47fb859d7385253c1b04052dbd65a8bcf0bbd8b6f7dba58a9e8753d",
+      "size": 10852
+    },
+    "share/doc/rustfmt/LICENSE-MIT": {
+      "sha256": "ae0f1f791e3b4faccf981c0b530199235a8b8a021c7ef0c3c85c6c676ea4d27f",
+      "size": 1076
+    },
+    "share/doc/rustfmt/README.md": {
+      "sha256": "f064e0c8e663367ae94f343aa6c7aa55892eb0c6f80fb1d7e1fe48ff3fbaaa9e",
+      "size": 10386
+    }
+  },
+  "install_prefix": "/opt/agency-rustfmt-v1",
+  "driver": {
+    "path": "/opt/agency-rust/lib/librustc_driver-03ff6c29172e9b06.so",
+    "sha256": "626e0c6efaac2ce87441a7fffa7ee53f66c3a90df282803420771698d33b2e2f",
+    "size": 310364368
+  },
+  "schema_version": 1,
+  "owner": "agencia-digital-marketing-ai:postgres-immich-rustfmt:v1",
+  "archive_prefix": "rustfmt-beta-x86_64-unknown-linux-musl/rustfmt-preview/",
+  "license": "MIT OR Apache-2.0",
+  "pgrx_bindgen_source_sha256": "283316fdf153860a21b2ee3263b6883bce9dc16bb6a0fdb06b96192f9d6393a2",
+  "catalog_sha256": "c77f7f7cdb1ba3b54598498067fb7bfed96a7d533e2df87b5903ee8c8f3c9d14",
+  "sdk_executed": false,
+  "installation_performed": false
+}

@@ -1,0 +1,24 @@
+[Unit]
+Description=SupoClip privado de la agencia y su aislamiento de red
+Wants=network-online.target
+Requires=docker.service
+After=network-online.target docker.service nftables.service netfilter-persistent.service agency-observability-nas.service agency-moneyprinter-lan.service
+PartOf=docker.service
+RequiresMountsFor=/opt/media-platform/supoclip-boot-v1 /opt/media-platform/supoclip-trial-20261113-v1 /opt/media-platform/supoclip-model-20261113-v1 /var/lib/docker
+StartLimitIntervalSec=600
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 -I -S -B /opt/media-platform/supoclip-boot-v1/supoclip_boot.py start
+ExecStop=/usr/bin/python3 -I -S -B /opt/media-platform/supoclip-boot-v1/supoclip_boot.py stop
+Restart=on-failure
+RestartSec=15s
+TimeoutStartSec=360s
+TimeoutStopSec=480s
+UMask=0077
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

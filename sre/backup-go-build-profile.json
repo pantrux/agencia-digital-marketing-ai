@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "owner": "agencia-digital-marketing-ai:backup-build-job:v1",
+  "build_root": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\backup-source-build",
+  "build_marker_name": ".agency-backup-build-owner",
+  "build_marker_value": "agencia-digital-marketing-ai:backup-source-build:v1",
+  "run_root": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\backup-source-build\\runs\\go-sdk-env-v1",
+  "run_marker_value": "agencia-digital-marketing-ai:backup-build-run:v1",
+  "sdk_version": "go1.27.3",
+  "sdk_root": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\backup-source-build\\sdk\\go1.27.3\\go",
+  "sdk_executable": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\backup-source-build\\sdk\\go1.27.3\\go\\bin\\go.exe",
+  "sdk_executable_sha256": "83b7ba66215e696414fa49462d0db2da4f4cf15c7bebd42f0b189fa04866999d",
+  "sdk_tools_map_path": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\evidence\\backup-go-sdk-executable-map.json",
+  "sdk_tools_map_sha256": "c88ef844b9f215c43406e106606f8a65b6e234672947cdd6daf84d5b3bc830ae",
+  "windows_root": "C:\\Windows",
+  "allowed_operations": ["env"],
+  "limits": {
+    "processes": 8,
+    "memory_bytes": 2147483648,
+    "output_bytes": 65536,
+    "env_timeout_seconds": 30,
+    "prepare_timeout_seconds": 180,
+    "build_timeout_seconds": 600
+  }
+}

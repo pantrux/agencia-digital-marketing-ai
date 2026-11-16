@@ -1,0 +1,75 @@
+flowchart TB
+    %% La Fase 1 incorpora Bash, PowerShell y Python de vcenter a los analizadores.
+    %% El control 4 instala los pines de requirements-dev.txt antes de ejecutar pytest.
+    %% El control 5 admite fases 0 a 7. Fases 1 a 7 heredan el SDK fijado sin contactar el laboratorio.
+    %% storage incorpora su Python/Bash a los analizadores; sus pruebas SMB usan mocks sin red.
+    %% ADR-001: origen NAS /volume2/producciones; las pruebas locales no sustituyen la evidencia real de Fase 2.
+    %% Preservar el datastore ESXi /volume2/NFS y las exportaciones existentes.
+    %% Control 6: pip-audit 2.10.1 aislado audita requisitos y constraints Python; su JSON debe cubrir todos los pines.
+    %% CI GPU: estilo, tipos y pruebas aisladas; no CUDA, pesos, servicios ni acceso al host .6.
+    %% Control 6 separa Python dev/contratos CPU (27), métricas (4), Immich runtime (70)/build (8) y Whisper (94).
+    %% npm audita raíz y renderer; runtime Immich tiene 69 consultas OSV incluido ORT CUDA 12 y una fuente exceptuada.
+    %% El validador exige cuatro JSON y cuatro stderr; avisos OSV incompletos bloquean aunque pip-audit devuelva 0.
+    %% Los informes de seguridad disponibles se conservan 14 días aun ante fallos, sin incluir secretos.
+    %% El recibo npm del renderer vincula los hashes de package.json, lock y reporte con umbral high.
+    %% Las pruebas Node cubren bundle único concurrente, assets UUID y QA normalizada 0..1920 también en 4K.
+    %% El manifiesto declara Fase 7 con CD deshabilitado. Los siete controles deben pasar.
+    %% El control 7 coteja los árboles de ambos commits cuando la comparación alcanza su límite.
+    %% La evidencia operativa de Fase 4 se registra fuera de CI.
+    %% Ruff y formato incluyen docker/.
+    %% Los controles de Worker, ingress y portal se ejecutan cuando existen sus fuentes de entrada.
+    INICIO["Solicitud de cambio a main, actualización de main o ejecución manual"]
+    INICIO --> G1["1. Secretos: Gitleaks y plantilla de variables"]
+    INICIO --> G2["2. Estilo y formato, incluidos ingress y Worker; sintaxis del workflow"]
+    INICIO --> G3["3. Tipos de raíz, Worker y renderer; tipos y exportación estática del portal"]
+    INICIO --> G4["4. Vitest, Node del renderer y pytest, incluidos ingreso, DSM, D1 y bóveda"]
+    INICIO --> G5["5. Mínimos de Fases 0 a 7, PowerCLI, Compose sintético y migraciones D1 locales"]
+    INICIO --> G6["6. npm raíz, renderer y portal; Trivy y SCA Python con cobertura exacta"]
+    INICIO --> G7["7. Integridad de documentos y diagramas con lista completa de cambios"]
+    G1 --> TODOS{"¿Siete resultados correctos?"}
+    G2 --> TODOS
+    G3 --> TODOS
+    G4 --> TODOS
+    G5 --> TODOS
+    G6 --> TODOS
+    G7 --> TODOS
+    TODOS -->|"No"| ERROR["Bloquear calidad y corregir la causa"]
+    TODOS -->|"Sí"| CALIDAD["quality-gates aprobado"]
+    CALIDAD --> LIMITE["Manifiesto Fase 7 con CD deshabilitado"]
+    GPU["Cierre GPU: CUDA, formatos 1080p y 4K con alfa, salud LAN, dos slots y YuNet/AuraFace"] -->|"Evidencia operativa"| LIMITE
+    LIMITE --> FASE4["Fase 4: aplicaciones, observabilidad y restauración desde NAS y R2"]
+    LIMITE --> FASE5["Fase 5: cinco agentes, skills y cuatro MCP en OpenClaw"]
+    LIMITE -. "Aceptación operativa pendiente" .-> FASE6["Fase 6: portal, Worker, D1, ingress y Sofía"]
+    LIMITE -. "Aceptación operativa pendiente" .-> FASE7["Fase 7: producción, entrega, reversión y auditoría de la bóveda"]
+    PG4["PostgreSQL en la VM: PGDATA, Kitsu, n8n, SupoClip e Immich; perfil del respaldo diario"] -->|"Evidencia operativa"| FASE4
+    PG1616["Imagen 16.16 fijada, aceptación SQL aislada y revisión de extensiones e índices"] --> PG4
+    PGIMMICH["Copia fría de Immich, cambio del digest y volcado verificado desde el nuevo contenedor"] --> PG4
+    OBS4["Validación de reglas con promtool y comprobación mTLS después de recargar Prometheus"] -->|"Evidencia operativa"| FASE4
+    CARAS4["Ensayo facial en Immich aislado con corpus y umbrales fijados"] -->|"Evidencia operativa"| FASE4
+    TRAZA4["Diagnóstico facial: cotejar consultas, vecinos y asignaciones de la instancia de ensayo"] --> CARAS4
+    TANDAS4["Cotejar asignaciones acumuladas tras tres tandas con las colas drenadas"] --> CARAS4
+    R2NAS4["Verificar montaje NFS e identidad del volumen en el aprovisionador DSM"] -->|Evidencia operativa| FASE4
+    COPIAS4["Cotejar recibos de D1 y restauración de la bóveda desde R2"] -->|Evidencia operativa| FASE4
+    ALERT4["Verificar TLS mutuo de Prometheus a Alertmanager y el acceso SMTP desde su bridge"] -->|Evidencia operativa| FASE4
+
+    %% Las líneas discontinuas representan trabajo futuro, no trabajos activos de entrega.
+    subgraph FUTURO["Fases posteriores: activar después de verificar recursos y salvaguardas"]
+        PREVIEW["Vista previa aislada con D1 de prueba"]
+        SALVA["Capturar versión previa, copia y manifiesto con hashes"]
+        NUBE["Desplegar Cloudflare Pages, Worker y migraciones compatibles"]
+        LAN["Runner en .85: medios .85, agencia .7 y verificación GPU .6"]
+        SALUD["Sondear todos los planos con presupuesto total de 85 s"]
+        DICTAMEN{"¿Salud correcta?"}
+        EXITO["Conservar evidencia de entrega y métricas"]
+        REV["Validar manifiesto y revertir Worker, Compose y OpenClaw"]
+        VERIF["Verificar recuperación y registrar duración real"]
+        SALVA --> NUBE
+        SALVA --> LAN
+        NUBE --> SALUD
+        LAN --> SALUD
+        SALUD --> DICTAMEN
+        DICTAMEN -->|"Sí"| EXITO
+        DICTAMEN -->|"No"| REV --> VERIF
+    end
+    LIMITE -. "Solicitud de cambio futura" .-> PREVIEW
+    LIMITE -. "Entrega futura a main" .-> SALVA

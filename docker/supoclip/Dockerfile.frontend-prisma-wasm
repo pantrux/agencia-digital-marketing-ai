@@ -1,0 +1,4 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+COPY --chown=0:0 --chmod=0444 query_compiler_bg.wasm /opt/supoclip/frontend/src/generated/prisma/query_compiler_bg.wasm
+USER 1000:1000

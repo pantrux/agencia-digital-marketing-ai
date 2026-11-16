@@ -1,0 +1,21 @@
+[Unit]
+Description=Consumidor R2 con montaje NAS verificado
+Wants=network-online.target
+Requisite=docker.service
+PartOf=docker.service
+BindsTo=mnt-producciones.mount
+After=network-online.target docker.service mnt-producciones.mount
+RequiresMountsFor=/mnt/producciones /opt/media-platform/r2-service-boot-v1 /var/lib/media-platform/r2-sync-consumer /var/lib/docker
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/bin/python3 -I -S -B /opt/media-platform/r2-service-boot-v1/r2_service_boot.py run
+# Cubre también fallos antes de READY=1 y la terminación del docker wait.
+ExecStopPost=/usr/bin/python3 -I -S -B /opt/media-platform/r2-service-boot-v1/r2_service_boot.py stop
+TimeoutStartSec=75s
+TimeoutStopSec=45s

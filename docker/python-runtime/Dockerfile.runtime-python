@@ -1,0 +1,8 @@
+# Base fijada; no hay RUN, instalación, scripts ni herramientas de compilación.
+FROM cgr.dev/chainguard/wolfi-base@sha256:ce3d463053d289b9cb4fd8a1b5202acaa5b20093acefb232df7304cf2be0bb72
+COPY --chown=0:0 rootfs/ /
+ENV LD_LIBRARY_PATH=/usr/lib64:/usr/lib
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+USER 1000:1000
+WORKDIR /
+CMD ["/usr/bin/python3.12", "-I", "-S", "-B", "-c", "raise SystemExit('Runtime base: falta una operación explícita')"]

@@ -1,0 +1,13 @@
+# Los contextos nombrados se verifican en vm-media-01 antes de construir.
+FROM wolfi
+USER 0:0
+COPY --chown=0:0 --chmod=0555 assemble_frontend.sh /opt/supoclip/bin/
+RUN --network=none --mount=type=bind,from=sdk,source=.,target=/sdk-inputs,ro --mount=type=tmpfs,target=/tmp ["/bin/sh", "/opt/supoclip/bin/assemble_frontend.sh"]
+COPY --from=standalone --chown=0:0 / /opt/supoclip/frontend/
+USER 1000:1000
+WORKDIR /opt/supoclip/frontend
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000 HOME=/tmp
+RUN --network=none ["/usr/bin/node", "--check", "server.js"]
+EXPOSE 3000
+HEALTHCHECK --interval=20s --timeout=5s --start-period=20s --retries=3 CMD ["/usr/bin/node", "-e", "fetch('http://127.0.0.1:3000/sitemap.xml',{signal:AbortSignal.timeout(3500)}).then(r=>{if(r.status!==200)process.exitCode=1;return r.body.cancel()}).catch(()=>{process.exitCode=1})"]
+ENTRYPOINT ["/usr/bin/node", "server.js"]

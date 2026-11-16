@@ -1,0 +1,63 @@
+{
+  "backup": {
+    "database": {
+      "enabled": false
+    }
+  },
+  "integrityChecks": {
+    "checksumFiles": {
+      "enabled": false
+    },
+    "missingFiles": {
+      "enabled": false
+    },
+    "untrackedFiles": {
+      "enabled": false
+    }
+  },
+  "library": {
+    "scan": {
+      "enabled": false
+    },
+    "watch": {
+      "enabled": false
+    }
+  },
+  "machineLearning": {
+    "availabilityChecks": {
+      "enabled": true,
+      "timeout": 7000
+    },
+    "clip": {
+      "enabled": true,
+      "modelName": "ViT-B-32__openai"
+    },
+    "duplicateDetection": {
+      "enabled": false
+    },
+    "enabled": true,
+    "facialRecognition": {
+      "enabled": false,
+      "modelName": "agency_yunet_auraface_v1"
+    },
+    "ocr": {
+      "enabled": false
+    },
+    "urls": ["http://immich-ml-auth:3003"]
+  },
+  "map": {
+    "enabled": false
+  },
+  "newVersionCheck": {
+    "enabled": false
+  },
+  "oauth": {
+    "enabled": false
+  },
+  "passwordLogin": {
+    "enabled": true
+  },
+  "reverseGeocoding": {
+    "enabled": false
+  }
+}

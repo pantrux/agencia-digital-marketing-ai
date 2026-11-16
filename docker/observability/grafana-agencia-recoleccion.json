@@ -1,0 +1,683 @@
+{
+  "uid": "agencia-recoleccion",
+  "title": "Agencia Digital · Recolección de métricas",
+  "description": "Salud, cobertura, métricas del puente GPU y espacio disponible de la VM.",
+  "schemaVersion": 41,
+  "editable": true,
+  "tags": [
+    "agencia",
+    "prometheus",
+    "nas"
+  ],
+  "timezone": "browser",
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Recolectores activos",
+      "description": "Resultado de la última recolección por destino. 1 indica éxito. 0 indica fallo.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "up{job=~\"agency-node|agency-cgroups|agency-gpu-bridge\"}",
+          "legendFormat": "{{job}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Éxito de recolección en 24 horas",
+      "description": "Proporción de las muestras up presentes en las últimas 24 horas. La cobertura indica cuántas muestras están presentes.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(up{job=~\"agency-node|agency-cgroups|agency-gpu-bridge\"}[24h])",
+          "legendFormat": "{{job}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Muestras presentes en 24 horas",
+      "description": "Número de muestras up presentes en las últimas 24 horas. La cobertura depende del intervalo de recolección y del tiempo durante el que el destino estuvo configurado.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "count_over_time(up{job=~\"agency-node|agency-cgroups|agency-gpu-bridge\"}[24h])",
+          "legendFormat": "{{job}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Historial de recolección",
+      "description": "Serie up de cada recolector de la agencia.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "up{job=~\"agency-node|agency-cgroups|agency-gpu-bridge\"}",
+          "legendFormat": "{{job}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Salud de los servicios GPU",
+      "description": "1 indica saludable y 0 indica degradado. Si la última muestra supera 45 segundos, se muestra sin datos.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "gpu_bridge_service_healthy{job=\"agency-gpu-bridge\",service=~\"immich|whisper|render\"} and (time() - timestamp(gpu_bridge_service_healthy{job=\"agency-gpu-bridge\",service=~\"immich|whisper|render\"}) < 45)",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Sin datos",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Degradado",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Saludable",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Edad de la última muestra GPU",
+      "description": "Tiempo transcurrido desde la última muestra. El intervalo normal de recolección es de 15 segundos.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 15,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "time() - timestamp(up{job=\"agency-gpu-bridge\"})",
+          "legendFormat": "Puente GPU",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 7,
+      "title": "Sesiones del codificador",
+      "description": "Sesiones NVENC informadas por el controlador. Cuando el controlador no informa el contador se muestra sin datos.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 15,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "gpu_encoder_sessions{job=\"agency-gpu-bridge\"} and on (job,instance) (gpu_encoder_sessions_available{job=\"agency-gpu-bridge\"} == 1)",
+          "legendFormat": "NVENC",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 8,
+      "title": "Memoria GPU",
+      "description": "Memoria en uso y capacidad total reportadas por el controlador.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "gpu_memory_used_mib{job=\"agency-gpu-bridge\"}",
+          "legendFormat": "En uso",
+          "instant": false,
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "gpu_memory_total_mib{job=\"agency-gpu-bridge\"}",
+          "legendFormat": "Capacidad",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "mbytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Utilización GPU",
+      "description": "Porcentaje de utilización reportado por el controlador.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "gpu_utilization_percent{job=\"agency-gpu-bridge\"}",
+          "legendFormat": "GPU",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Temperatura GPU",
+      "description": "Temperatura de la GPU en grados Celsius.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "gpu_temperature_celsius{job=\"agency-gpu-bridge\"}",
+          "legendFormat": "GPU",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Reinicios por servicio GPU",
+      "description": "Reinicios acumulados desde el arranque del supervisor. El contador vuelve a cero al reiniciar el supervisor.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 29,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "gpu_bridge_service_restarts_total{job=\"agency-gpu-bridge\",service=~\"immich|whisper|render\"}",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "title": "Espacio disponible en vm-media-01",
+      "description": "Bytes disponibles para procesos sin privilegios en el disco raíz. La alerta se activa después de cinco minutos por debajo de 3 GiB.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "agency-prometheus-nas"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "agency-prometheus-nas"
+          },
+          "editorMode": "code",
+          "expr": "min by (job, mountpoint) (system_filesystem_usage_bytes{job=\"agency-media-host\",mountpoint=\"/\",type=\"ext4\",state=\"free\"} and (time() - timestamp(system_filesystem_usage_bytes{job=\"agency-media-host\",mountpoint=\"/\",type=\"ext4\",state=\"free\"}) < 180))",
+          "legendFormat": "Disponible",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 3221225472 }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": { "mode": "line" },
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Latencia de inferencia de Whisper",
+      "description": "Percentil 95 estimado en 30 días. Cada inferencia completa se expresa en segundos por minuto de audio.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "agency-prometheus-nas" },
+      "gridPos": { "x": 0, "y": 45, "w": 16, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le) (increase(agency_whisper_inference_seconds_per_minute_bucket{job=\"agency-whisper\"}[30d]))) and (sum(increase(agency_whisper_inference_seconds_per_minute_count{job=\"agency-whisper\"}[30d])) > 0)",
+          "legendFormat": "p95 en 30 días",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 8 }]
+          },
+          "custom": { "thresholdsStyle": { "mode": "line" } }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "title": "Inferencias de Whisper en 30 días",
+      "description": "Recuento estimado por Prometheus para interpretar el percentil de la misma ventana.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "agency-prometheus-nas" },
+      "gridPos": { "x": 16, "y": 45, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "expr": "round(sum(increase(agency_whisper_inference_seconds_per_minute_count{job=\"agency-whisper\"}[30d])))",
+          "legendFormat": "Inferencias observadas",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0 },
+        "overrides": []
+      }
+    }
+  ]
+}
