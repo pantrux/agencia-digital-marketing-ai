@@ -14,7 +14,7 @@ flowchart TB
     %% El recibo npm del renderer vincula los hashes de package.json, lock y reporte con umbral high.
     %% Las pruebas Node cubren bundle único concurrente, assets UUID y QA normalizada 0..1920 también en 4K.
     %% El manifiesto declara Fase 7 con CD deshabilitado. Los siete controles deben pasar.
-    %% La publicación del código y la ejecución remota en GitHub siguen pendientes.
+    %% El control 7 coteja los árboles de ambos commits cuando la comparación alcanza su límite.
     %% La evidencia operativa de Fase 4 se registra fuera de CI.
     %% Ruff y formato incluyen docker/.
     %% Los controles de Worker, ingress y portal se ejecutan cuando existen sus fuentes de entrada.
@@ -25,7 +25,7 @@ flowchart TB
     INICIO --> G4["4. Vitest, Node del renderer y pytest, incluidos ingreso, DSM, D1 y bóveda"]
     INICIO --> G5["5. Mínimos de Fases 0 a 7, PowerCLI, Compose sintético y migraciones D1 locales"]
     INICIO --> G6["6. npm raíz, renderer y portal; Trivy y SCA Python con cobertura exacta"]
-    INICIO --> G7["7. Integridad de documentos y diagramas"]
+    INICIO --> G7["7. Integridad de documentos y diagramas con lista completa de cambios"]
     G1 --> TODOS{"¿Siete resultados correctos?"}
     G2 --> TODOS
     G3 --> TODOS
@@ -35,7 +35,7 @@ flowchart TB
     G7 --> TODOS
     TODOS -->|"No"| ERROR["Bloquear calidad y corregir la causa"]
     TODOS -->|"Sí"| CALIDAD["quality-gates aprobado"]
-    CALIDAD --> LIMITE["Manifiesto Fase 7 con CD deshabilitado. Publicación y ejecución GitHub pendientes."]
+    CALIDAD --> LIMITE["Manifiesto Fase 7 con CD deshabilitado"]
     GPU["Cierre GPU: CUDA, formatos 1080p y 4K con alfa, salud LAN, dos slots y YuNet/AuraFace"] -->|"Evidencia operativa"| LIMITE
     LIMITE --> FASE4["Fase 4: aplicaciones, observabilidad y restauración desde NAS y R2"]
     LIMITE --> FASE5["Fase 5: cinco agentes, skills y cuatro MCP en OpenClaw"]

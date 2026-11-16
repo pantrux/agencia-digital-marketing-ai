@@ -180,6 +180,48 @@ class PruebasCambiosGitHub(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULO.changes_from_github(self.entorno, lambda ruta: respuesta)
 
+    def test_push_desde_licencia_usa_arboles_completos_al_llegar_al_limite(self):
+        self.entorno["GITHUB_EVENT_NAME"] = "push"
+        anterior, actual = "a" * 40, "b" * 40
+        arbol_anterior, arbol_actual = "c" * 40, "d" * 40
+        self.guardar_evento({"before": anterior, "after": actual})
+        prefijo = "/repos/equipo/plataforma"
+        fuentes = [f"src/archivo-{i}.ts" for i in range(300)]
+        rutas_requeridas = [MODULO.WORKFLOW, MODULO.RECIPE, MODULO.DIAGRAM]
+        licencia = {"type": "blob", "path": "LICENSE", "sha": "e" * 40, "mode": "100644"}
+        respuestas = {
+            f"{prefijo}/compare/{anterior}...{actual}?per_page=100&page=1": {
+                "files": [{"filename": path} for path in fuentes]
+            },
+            f"{prefijo}/commits/{anterior}": {
+                "sha": anterior,
+                "commit": {"tree": {"sha": arbol_anterior}},
+            },
+            f"{prefijo}/commits/{actual}": {
+                "sha": actual,
+                "commit": {"tree": {"sha": arbol_actual}},
+            },
+            f"{prefijo}/git/trees/{arbol_anterior}?recursive=1": {
+                "sha": arbol_anterior,
+                "truncated": False,
+                "tree": [licencia],
+            },
+            f"{prefijo}/git/trees/{arbol_actual}?recursive=1": {
+                "sha": arbol_actual,
+                "truncated": False,
+                "tree": [
+                    licencia,
+                    *[
+                        {"type": "blob", "path": path, "sha": "f" * 40, "mode": "100644"}
+                        for path in fuentes + rutas_requeridas
+                    ],
+                ],
+            },
+        }
+        cambios = MODULO.changes_from_github(self.entorno, respuestas.__getitem__)
+        self.assertCountEqual(cambios, fuentes + rutas_requeridas)
+        self.assertEqual(MODULO.validate_changes(cambios), [])
+
     def test_push_inicial_sin_arbol_verificable_falla_cerrado(self):
         self.entorno["GITHUB_EVENT_NAME"] = "push"
         self.guardar_evento({"before": "0" * 40, "after": "b" * 40})

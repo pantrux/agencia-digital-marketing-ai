@@ -28,7 +28,7 @@ La [Fase 4 de aplicaciones y copias](../specs/FASE-4-APLICACIONES-Y-BACKUPS.md) 
 
 Cada runbook distingue resultados esperados de evidencia observada. La última ejecución real se registra al realizar el procedimiento; su existencia no equivale a un simulacro aprobado.
 
-Al crear el repositorio, la primera actualización no tiene versión anterior para comparar. El control documental consulta por API de solo lectura el commit recibido y su árbol completo, exige SHA coincidente y `truncated: false`, y comprueba que workflow, receta y diagrama existan como archivos. Una respuesta incompleta o sin esos documentos bloquea. En actualizaciones posteriores compara versiones; en solicitudes de cambio pagina todos los archivos y comprueba que la solicitud no cambió durante la consulta. No ejecuta comandos Git para ninguna de estas verificaciones.
+Si el evento inicial carece de una versión anterior, el control documental consulta por API de solo lectura el commit recibido y su árbol completo. Exige SHA coincidente, `truncated: false` y la presencia del workflow, la receta y el diagrama como archivos. Si una actualización alcanza el límite de 300 archivos de la API de comparación, el control coteja los árboles completos de ambos commits para identificar todas las rutas modificadas. En las solicitudes de cambio pagina los archivos y comprueba que la solicitud siga en el mismo estado durante la consulta. Una respuesta incompleta bloquea el control.
 
 ## Los siete controles de calidad
 

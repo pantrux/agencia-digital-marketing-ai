@@ -247,16 +247,16 @@ def pull_request_identity(metadata: object) -> tuple[int, str, str]:
     return count, commits[0], commits[1]
 
 
-def initial_snapshot_paths(fetch: Callable[[str], object], prefix: str, after: str) -> list[str]:
-    """Valida un primer push desde el árbol completo de su versión inmutable."""
-    commit = fetch(f"{prefix}/commits/{after}")
-    if not isinstance(commit, dict) or commit.get("sha") != after:
-        raise ValueError("El primer push no identifica la versión indicada por el evento.")
+def commit_tree(fetch: Callable[[str], object], prefix: str, revision: str) -> dict[str, tuple]:
+    """Lee e identifica un árbol completo del commit indicado por el evento."""
+    commit = fetch(f"{prefix}/commits/{revision}")
+    if not isinstance(commit, dict) or commit.get("sha") != revision:
+        raise ValueError("La API no identifica la versión indicada por el evento.")
     detail = commit.get("commit")
     tree_reference = detail.get("tree") if isinstance(detail, dict) else None
     tree_sha = tree_reference.get("sha") if isinstance(tree_reference, dict) else None
     if not isinstance(tree_sha, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", tree_sha):
-        raise ValueError("El primer push no contiene una referencia de árbol verificable.")
+        raise ValueError("El commit no contiene una referencia de árbol verificable.")
     snapshot = fetch(f"{prefix}/git/trees/{tree_sha}?recursive=1")
     if (
         not isinstance(snapshot, dict)
@@ -264,27 +264,32 @@ def initial_snapshot_paths(fetch: Callable[[str], object], prefix: str, after: s
         or snapshot.get("truncated") is not False
         or not isinstance(snapshot.get("tree"), list)
     ):
-        raise ValueError("El árbol inicial está truncado o no acredita integridad completa.")
-    paths = []
-    blobs = []
+        raise ValueError("El árbol del commit está truncado o no acredita integridad completa.")
+    identities = []
     all_paths = []
     for entry in snapshot["tree"]:
         if not isinstance(entry, dict) or entry.get("type") not in ("blob", "tree", "commit"):
-            raise ValueError("El árbol inicial contiene una entrada no verificable.")
+            raise ValueError("El árbol del commit contiene una entrada no verificable.")
         sha = entry.get("sha")
         if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-fA-F]{40}", sha):
-            raise ValueError("El árbol inicial contiene una entrada sin identidad verificable.")
-        path = entry.get("path")
-        all_paths.append(path)
-        if entry["type"] != "tree":
-            paths.append(path)
-        if entry["type"] == "blob":
-            blobs.append(path)
+            raise ValueError("El árbol del commit contiene una entrada sin identidad verificable.")
+        all_paths.append(entry.get("path"))
+        identities.append((entry["type"], entry.get("mode"), sha))
     normalized_all = normalize_paths(all_paths)
     if len(normalized_all) != len(all_paths):
-        raise ValueError("El árbol inicial contiene rutas duplicadas o ambiguas.")
-    changed = normalize_paths(paths)
-    if any(required not in blobs for required in (WORKFLOW, RECIPE, DIAGRAM)):
+        raise ValueError("El árbol del commit contiene rutas duplicadas o ambiguas.")
+    return {
+        path: identity
+        for path, identity in zip(normalized_all, identities, strict=True)
+        if identity[0] != "tree"
+    }
+
+
+def initial_snapshot_paths(fetch: Callable[[str], object], prefix: str, after: str) -> list[str]:
+    """Valida un primer push desde el árbol completo de su versión inmutable."""
+    files = commit_tree(fetch, prefix, after)
+    changed = list(files)
+    if any(files.get(required, (None,))[0] != "blob" for required in (WORKFLOW, RECIPE, DIAGRAM)):
         raise ValueError(
             "El primer push debe incluir el workflow, la receta y el diagrama como archivos."
         )
@@ -357,10 +362,19 @@ def changes_from_github(
         return initial_snapshot_paths(fetch, prefix, after)
     comparison = fetch(f"{prefix}/compare/{before}...{after}?per_page=100&page=1")
     rows = comparison.get("files") if isinstance(comparison, dict) else None
-    # La API solo entrega hasta 300 archivos de comparación: se rechaza el límite
-    # porque no permite distinguir exactamente 300 de una respuesta truncada.
-    if not isinstance(rows, list) or len(rows) >= 300:
+    if not isinstance(rows, list):
         raise ValueError("La comparación no acredita todos los archivos cambiados.")
+    # La comparación de GitHub se limita a 300 archivos, incluso si se pagina.
+    if len(rows) >= 300:
+        previous = commit_tree(fetch, prefix, before)
+        current = commit_tree(fetch, prefix, after)
+        return normalize_paths(
+            sorted(
+                path
+                for path in previous.keys() | current.keys()
+                if previous.get(path) != current.get(path)
+            )
+        )
     return file_paths(rows)
 
 

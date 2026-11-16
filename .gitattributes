@@ -9,3 +9,11 @@
 *.json text eol=lf
 *.md text eol=lf
 *.mmd text eol=lf
+
+# Los insumos fijados por SHA-256 conservan los bytes del archivo original.
+/docker/kitsu-zou/zou-runtime-linux-cp312.lock -text !eol
+/docker/moneyprinter/apply_speaches_provider.py -text !eol
+/docker/moneyprinter/speaches-provider-artifacts.json -text !eol
+/docker/n8n/remediation-inputs.json -text !eol
+/docker/postgres-immich/musl-build-inputs.json -text !eol
+/docker/python-runtime/python-runtime-inputs.json -text !eol

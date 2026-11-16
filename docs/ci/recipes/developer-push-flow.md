@@ -1,6 +1,8 @@
 # Cómo verificar un cambio y preparar su entrega
 
-El manifiesto declara Fase 7 con CD deshabilitado. El workflow valida el código presente con siete controles. Su ejecución remota y la publicación del código siguen pendientes. Los comandos de Git requieren instrucción explícita del usuario.
+El manifiesto declara Fase 7 con CD deshabilitado. El workflow valida el código con siete controles. Los comandos de Git requieren instrucción explícita del usuario.
+
+Cuando un push alcanza las 300 rutas que devuelve la comparación de GitHub, el control documental coteja los árboles completos de los commits anterior y actual. Así verifica también las rutas añadidas, eliminadas o modificadas más allá del límite. Los archivos con una huella fijada conservan sus bytes originales mediante `.gitattributes`, incluso al pasar de Windows a Linux.
 
 La Fase 7 añade el ciclo de producción, la entrega y la reversión a los mínimos previos del [portal y el Worker](../../specs/FASE-6-CLOUDFLARE-Y-PORTAL.md). Ejecuta `python -I -B scripts/ci/validate_phase.py --phase 7` para cotejar los mínimos acumulativos. Los resultados reales se registran en el [estado del piloto](../../../ESTADO.md#primera-producción-del-portal).
 
