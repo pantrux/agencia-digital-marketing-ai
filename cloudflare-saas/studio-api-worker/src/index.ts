@@ -118,7 +118,12 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
     if (request.method === "POST" && path === "/api/auth/logout") return await logout(request, env, ctx);
     const parts = partAccessTarget(path, request.method);
     if (parts) return await handlePartAccess(request, env, parts);
-    if (request.method === "POST" && path === "/api/uploads") return await handleUploadCreation(request, env);
+    const onUploadCommitted = (id: string) => {
+      ctx.waitUntil(dispatchOutbox(env, id).catch(() => {
+        // El cron recupera una orden si falla el despacho tras confirmar la carga.
+      }));
+    };
+    if (request.method === "POST" && path === "/api/uploads") return await handleUploadCreation(request, env, onUploadCommitted);
     const user = await identity(request, env);
     if (path === "/api/metrics/ttfb" && request.method === "POST") {
       return await recordBrowserTimings(request, env, user.email.toLowerCase().endsWith(".invalid"));
@@ -144,11 +149,7 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
       return await reserveOrder(request, user.id, env);
     }
     if (path === "/api/uploads" || path.startsWith("/api/uploads/")) {
-      return await handleIngest(request, env, user.id, path, (id) => {
-        ctx.waitUntil(dispatchOutbox(env, id).catch(() => {
-          // El cron recupera una orden si falla el despacho tras confirmar la carga.
-        }));
-      });
+      return await handleIngest(request, env, user.id, path, onUploadCommitted);
     }
     if (path.startsWith("/api/billing/")) return await handleBilling(request, env, path, user);
     throw new HttpError(404, "RUTA_NO_DISPONIBLE");
@@ -184,7 +185,7 @@ export default {
     ctx.waitUntil(expireAbandonedReservations(env));
     ctx.waitUntil(retryWebhookEvents(env));
   },
-  queue(batch: { messages: JobMessage[] }, env: WorkerEnv, ctx: ExecutionTasks) {
-    ctx.waitUntil(syncQueue(batch.messages, env));
+  async queue(batch: { messages: JobMessage[] }, env: WorkerEnv) {
+    await syncQueue(batch.messages, env);
   },
 };

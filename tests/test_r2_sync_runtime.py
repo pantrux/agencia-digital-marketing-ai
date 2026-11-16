@@ -194,16 +194,19 @@ class HttpTests(unittest.TestCase):
     def setUpClass(cls):
         cls.H = importlib.import_module("sync_http")
 
-    def service(self, *, busy=False, ledger_error=None, delay=0):
+    def service(self, *, busy=False, ledger_error=None, delay=0, before_finish=None):
         calls = []
 
         class Supervisor:
             def __init__(self):
                 self.busy = busy
+                self.cancel = threading.Event()
 
             def run(self, raw, verified, *, client=None):
                 calls.append(raw)
                 time.sleep(delay)
+                if before_finish:
+                    before_finish()
                 return {
                     "status": "completed",
                     "job_id": verified.job.job_id,
@@ -262,8 +265,10 @@ class HttpTests(unittest.TestCase):
 
     def test_post_autentica_y_responde_sin_metadata_privada(self):
         service, calls = self.service()
-        response = self.exchange(self.request(), service)
-        self.assertTrue(response.startswith(b"HTTP/1.1 200 "))
+        accepted = self.exchange(self.request(), service)
+        self.assertTrue(accepted.startswith(b"HTTP/1.1 202 "))
+        self.assertEqual(json.loads(accepted.split(b"\r\n\r\n", 1)[1]), {"status": "processing"})
+        response = self.exchange_receipt(service)
         self.assertIn(b"Connection: close\r\n", response)
         body = json.loads(response.split(b"\r\n\r\n", 1)[1])
         self.assertEqual(
@@ -271,6 +276,15 @@ class HttpTests(unittest.TestCase):
         )
         self.assertNotIn(FakeRuntime.snapshot.encode(), response)
         self.assertEqual(len(calls), 1)
+
+    def exchange_receipt(self, service, *, status=200):
+        until = time.monotonic() + 2
+        response = self.exchange(self.request(), service)
+        while response.startswith(b"HTTP/1.1 202 ") and time.monotonic() < until:
+            time.sleep(0.01)
+            response = self.exchange(self.request(), service)
+        self.assertTrue(response.startswith(f"HTTP/1.1 {status} ".encode()))
+        return response
 
     def test_duplicados_te_y_oversize_nunca_inician_worker(self):
         e = json.loads(envelope())
@@ -345,7 +359,8 @@ class HttpTests(unittest.TestCase):
     def test_timer_de_entrada_no_se_mantiene_durante_trabajo(self):
         service, calls = self.service(delay=0.15)
         response = self.exchange(self.request(), service, budget=0.05)
-        self.assertTrue(response.startswith(b"HTTP/1.1 200 "))
+        self.assertTrue(response.startswith(b"HTTP/1.1 202 "))
+        self.exchange_receipt(service)
         self.assertEqual(len(calls), 1)
 
     def test_worker_ocupado_503_retry_after(self):
@@ -354,6 +369,26 @@ class HttpTests(unittest.TestCase):
         self.assertTrue(response.startswith(b"HTTP/1.1 503 "))
         self.assertIn(b"Retry-After: 1\r\n", response)
         self.assertFalse(calls)
+
+    def test_copia_lenta_sobrevive_al_cierre_y_el_reintento_devuelve_recibo(self):
+        entered, release = threading.Event(), threading.Event()
+
+        def wait_for_release():
+            entered.set()
+            release.wait(1)
+
+        service, calls = self.service(before_finish=wait_for_release)
+        try:
+            self.assertTrue(self.exchange(self.request(), service).startswith(b"HTTP/1.1 202 "))
+            self.assertTrue(entered.wait(1))
+            self.assertTrue(self.exchange(self.request(), service).startswith(b"HTTP/1.1 202 "))
+            self.assertEqual(len(calls), 1)
+        finally:
+            release.set()
+
+        response = self.exchange_receipt(service)
+        self.assertEqual(json.loads(response.split(b"\r\n\r\n", 1)[1])["sha256"], job()["sha256"])
+        self.assertEqual(len(calls), 1)
 
     def test_ocho_conexiones_y_novena_503_sin_listener_real(self):
         stop, release = threading.Event(), threading.Event()
@@ -398,7 +433,10 @@ class HttpTests(unittest.TestCase):
             config=SimpleNamespace(listen_host="127.0.0.1", listen_port=8091),
             ledger=lambda: SimpleNamespace(check=lambda: None),
         )
-        service = SimpleNamespace(supervisor=SimpleNamespace(cancel=threading.Event(), busy=False))
+        service = SimpleNamespace(
+            supervisor=SimpleNamespace(cancel=threading.Event(), busy=False),
+            wait_for_worker=lambda _deadline: False,
+        )
         self_outer = self
 
         def run():
@@ -432,8 +470,8 @@ class HttpTests(unittest.TestCase):
         service.supervisor.run = lambda *_args, **_kwargs: (_ for _ in ()).throw(
             R.RuntimeErrorCode("CONFLICT")
         )
-        response = self.exchange(self.request(), service)
-        self.assertTrue(response.startswith(b"HTTP/1.1 409 "))
+        self.assertTrue(self.exchange(self.request(), service).startswith(b"HTTP/1.1 202 "))
+        response = self.exchange_receipt(service, status=409)
         self.assertEqual(json.loads(response.split(b"\r\n\r\n", 1)[1]), {"error": "CONFLICT"})
 
     def test_cuerpo_incompleto_tambien_tiene_plazo_absoluto(self):
@@ -687,10 +725,28 @@ class LinuxRuntimeTests(unittest.TestCase):
             release.wait(3)
             return native_watch(*args, **kwargs)
 
-        # El worker sólo usa la biblioteca estándar. En CI, Python del sistema
-        # cumple los permisos que el supervisor exige al intérprete del worker.
+        # El Python del sistema da permisos aptos, si también cumple la versión mínima.
         system_python = shutil.which("python3", path=os.defpath)
-        worker_python = Path(system_python).resolve() if system_python else R.PYTHON
+        worker_python = R.PYTHON
+        if (
+            system_python
+            and subprocess.run(
+                [
+                    system_python,
+                    "-I",
+                    "-B",
+                    "-S",
+                    "-c",
+                    "import sys; sys.exit(sys.version_info < (3, 12))",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=3,
+                check=False,
+            ).returncode
+            == 0
+        ):
+            worker_python = Path(system_python).resolve()
         with patch.object(R, "CODE_DIR", code), patch.object(R, "PYTHON", worker_python):
             supervisor = R.WorkerSupervisor(self.runtime)
 

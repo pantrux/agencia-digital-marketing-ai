@@ -39,7 +39,7 @@
       {
         "queue": "studio-jobs-queue",
         "dead_letter_queue": "studio-jobs-dlq",
-        "max_batch_size": 3,
+        "max_batch_size": 2,
         "max_batch_timeout": 2,
         "max_concurrency": 2,
         "max_retries": 5,

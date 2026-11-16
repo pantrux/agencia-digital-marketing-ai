@@ -45,6 +45,7 @@ MAX_HEADER_LINES = 64
 HEADER_NAME = re.compile(rb"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
 STATUS = {
     200: "OK",
+    202: "Accepted",
     400: "Bad Request",
     401: "Unauthorized",
     404: "Not Found",
@@ -185,9 +186,13 @@ class SyncService:
         self.supervisor = supervisor if supervisor is not None else R.WorkerSupervisor(runtime)
         self.ledger = ledger if ledger is not None else runtime.ledger()
         self.now_seconds = now_seconds
+        self._lock = threading.Lock()
+        self._active = None
+        self._result = None
+        self._thread = None
 
     def health(self):
-        if self.supervisor.busy:
+        if self._active is not None or self.supervisor.busy:
             return 200, {"ready": False, "busy": True}
         try:
             self.ledger.check()
@@ -201,7 +206,7 @@ class SyncService:
         except Exception:
             return 503, {"ready": False, "busy": False}
 
-    def sync(self, body, timestamp, signature, connection):
+    def sync(self, body, timestamp, signature):
         try:
             verified = R.verify_request(
                 body,
@@ -213,14 +218,56 @@ class SyncService:
             )
         except R.ProtocolError:
             raise R.RuntimeErrorCode("UNAUTHORIZED") from None
-        if self.supervisor.busy:
-            raise R.RuntimeErrorCode("BUSY")
+        key = (verified.job.job_id, verified.fingerprint)
+        with self._lock:
+            for known in (self._active, self._result and self._result[0]):
+                if known is not None and known[0] == key[0] and known != key:
+                    raise R.RuntimeErrorCode("CONFLICT")
+            if self._result is not None and self._result[0] == key:
+                _, receipt, error = self._result
+                if error is None:
+                    return 200, receipt
+                self._result = None
+                raise R.RuntimeErrorCode(error)
+            if self._active == key:
+                return 202, {"status": "processing"}
+            if self._active is not None or self.supervisor.busy or self.supervisor.cancel.is_set():
+                raise R.RuntimeErrorCode("BUSY")
+            try:
+                self.ledger.check()
+            except R.LedgerError as error:
+                raise R.RuntimeErrorCode(
+                    "BUSY" if error.code == "LOCK_TIMEOUT" else "FAILED"
+                ) from None
+            envelope = R.encode_envelope(body, timestamp, signature, self.runtime.snapshot)
+            self._active = key
+            self._thread = threading.Thread(
+                target=self._execute, args=(key, envelope, verified), daemon=True
+            )
+            try:
+                self._thread.start()
+            except RuntimeError:
+                self._active, self._thread = None, None
+                raise R.RuntimeErrorCode("FAILED") from None
+            return 202, {"status": "processing"}
+
+    def _execute(self, key, envelope, verified):
+        receipt, error = None, None
         try:
-            self.ledger.check()
-        except R.LedgerError as error:
-            raise R.RuntimeErrorCode("BUSY" if error.code == "LOCK_TIMEOUT" else "FAILED") from None
-        envelope = R.encode_envelope(body, timestamp, signature, self.runtime.snapshot)
-        return self.supervisor.run(envelope, verified, client=connection)
+            receipt = self.supervisor.run(envelope, verified)
+        except R.RuntimeErrorCode as failure:
+            error = failure.code
+        except Exception:
+            error = "FAILED"
+        finally:
+            with self._lock:
+                self._result = (key, receipt, error)
+                self._active = None
+
+    def wait_for_worker(self, deadline):
+        if self._thread is not None:
+            self._thread.join(max(0, deadline - time.monotonic()))
+        return self._thread is not None and self._thread.is_alive()
 
 
 def handle_connection(connection, service, *, read_seconds=10):
@@ -237,7 +284,8 @@ def handle_connection(connection, service, *, read_seconds=10):
             status, value = service.health()
             send_json(connection, status, value)
         else:
-            send_json(connection, 200, service.sync(body, timestamp, signature, connection))
+            status, value = service.sync(body, timestamp, signature)
+            send_json(connection, status, value)
     except RequestError as error:
         if not deadline.expired:
             try:
@@ -330,7 +378,8 @@ def serve(runtime, *, stop=None):
         until = time.monotonic() + 5
         for thread in waiting:
             thread.join(max(0, until - time.monotonic()))
-        if any(thread.is_alive() for thread in waiting) or service.supervisor.busy:
+        worker_alive = service.wait_for_worker(until)
+        if any(thread.is_alive() for thread in waiting) or worker_alive or service.supervisor.busy:
             raise R.RuntimeErrorCode("BUSY")
 
 

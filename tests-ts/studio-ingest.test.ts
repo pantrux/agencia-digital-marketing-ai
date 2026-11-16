@@ -1087,6 +1087,68 @@ describe("Ingesta R2 multipart", () => {
     },
   );
 
+  it.each(["antes de consolidar", "después de consolidar", "con partes faltantes"] as const)(
+    "recupera la confirmación interrumpida %s de R2 al repetir la apertura", async (phase) => {
+      const db = databaseForIngest();
+      const source = new TextEncoder().encode("fixture");
+      const sha256 = createHash("sha256").update(source).digest("hex");
+      const { bucket, handle } = mockMedia(source);
+      const env: IngestEnv = {
+        DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production",
+        R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
+        R2_SECRET_ACCESS_KEY: credentials.secretAccessKey,
+      };
+      const transient = new Error("R2 temporalmente inaccesible");
+      if (phase === "después de consolidar") vi.mocked(bucket.get).mockResolvedValueOnce(null).mockRejectedValueOnce(transient);
+      else handle.complete.mockRejectedValueOnce(transient);
+      const restore = installDigestStream();
+      const listing = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(
+        `<ListPartsResult><IsTruncated>false</IsTruncated><Part><PartNumber>1</PartNumber>
+        <Size>${source.length}</Size><ETag>"${etag}"</ETag></Part></ListPartsResult>`,
+      ));
+      try {
+        const start = "/api/uploads";
+        const onCommitted = vi.fn();
+        const api = (path: string, value: Record<string, unknown>) =>
+          handleIngest(request(path, "POST", value), env, "user", path, onCommitted);
+        const payload = { order_id: order, project_slug: "job-fixture", extension: "mp4",
+          bytes: source.length, sha256, content_type: "video/mp4" };
+        const created = await (await api(start, payload)).json() as { id: string; key: string };
+        const complete = `${start}/${created.id}/complete`;
+        const parts = { parts: [{ PartNumber: 1, ETag: `"${etag}"` }] };
+        await expect(api(complete, parts)).rejects.toThrow("R2 temporalmente inaccesible");
+        expect(db.prepare("SELECT status FROM upload_sessions WHERE id=?").get(created.id))
+          .toEqual({ status: "completing" });
+        await expect(api(start, payload)).rejects.toMatchObject({ code: "SUBIDA_EN_TRANSICION" });
+        await expect(api(complete, parts)).rejects.toMatchObject({ code: "SUBIDA_EN_TRANSICION" });
+        expect(handle.complete).toHaveBeenCalledOnce();
+        expect(db.prepare("SELECT COUNT(*) AS n FROM job_outbox").get()).toEqual({ n: 0 });
+
+        db.prepare("UPDATE upload_sessions SET lease_until=unixepoch()-1 WHERE id=?").run(created.id);
+        if (phase === "con partes faltantes") {
+          listing.mockResolvedValueOnce(new Response("<ListPartsResult><IsTruncated>false</IsTruncated></ListPartsResult>"));
+          expect(await (await api(start, payload)).json()).toMatchObject({ id: created.id, uploadId, status: "open" });
+          expect(db.prepare("SELECT status,operation_id,lease_until FROM upload_sessions WHERE id=?").get(created.id))
+            .toEqual({ status: "open", operation_id: null, lease_until: null });
+          expect(onCommitted).not.toHaveBeenCalled();
+        }
+        const resumed = await (await (phase === "con partes faltantes" ? api(complete, parts) : api(start, payload))).json();
+        expect(resumed).toMatchObject({ id: created.id, key: created.key, uploadId, status: "completed", hash_verified: true });
+        expect(await (await api(start, payload)).json()).toEqual(resumed);
+        expect(bucket.createMultipartUpload).toHaveBeenCalledOnce();
+        expect(handle.complete).toHaveBeenCalledTimes(phase === "después de consolidar" ? 1 : 2);
+        expect(onCommitted).toHaveBeenCalledExactlyOnceWith(order);
+        expect(db.prepare("SELECT status FROM usage_ledger WHERE order_id=?").get(order))
+          .toEqual({ status: "reserved" });
+        expect(db.prepare("SELECT COUNT(*) AS n FROM job_outbox WHERE order_id=?").get(order)).toEqual({ n: 1 });
+      } finally {
+        listing.mockRestore();
+        restore();
+        db.close();
+      }
+    },
+  );
+
   it.each(["completed", "sha256_mismatch", "metadata_mismatch", "cancelled"] as const)("unifica apertura, confirmación y aborto con transacciones reales (%s)", async (outcome) => {
     const db = databaseForIngest();
     const source = new TextEncoder().encode("fixture");

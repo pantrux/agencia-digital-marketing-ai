@@ -160,7 +160,9 @@ function uploadInput(payload: Plain) {
 
 type UploadOwner = string | Awaited<ReturnType<typeof sessionLookup>>;
 
-async function createUpload(request: Request, env: IngestEnv, owner: UploadOwner): Promise<Response> {
+async function createUpload(
+  request: Request, env: IngestEnv, owner: UploadOwner, onCommitted?: (orderId: string) => void,
+): Promise<Response> {
   async function requireSession() {
     if (typeof owner === "string") return;
     if (!await owner.statement(env.DB.withSession("first-primary")).first<PortalIdentity>()) {
@@ -229,6 +231,7 @@ async function createUpload(request: Request, env: IngestEnv, owner: UploadOwner
   }
   if (row.status === "completed") return uploadInfo(row);
   requireReserved(row);
+  if (row.status === "completing") return complete(null, env, row, onCommitted);
   if (row.expires_at <= current) return fail(410, "SUBIDA_VENCIDA");
   if (row.status === "open") return uploadInfo(row);
   if (row.status !== "creating") return fail(409, "SUBIDA_EN_TRANSICION");
@@ -439,10 +442,11 @@ export async function expireAbandonedReservations(env: IngestEnv): Promise<void>
 }
 
 async function complete(
-  request: Request, env: IngestEnv, row: UploadRow, onCommitted?: (orderId: string) => void,
+  request: Request | null, env: IngestEnv, row: UploadRow, onCommitted?: (orderId: string) => void,
 ): Promise<Response> {
   const job = syncJob(row);
-  const parts = requestedParts(await readJson(request), Math.ceil(row.bytes / partSize));
+  const count = Math.ceil(row.bytes / partSize);
+  const parts = request ? requestedParts(await readJson(request), count) : null;
   if (row.status === "completed") return uploadInfo(row);
   requireReserved(row);
   if (!row.upload_id || (row.status !== "open" && row.status !== "completing")) return fail(409, "SUBIDA_NO_ABIERTA");
@@ -451,22 +455,18 @@ async function complete(
   const token = await claim(env, row, "completing");
   let object = await env.MEDIA.get(row.object_key);
   if (!object) {
-    try {
-      const present = await listParts(env, bound);
-      if (present.length !== parts.length || present.some((value, index) => {
-        const expected = parts[index];
-        return !expected || value.PartNumber !== expected.PartNumber || value.ETag !== expected.ETag
-          || value.Size !== bytesForPart(row, value.PartNumber);
-      })) return fail(409, "SUBIDA_PARTES_INCOMPLETAS");
-    } catch (error) {
-      if (error instanceof HttpError && error.code === "SUBIDA_PARTES_INCOMPLETAS") {
-        await env.DB.prepare(`UPDATE upload_sessions SET status = 'open', operation_id = NULL, lease_until = NULL
-          WHERE id = ? AND operation_id = ? AND status = 'completing'`).bind(row.id, token).run();
-      }
-      throw error;
+    const present = await listParts(env, bound);
+    if (present.length !== count || present.some((value, index) => value.PartNumber !== index + 1
+      || value.Size !== bytesForPart(row, value.PartNumber) || (parts && value.ETag !== parts[index]?.ETag))) {
+      const reopened = await env.DB.prepare(`UPDATE upload_sessions SET status = 'open', operation_id = NULL, lease_until = NULL
+        WHERE id = ? AND operation_id = ? AND status = 'completing'`).bind(row.id, token).run();
+      if (reopened.meta.changes !== 1) return fail(409, "SUBIDA_EN_TRANSICION");
+      if (parts) return fail(409, "SUBIDA_PARTES_INCOMPLETAS");
+      if (row.expires_at <= unix()) return fail(410, "SUBIDA_VENCIDA");
+      return uploadInfo({ ...row, status: "open" });
     }
     const handle = env.MEDIA.resumeMultipartUpload(row.object_key, row.upload_id);
-    await handle.complete(parts.map((part) => ({ partNumber: part.PartNumber, etag: part.ETag })));
+    await handle.complete(present.map((part) => ({ partNumber: part.PartNumber, etag: part.ETag })));
     object = await env.MEDIA.get(row.object_key);
   }
   if (!object) return fail(503, "R2_OBJETO_AUSENTE");
@@ -566,15 +566,17 @@ export async function handlePartAccess(request: Request, env: AuthEnv & IngestEn
   return number === undefined ? listUploadParts(env, upload) : signPart(env, upload, number);
 }
 
-export async function handleUploadCreation(request: Request, env: AuthEnv & IngestEnv): Promise<Response> {
-  return await createUpload(request, env, await sessionLookup(request, env));
+export async function handleUploadCreation(
+  request: Request, env: AuthEnv & IngestEnv, onCommitted?: (orderId: string) => void,
+): Promise<Response> {
+  return await createUpload(request, env, await sessionLookup(request, env), onCommitted);
 }
 
 export async function handleIngest(
   request: Request, env: IngestEnv, userId: string, path: string, onCommitted?: (orderId: string) => void,
 ): Promise<Response> {
   const { method } = request;
-  if (path === "/api/uploads" && method === "POST") return createUpload(request, env, userId);
+  if (path === "/api/uploads" && method === "POST") return createUpload(request, env, userId, onCommitted);
   const route = uploadRoute.exec(path);
   const id = route?.[1];
   if (!isUuid(id)) return fail(404, "SUBIDA_NO_ENCONTRADA");

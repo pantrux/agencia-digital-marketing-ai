@@ -96,11 +96,11 @@ límites exactos.
 Hay como máximo ocho conexiones atendidas y un worker activo. La lectura de
 cabeceras y cuerpo comparte un plazo absoluto de 10 segundos y hasta 8192 bytes
 de cabeceras/64 líneas. Al vencer, un temporizador cierra únicamente ese socket.
-Se cancela y espera ese temporizador antes de trabajar; no puede interrumpir una
-descarga posterior por confundirla con una entrada lenta. La respuesta tiene un
-plazo de envío de tres segundos. No hay keep-alive, pipelining ni soporte para
-que el cliente cierre su mitad de escritura mientras espera: el EOF durante
-el trabajo se considera desconexión y cancela el worker.
+Al validar la petición se cancela ese temporizador. La respuesta tiene un plazo
+de envío de tres segundos. El primer POST aceptado devuelve `202` y
+`{"status":"processing"}`. El worker sigue copiando tras el cierre de la conexión.
+Un POST firmado con la misma huella sondea el trabajo y devuelve `200` al obtener
+el recibo. Una huella distinta para el mismo pedido devuelve `409`.
 
 Los errores son JSON con códigos fijos, sin HTML ni valores recibidos:
 `400 BAD_REQUEST`, `401 UNAUTHORIZED`, `404 NOT_FOUND`,
@@ -139,7 +139,7 @@ otros secretos. El supervisor conserva un
 y lo usa con
 [`pidfd_send_signal`](https://docs.python.org/3.12/library/signal.html#signal.pidfd_send_signal):
 plazo de trabajo 300 segundos, salida combinada stdout/stderr de hasta 8 KiB,
-lectura/escritura no bloqueante y desconexión vigiladas. Una cancelación,
+lectura y escritura sin bloqueo. Una cancelación,
 timeout o exceso de salida envía SIGTERM, espera dos segundos y después SIGKILL
 con hasta dos segundos de espera adicional. No usa señales por número de PID,
 nombre de proceso ni grupo. Si el hijo sigue vivo o no se pudo obtener un
