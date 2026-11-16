@@ -12,6 +12,11 @@ GROUPS = [
     ),
     (("ROUTER_",), "Acceso y verificación del router perimetral", "router (.1)"),
     (
+        ("GREPTILE_API_KEY",),
+        "Autenticación de la revisión de cambios de Studio",
+        "Cuenta Greptile del repositorio de Studio",
+    ),
+    (
         ("SYNOLOGY_",),
         "Acceso al almacenamiento compartido",
         "Synology DSM (.8), clientes NFS/SMB",
