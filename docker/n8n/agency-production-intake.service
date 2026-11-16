@@ -1,0 +1,21 @@
+[Unit]
+Description=Recepción de crudos verificados en OpenClaw
+RequiresMountsFor=/mnt/producciones
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-intake
+StateDirectoryMode=0700
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_intake.py %d/profile /var/lib/agency-production-intake
+TimeoutStartSec=5min
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ReadWritePaths=/mnt/producciones/proyectos
+RestrictAddressFamilies=AF_UNIX

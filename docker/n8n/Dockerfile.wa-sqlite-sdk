@@ -1,0 +1,9 @@
+FROM wolfi
+COPY --chown=0:0 launch/ /opt/wa-sqlite/
+RUN --network=none --mount=type=bind,source=apk,target=/sdk-inputs,ro \
+    --mount=type=tmpfs,target=/tmp ["/bin/sh", "/opt/wa-sqlite/install-apk.sh"]
+COPY --chown=0:0 upstream/ /emsdk/upstream/
+COPY --chown=0:0 --chmod=0444 emscripten-config /emsdk/.emscripten
+USER 1000:1000
+WORKDIR /work
+ENTRYPOINT ["/usr/bin/busybox", "timeout", "-s", "TERM", "-k", "15", "900", "/usr/bin/python3.12", "-I", "-S", "-B", "/opt/wa-sqlite/run_wa_sqlite_sdk.py"]

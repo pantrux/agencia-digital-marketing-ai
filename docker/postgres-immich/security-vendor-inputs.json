@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "security_root": ".tools/postgres-immich-security-inputs-v1",
+  "root_receipt_sha256": "848c25b8ce45e5a76d97b1d7fe3c0567f2c57363f4056935543d91bea3d9e0c2",
+  "root_owner": "agencia-digital-marketing-ai:postgres-immich-security-inputs:v1",
+  "derived_owner": "agencia-digital-marketing-ai:postgres-immich-security-derived:v1",
+  "source": {
+    "path": ".tools/cache/phase4-sources/vectorchord-1.1.1-source.tar.gz",
+    "sha256": "7cc81fe827f41e66dcca37dd4cb6dc171da9f6807ebf3d5892d72edda61fdf28",
+    "lock_member": "VectorChord-f9b5e234c44cee69b266b8431f92b7deed4e99d3/Cargo.lock",
+    "lock_sha256": "dae0885db162d70f216360330c235669e9dda610a93b31eb593c5755fde856ab"
+  },
+  "vendor_lock": {
+    "path": ".tools/postgres-immich-build/vendor-8d5a521ef8b2827f/vendor-lock.json",
+    "sha256": "6bd7c4db4c0d297da3a073939f6e78c6d7837bc65d2a245053dac531f9199c57"
+  },
+  "vendor_archive": {
+    "path": ".tools/postgres-immich-build/vendor-8d5a521ef8b2827f/vendor.tar.gz",
+    "sha256": "c0209f4b1b6fc31d56e495886cb4729c0c52634504c7a0c627b29d2859a0b2c1"
+  },
+  "changes": [
+    {
+      "name": "anyhow",
+      "old_version": "1.0.101",
+      "old_checksum": "5f0e0fee31ef5ed1ba1316088939cea399010ed7731dba877ed44aeb407a75ea",
+      "version": "1.0.103",
+      "checksum": "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3",
+      "path": ".tools/postgres-immich-security-inputs-v1/anyhow-1.0.103.crate",
+      "build_script_sha256": "89d1baedcff59822ed692d3a33f131c211a213bdec33c83f68b54110d9c64223"
+    },
+    {
+      "name": "crossbeam-epoch",
+      "old_version": "0.9.18",
+      "old_checksum": "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e",
+      "version": "0.9.20",
+      "checksum": "2d6914041f254d6e9176c01941b21115dcfb7089e55135a35411081bd106ef3f",
+      "path": ".tools/postgres-immich-security-inputs-v1/crossbeam-epoch-0.9.20.crate",
+      "build_script_sha256": "e40cf96d7d7b1650f9f53a3f578633a178324dbea1d905b3f71a75b45d3982a1"
+    }
+  ],
+  "helpers": [
+    {
+      "path": ".tools/backup-source-build/vault-controller-v1/vault-r2-state.py",
+      "sha256": "aa8fc9a38f1707f9a27289b4fe1efb6b6643eddd0ed672deb6b4502b13215df7"
+    },
+    {
+      "path": ".tools/backup-source-build/vault-controller-v1/verify-restic-auth-v2-r2.py",
+      "sha256": "d8fa9ed6e2f8ad7f44227ee1d4bd3890d9dbf813d5fd39db49c9c3ed61cb5c7c"
+    }
+  ]
+}

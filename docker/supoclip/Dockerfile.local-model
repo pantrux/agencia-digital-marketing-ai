@@ -1,0 +1,23 @@
+ARG BASE_IMAGE=docker.io/library/ubuntu@sha256:77eb101c607d6e3d4f5ad0c8a02c2136c689b98aba1f359e6502ba517e5c57ec
+FROM ${BASE_IMAGE}
+
+RUN --network=none --mount=type=bind,source=payload,target=/inputs,ro \
+    set -eu; cd /inputs; sha256sum -c INPUTS.sha256; \
+    install -d -m 0755 /opt/supoclip-model; \
+    tar -xzf engine.tar.gz -C /opt/supoclip-model --no-same-owner --no-same-permissions; \
+    dpkg-deb -x libgomp.deb /tmp/gomp; \
+    install -m 0644 /tmp/gomp/usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0 /opt/supoclip-model/libgomp.so.1; \
+    printf '%s  %s\n' 135f3c8f006d2fe5e68e51281c7974cb991a03de3bfb3593d68d174dfcf854d1 /opt/supoclip-model/libgomp.so.1 | sha256sum -c -; \
+    rm -rf /tmp/gomp; install -m 0555 launch.sh /usr/local/bin/supoclip-model; \
+    cd /opt/supoclip-model; \
+    for elf in llama-server lib*.so*; do \
+      links="$(LD_LIBRARY_PATH="$PWD" ldd "$elf")"; \
+      case "$links" in *'not found'*) printf '%s\n' "$links" >&2; exit 1 ;; esac; \
+    done; \
+    LD_LIBRARY_PATH="$PWD" ./llama-server --version
+
+USER 1000:1000
+WORKDIR /opt/supoclip-model
+ENTRYPOINT ["/usr/local/bin/supoclip-model"]
+HEALTHCHECK --interval=15s --timeout=4s --start-period=90s --retries=3 \
+    CMD ["/bin/bash", "-ec", "exec 3<>/dev/tcp/127.0.0.1/18963; printf 'GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; IFS=' ' read -r protocol code rest <&3; test \"$code\" = 200"]

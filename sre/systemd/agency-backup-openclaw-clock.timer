@@ -1,0 +1,11 @@
+[Unit]
+Description=Copia de OpenClaw a las 04:00 de Santiago
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 America/Santiago
+AccuracySec=1s
+Persistent=true
+Unit=agency-backup-openclaw-clock.service
+
+[Install]
+WantedBy=timers.target

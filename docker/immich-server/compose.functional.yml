@@ -1,0 +1,144 @@
+name: agency-media-immich-trial
+
+x-isolated: &isolated
+  pull_policy: never
+  platform: linux/amd64
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: "no"
+  stop_grace_period: 30s
+  logging:
+    driver: local
+    options: {max-size: "10m", max-file: "2"}
+
+services:
+  immich-server:
+    <<: *isolated
+    image: ghcr.io/immich-app/immich-server@sha256:c0a8e008ad9befe8af0e3a515e3b3661e98d38c37eadb6efee18a6d5098136c1
+    labels:
+      agency.owner: agencia-digital-marketing-ai:immich-server-trial:v1
+    user: "1000:1000"
+    cpus: "2.0"
+    mem_limit: 2g
+    memswap_limit: 2g
+    pids_limit: 128
+    environment:
+      IMMICH_CONFIG_FILE: /run/immich/functional.json
+      IMMICH_MEDIA_LOCATION: /data
+      IMMICH_HOST: 127.0.0.1
+      IMMICH_LOG_LEVEL: log
+      DB_HOSTNAME: postgres-immich
+      DB_PORT: "5432"
+      DB_DATABASE_NAME: immich
+      DB_USERNAME: immich_trial
+      DB_PASSWORD_FILE: /run/secrets/immich_db_password
+      DB_VECTOR_EXTENSION: vectorchord
+      REDIS_HOSTNAME: immich-valkey
+      REDIS_PORT: "6379"
+      REDIS_USERNAME: immich_trial
+      REDIS_PASSWORD_FILE: /run/secrets/immich_redis_password
+    secrets: [immich_db_password, immich_redis_password]
+    volumes:
+      - type: bind
+        source: ${MEDIA_IMMICH_TRIAL_MEDIA_PATH:?Falta ruta local vacía del ensayo}
+        target: /data
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_IMMICH_TRIAL_CONFIG_FILE:?Falta configuración exacta del ensayo}
+        target: /run/immich/functional.json
+        read_only: true
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777
+    networks: [data, ml]
+    healthcheck:
+      test: [CMD, immich-healthcheck]
+      interval: 10s
+      timeout: 4s
+      start_period: 180s
+      retries: 3
+
+  immich-valkey:
+    <<: *isolated
+    image: sha256:de6fbe9626fea9f6f297b6867d2c8cf8f0394ee5ed171613166fc093cb49d0a6
+    labels:
+      agency.owner: agencia-digital-marketing-ai:immich-server-trial:v1
+    user: "1000:1000"
+    cpus: "0.5"
+    mem_limit: 192m
+    memswap_limit: 192m
+    pids_limit: 64
+    command:
+      - valkey-server
+      - --bind
+      - 0.0.0.0
+      - --protected-mode
+      - "yes"
+      - --port
+      - "6379"
+      - --aclfile
+      - /run/secrets/immich_redis_acl
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --dir
+      - /data
+      - --maxmemory
+      - 96mb
+      - --maxmemory-policy
+      - noeviction
+    secrets: [immich_redis_acl, immich_redis_password]
+    tmpfs:
+      - /data:rw,nosuid,nodev,noexec,size=16m,uid=1000,gid=1000,mode=0700
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
+    networks: [data]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          REDISCLI_AUTH=$$(cat /run/secrets/immich_redis_password) &&
+          test -n "$$REDISCLI_AUTH" && export REDISCLI_AUTH &&
+          exec valkey-cli --no-auth-warning -e -h 127.0.0.1 -p 6379 --user immich_trial ping
+      interval: 10s
+      timeout: 4s
+      retries: 3
+
+  immich-ml-auth:
+    <<: *isolated
+    image: sha256:077a815fb7f45eedee7fdb799d52519de21266884eb0bcdd6b38d0b78ca0f723
+    stop_signal: SIGINT
+    labels:
+      agency.owner: agencia-digital-marketing-ai:immich-server-trial:v1
+    user: "65532:65532"
+    cpus: "0.5"
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 64
+    secrets: [gpu_bridge_bearer]
+    networks:
+      ml: {}
+      ml_egress:
+        gw_priority: 1
+
+networks:
+  data:
+    external: true
+    name: ${MEDIA_POSTGRES_IMMICH_BACKUP_NETWORK:?Falta red privada de Immich}
+  ml:
+    external: true
+    name: ${MEDIA_IMMICH_TRIAL_ML_NETWORK:?Falta red interna exclusiva del ensayo ML}
+  ml_egress:
+    external: true
+    name: ${MEDIA_IMMICH_TRIAL_ML_EGRESS_NETWORK:?Falta red de salida exclusiva del proxy}
+
+secrets:
+  immich_db_password:
+    file: ${MEDIA_IMMICH_TRIAL_DB_PASSWORD_FILE:?Falta archivo de contraseña del rol}
+  immich_redis_password:
+    file: ${MEDIA_IMMICH_TRIAL_REDIS_PASSWORD_FILE:?Falta archivo de contraseña Valkey}
+  immich_redis_acl:
+    file: ${MEDIA_IMMICH_TRIAL_REDIS_ACL_FILE:?Falta ACL del Valkey de ensayo}
+  gpu_bridge_bearer:
+    file: ${MEDIA_IMMICH_TRIAL_GPU_BEARER_FILE:?Falta archivo Bearer del proxy}

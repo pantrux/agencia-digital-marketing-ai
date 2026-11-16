@@ -1,0 +1,12 @@
+{
+  "id": "agency-mateo-production",
+  "name": "Mateo · estrategia de producción",
+  "description": "Genera tres ángulos desde un brief confirmado con el runtime aislado de Codex.",
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": { "profileFile": { "type": "string", "minLength": 2 } },
+    "required": ["profileFile"]
+  }
+}

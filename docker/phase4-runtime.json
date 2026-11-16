@@ -1,0 +1,285 @@
+{
+  "schema": 1,
+  "host": "vm-media-01",
+  "evidence": {
+    "compose_paths": {
+      "path": ".tools/evidence/phase4-runtime-compose-paths-20261113-v1.json",
+      "sha256": "2b11d8236b63d8e4e7eb3d9a1df13d93230099ec9d3ef9f6adeb05caf0afabca"
+    },
+    "compose_hashes": {
+      "path": ".tools/evidence/phase4-runtime-compose-sha-20261113-v4.json",
+      "sha256": "18287b58ad7922cf8f9271bc585a521ec805979a3dd16f815bb373e20e54f2d3"
+    },
+    "runtime_inventory": {
+      "path": ".tools/evidence/phase4-runtime-inventory-20261113-v4.json",
+      "sha256": "61c46eff0f239ad56d2d318f2dacead145916e0226df2a612c4f6f0a0120036e"
+    }
+  },
+  "projects": {
+    "agency-media": {
+      "workdir": "/opt/media-platform/kitsu-base-v1",
+      "env_file": "/opt/media-platform/kitsu-base-v1/compose.env",
+      "profiles": [],
+      "variables": [],
+      "files": {
+        "compose.yml": {
+          "source": "docker/docker-compose.yml",
+          "source_sha256": "29832eb56f5ae2172afe8c6eb59b8b3352da2c5c20d81ced75930d146996fb82",
+          "installed_sha256": "29832eb56f5ae2172afe8c6eb59b8b3352da2c5c20d81ced75930d146996fb82",
+          "installed_mode": "600"
+        }
+      },
+      "groups": [
+        {
+          "files": [
+            "compose.yml"
+          ],
+          "roles": [
+            "postgres-apps",
+            "valkey",
+            "zou-api",
+            "zou-events"
+          ]
+        }
+      ],
+      "supervisor": "agency-kitsu-zou.service",
+      "replacement_overlay": null
+    },
+    "agency-media-ui-refresh-v1": {
+      "workdir": "/opt/media-platform/kitsu-ui-refresh-v1",
+      "env_file": "/opt/media-platform/kitsu-ui-refresh-v1/compose.env",
+      "profiles": [],
+      "variables": [],
+      "files": {
+        "compose.yml": {
+          "source": "docker/kitsu-ui/compose.yml",
+          "source_sha256": "becf762a488a346875130def5198701e465e88d1a4705f70ae35cd28ae756d95",
+          "installed_sha256": "becf762a488a346875130def5198701e465e88d1a4705f70ae35cd28ae756d95",
+          "installed_mode": "600"
+        }
+      },
+      "groups": [
+        {
+          "files": [
+            "compose.yml"
+          ],
+          "roles": [
+            "kitsu-ui"
+          ]
+        }
+      ],
+      "supervisor": null,
+      "replacement_overlay": null
+    },
+    "agency-n8n-private": {
+      "workdir": "/opt/media-platform/n8n-private-v1",
+      "env_file": "/opt/media-platform/n8n-private-v1/compose.env",
+      "profiles": [],
+      "variables": [],
+      "files": {
+        "compose.private.yml": {
+          "source": "docker/n8n/compose.private.yml",
+          "source_sha256": "818efa36e4a6c474a43474ead715e54a005a5e39ea9162b653b8abb2de5741af",
+          "installed_sha256": "818efa36e4a6c474a43474ead715e54a005a5e39ea9162b653b8abb2de5741af",
+          "installed_mode": "444"
+        }
+      },
+      "groups": [
+        {
+          "files": [
+            "compose.private.yml"
+          ],
+          "roles": [
+            "javascript",
+            "n8n",
+            "python"
+          ]
+        }
+      ],
+      "supervisor": "agency-n8n-private.service",
+      "replacement_overlay": null
+    },
+    "agency-media-immich-lan": {
+      "workdir": "/opt/media-platform/immich-lan-v1",
+      "env_file": "/opt/media-platform/immich-lan-v1/compose.env",
+      "profiles": [],
+      "variables": [],
+      "files": {
+        "compose.yml": {
+          "source": "docker/immich-server/compose.lan.yml",
+          "source_sha256": "7711061137b0c8f67efb99ac59430a2ffded8f159484cde2db08e123d3540f57",
+          "installed_sha256": "7711061137b0c8f67efb99ac59430a2ffded8f159484cde2db08e123d3540f57",
+          "installed_mode": "444"
+        }
+      },
+      "groups": [
+        {
+          "files": [
+            "compose.yml"
+          ],
+          "roles": [
+            "immich-ml-auth",
+            "immich-server",
+            "immich-valkey",
+            "postgres-immich"
+          ]
+        }
+      ],
+      "supervisor": "agency-immich-lan.service",
+      "replacement_overlay": null
+    },
+    "agency-supoclip-trial-nov13": {
+      "workdir": "/opt/media-platform/supoclip-trial-20261113-v1/config",
+      "env_file": "/dev/null",
+      "profiles": [
+        "migration"
+      ],
+      "variables": [
+        "MEDIA_SUPOCLIP_MODEL_IMAGE",
+        "MEDIA_SUPOCLIP_MODEL_WEIGHTS",
+        "MEDIA_SUPOCLIP_TRIAL_BACKEND_IMAGE",
+        "MEDIA_SUPOCLIP_TRIAL_FRONTEND_IMAGE",
+        "MEDIA_SUPOCLIP_TRIAL_HOST",
+        "MEDIA_SUPOCLIP_TRIAL_NGINX_IMAGE",
+        "MEDIA_SUPOCLIP_TRIAL_PG_ADMIN",
+        "MEDIA_SUPOCLIP_TRIAL_POSTGRES_IMAGE",
+        "MEDIA_SUPOCLIP_TRIAL_PRISMA_BIN",
+        "MEDIA_SUPOCLIP_TRIAL_PRISMA_SOURCE",
+        "MEDIA_SUPOCLIP_TRIAL_ROOT",
+        "MEDIA_SUPOCLIP_TRIAL_SPEACHES_NETWORK",
+        "MEDIA_SUPOCLIP_TRIAL_VALKEY_IMAGE",
+        "MEDIA_SUPOCLIP_WORKER_TIMESTAMPS_IMAGE"
+      ],
+      "files": {
+        "compose.functional.yml": {
+          "source": "docker/supoclip/compose.functional.yml",
+          "source_sha256": "258a30aef9c3faa3dece08fe507830014a87db6268c50be727625519fa73fd18",
+          "installed_sha256": "fa2141eb7c086d077a6f5684926284c7fcaa4f22202b5a71e1532b14e87d12cd",
+          "installed_mode": "444"
+        },
+        "compose.integration.override.yml": {
+          "source": "docker/supoclip/compose.integration.override.yml",
+          "source_sha256": "53fca56b5f2639d087990e519225c501d5805a0fa9043c272341d9dd3ce8170f",
+          "installed_sha256": "53fca56b5f2639d087990e519225c501d5805a0fa9043c272341d9dd3ce8170f",
+          "installed_mode": "444"
+        },
+        "compose.local-model.yml": {
+          "source": "docker/supoclip/compose.local-model.yml",
+          "source_sha256": "0e8fc716d5073a05bab156eb6ab608f20d52b338636c9e509a41428f29825fce",
+          "installed_sha256": "0e8fc716d5073a05bab156eb6ab608f20d52b338636c9e509a41428f29825fce",
+          "installed_mode": "444"
+        },
+        "compose.transcript-timestamps.yml": {
+          "source": "docker/supoclip/compose.transcript-timestamps.yml",
+          "source_sha256": "9826d38a97f726c16c456a328c92134f38d785b138b1eff6512787051855a186",
+          "installed_sha256": "9826d38a97f726c16c456a328c92134f38d785b138b1eff6512787051855a186",
+          "installed_mode": "444"
+        }
+      },
+      "groups": [
+        {
+          "files": [
+            "compose.functional.yml",
+            "compose.integration.override.yml"
+          ],
+          "roles": [
+            "backend",
+            "frontend",
+            "migrate",
+            "postgres",
+            "proxy",
+            "valkey"
+          ]
+        },
+        {
+          "files": [
+            "compose.functional.yml",
+            "compose.integration.override.yml",
+            "compose.local-model.yml",
+            "compose.transcript-timestamps.yml"
+          ],
+          "roles": [
+            "model",
+            "worker"
+          ]
+        }
+      ],
+      "supervisor": "agency-supoclip-private.service",
+      "replacement_overlay": {
+        "source": "docker/supoclip/compose.boot.yml",
+        "sha256": "587647b3d8e8e9cd2bd8d537bbc90e9d81c90aab1dcad0225f6ff0ce32f33ad6"
+      }
+    },
+    "agency-moneyprinter-lan": {
+      "workdir": "/opt/media-platform/moneyprinter-lan-v1",
+      "env_file": "/opt/media-platform/moneyprinter-lan-v1/compose.env",
+      "profiles": [],
+      "variables": [],
+      "files": {
+        "compose.yml": {
+          "source": "docker/moneyprinter/compose.lan.yml",
+          "source_sha256": "63f84acb424aa16c6e106e5ef7b4456aecba9b8b13f609866cb3ec6bd6628606",
+          "installed_sha256": "63f84acb424aa16c6e106e5ef7b4456aecba9b8b13f609866cb3ec6bd6628606",
+          "installed_mode": "400"
+        }
+      },
+      "groups": [
+        {
+          "files": [
+            "compose.yml"
+          ],
+          "roles": [
+            "api",
+            "ui"
+          ]
+        }
+      ],
+      "supervisor": "agency-moneyprinter-lan.service",
+      "replacement_overlay": null
+    },
+    "agency-observability-nas-v1": {
+      "workdir": "/opt/media-platform/observability-nas-v1",
+      "env_file": "/dev/null",
+      "profiles": [],
+      "variables": [
+        "AGENCY_OBS_CADVISOR_IMAGE",
+        "AGENCY_OBS_EGRESS_IPV4",
+        "AGENCY_OBS_EGRESS_SUBNET",
+        "AGENCY_OBS_NODE_IMAGE",
+        "AGENCY_OBS_OTEL_IMAGE"
+      ],
+      "files": {
+        "compose.nas.yml": {
+          "source": "docker/observability/compose.nas.yml",
+          "source_sha256": "8a77429275f82e7f4a30d5b517f65bf84346052356516d39c3d2644d616da762",
+          "installed_sha256": "8a77429275f82e7f4a30d5b517f65bf84346052356516d39c3d2644d616da762",
+          "installed_mode": "444"
+        }
+      },
+      "groups": [
+        {
+          "files": [
+            "compose.nas.yml"
+          ],
+          "roles": [
+            "cadvisor",
+            "node-exporter",
+            "otel-collector"
+          ]
+        }
+      ],
+      "supervisor": "agency-observability-nas.service",
+      "replacement_overlay": null
+    }
+  },
+  "engine": {
+    "r2": {
+      "owner": "agencia-digital-marketing-ai:r2-service:v1",
+      "source": "docker/r2_service.py",
+      "roles": {
+        "serve": "running",
+        "init": "optional_exited"
+      }
+    }
+  }
+}

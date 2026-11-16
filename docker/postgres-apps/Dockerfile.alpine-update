@@ -1,0 +1,39 @@
+ARG POSTGRES_APPS_BASE
+FROM ${POSTGRES_APPS_BASE}
+
+USER 0:0
+RUN --network=none --mount=type=bind,from=apk_inputs,target=/apk-inputs,ro <<'UPDATE'
+set -eu
+export LC_ALL=C
+cd /apk-inputs
+printf '%s  %s\n' \
+    '667a7af496086dec9e19c61d490eb2dd426b547b6c2cdc5b6bb86e02cc7fa9e5' SHA256SUMS \
+    'af1be6395c8850e28ddc34c3de8839c47de7aee1611380fa75c380cb9f75a72f' /lib/apk/db/installed \
+    '207e4696d3c05f7cb05966aee557307151f1f00217af4143c1bcaf33b8df733f' /etc/apk/keys/alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub \
+    | sha256sum -c -
+sha256sum -c SHA256SUMS
+
+inventory() {
+    awk '/^P:/{name=substr($0,3)} /^V:/{print name "=" substr($0,3)}' /lib/apk/db/installed | sort
+}
+test "$(inventory)" = "$(sort before.lock)"
+test "$(id -u postgres):$(id -g postgres)" = '70:70'
+
+set -- /apk-inputs/krb5-libs-1.22.3-r0.apk \
+    /apk-inputs/libxslt-1.1.43-r4.apk \
+    /apk-inputs/zlib-1.4-r0.apk
+/sbin/apk --no-network --keys-dir /etc/apk/keys verify "$@"
+/sbin/apk --no-network --no-scripts --no-commit-hooks --no-cache \
+    --repositories-file /dev/null --keys-dir /etc/apk/keys add "$@"
+
+test "$(inventory)" = "$(sort after.lock)"
+test ! -e /usr/local/bin/gosu
+test ! -L /usr/local/bin/su-exec
+printf '%s  %s\n' \
+    '9c440299ae04a0a79d55b8bf03307036d890a40979d2fb698073c9050d4b20a5' /usr/local/bin/docker-entrypoint.sh \
+    '922ade6b23a312e65023349b36e873752b15ff38ae4c0ae461d74451e104f312' /usr/local/bin/docker-ensure-initdb.sh \
+    | sha256sum -c -
+test "$(/usr/local/bin/postgres --version)" = 'postgres (PostgreSQL) 16.15'
+UPDATE
+
+USER 70:70

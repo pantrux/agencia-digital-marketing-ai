@@ -1,0 +1,167 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {alphaMaskArgs, alphaMaskSummary, audioPass, encodeNvenc, encodeOutput, measureAudio, overlayInputSupported, overlayPacketTimingSupported, parseLoudness, parseProbe, audioAccepted, outputAccepted, outputViolations} from '../src/media.ts';
+import {parseRender} from '../src/contracts.ts';
+
+const measured = {integrated_lufs: -21, true_peak_dbtp: -4, range_lu: 2, threshold_lufs: -31, offset_lu: 0.01};
+test('la medición usa entrada real, no valores previstos de salida', () => {
+  const result = parseLoudness('aviso\n' + JSON.stringify({input_i: '-14.20', input_tp: '-1.30', input_lra: '1.10', input_thresh: '-24.20', target_offset: '0.10', output_i: '-2.00'}));
+  assert.equal(result.integrated_lufs, -14.2);
+  assert.equal(audioAccepted(result), true);
+  assert.equal(audioAccepted({...result, true_peak_dbtp: -0.9}), false);
+  assert.throws(() => parseLoudness(JSON.stringify({input_i: '-inf'})));
+});
+test('NVENC, BT.709 y audio en dos pasadas son obligatorios en el comando', () => {
+  const args = encodeNvenc('frames/frame-%03d.png', 'voice.wav', 'master.mp4', 90, 3, measured);
+  assert.equal(args[args.indexOf('-c:v') + 1], 'h264_nvenc');
+  assert.equal(args[args.indexOf('-color_trc') + 1], 'bt709');
+  assert.ok(args[args.indexOf('-af') + 1]?.includes('measured_I=-21'));
+  assert.ok(args[args.indexOf('-af') + 1]?.includes('TP=-1.5'));
+  assert.ok(measureAudio('voz.wav', 3).includes('0:a:0'));
+  assert.ok(audioPass(3).includes('apad='));
+});
+test('la secuencia JPEG convierte su matriz BT.601 a BT.709 antes de NVENC', () => {
+  const args = encodeNvenc('frames/frame-%04d.jpeg', 'voice.wav', 'master.mp4', 1800, 60, measured);
+  assert.match(args[args.indexOf('-vf') + 1]!, /in_range=pc:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709/);
+  assert.equal(args[args.indexOf('-c:v') + 1], 'h264_nvenc');
+});
+test('la composición por capas admite H.264 progresivo de 30 fps con geometría y color verificados', () => {
+  const request = parseRender({project_id:'sansevieras',job_id:'capas',composition:'AgencyVertical',plan:'Free',props:{title:'Capas',duration_seconds:60,video_path:'proyectos/sansevieras/01_raw/video.mp4',audio_path:'proyectos/sansevieras/03_assets/voz.wav'}});
+  const video = {
+    codec_type:'video',codec_name:'h264',pix_fmt:'yuv420p',field_order:'progressive',width:720,height:1280,
+    sample_aspect_ratio:'1:1',color_space:'bt709',color_range:'tv',r_frame_rate:'30/1',avg_frame_rate:'30/1',
+    start_pts:0,nb_frames:'1800',duration_ts:921600,time_base:'1/15360',disposition:{attached_pic:0},
+  };
+  const probe = (changes = {}) => JSON.stringify({streams:[{...video,...changes}]});
+  assert.ok(overlayInputSupported(probe(),request));
+  assert.ok(overlayInputSupported(probe({width:960,height:540}),request));
+  assert.ok(overlayInputSupported(probe({width:1280,height:720}),request));
+  for (const changes of [
+    {sample_aspect_ratio:'4:3'}, {field_order:'tt'}, {avg_frame_rate:'30000/1001'}, {duration_ts:921088},
+    {nb_frames:'1799'}, {start_pts:512}, {color_transfer:'smpte2084'}, {width:1000}, {width:721},
+    {side_data_list:[{side_data_type:'Display Matrix',rotation:90}]}, {tags:{rotate:'90'}}, {disposition:{attached_pic:1}},
+  ]) assert.equal(overlayInputSupported(probe(changes),request),false);
+  assert.ok(overlayInputSupported(probe(), {...request, plan:'Pro', watermark:false}));
+  const ultra = parseRender({project_id:'sansevieras',job_id:'capas-ultra',composition:'AgencyVertical',
+    plan:'Ultra',format:'mp4',resolution:'4k',props:request.props});
+  assert.ok(overlayInputSupported(probe(), ultra));
+  assert.ok(overlayInputSupported(probe({width:2160,height:3840}), ultra));
+  assert.ok(overlayInputSupported(probe({width:2160,height:3840}), {...ultra,plan:'Ilimitado'}));
+  assert.ok(overlayInputSupported(probe({width:2160,height:3840}),request));
+  assert.ok(overlayInputSupported(probe({width:3840,height:2160}), {...request, plan:'Pro', watermark:false}));
+  assert.equal(overlayInputSupported(probe({width:4320,height:7680}),request),false);
+  assert.equal(overlayInputSupported(probe(),{...ultra,format:'prores4444',transparent:true}),false);
+  assert.equal(overlayInputSupported(probe({color_primaries:'bt2020'}),ultra),false);
+  assert.equal(overlayInputSupported(probe(),{...ultra,durationInFrames:1801}),false);
+  assert.ok(overlayInputSupported(probe({nb_frames:'120',duration_ts:61440}),{...ultra,durationInFrames:120}));
+  assert.equal(overlayInputSupported(probe({nb_frames:'12',duration_ts:6144}),{...ultra,durationInFrames:12}),false);
+  assert.equal(overlayInputSupported(probe(),{...request,durationInFrames:1799}),false);
+});
+test('la codificación por capas usa el vídeo, prolonga el último PNG y conserva la pista normalizada', () => {
+  const args = encodeOutput('mp4','1080p','still-%d.png','voz.wav','master.mp4',1800,60,measured,-1.5,'crudo.mp4');
+  const inputs = args.flatMap((value,index) => value === '-i' ? [args[index+1]] : []);
+  assert.deepEqual(inputs,['crudo.mp4','still-%d.png','voz.wav']);
+  const filter = args[args.indexOf('-filter_complex')+1]!;
+  assert.match(filter, /in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=tv,crop=1080:1920,setsar=1,format=yuv420p\[video\]/);
+  assert.match(filter, /\[1:v\]scale=in_range=pc:out_range=tv:out_color_matrix=bt709,format=yuva420p\[capa\]/);
+  assert.match(filter, /overlay=format=yuv420:alpha=straight:eof_action=repeat:repeatlast=1,setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709/);
+  assert.ok(args.includes('2:a:0'));
+  assert.equal(args[args.indexOf('-frames:v')+1],'1800');
+  assert.equal(args[args.indexOf('-c:v')+1],'h264_nvenc');
+});
+test('la composición 4K conserva el vídeo en YUV BT.709 y convierte la capa transparente', () => {
+  const args = encodeOutput('mp4','4k','still-%d.png','voz.wav','master.mp4',1800,60,measured,-1.5,'crudo.mp4');
+  const filter = args[args.indexOf('-filter_complex')+1]!;
+  assert.match(filter, /in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=tv,crop=2160:3840,setsar=1,format=yuv420p\[video\]/);
+  assert.match(filter, /\[1:v\]scale=in_range=pc:out_range=tv:out_color_matrix=bt709,format=yuva420p\[capa\]/);
+  assert.match(filter, /overlay=format=yuv420:alpha=straight:eof_action=repeat:repeatlast=1,setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709/);
+  assert.equal(args[args.indexOf('-c:v')+1],'h264_nvenc');
+});
+test('la composición por capas verifica el tiempo de presentación de todos los fotogramas', () => {
+  const probe = (positions: number[]) => JSON.stringify({
+    streams:[{time_base:'1/15360'}],
+    packets:positions.map(pts => ({pts,duration:512})),
+  });
+  assert.equal(overlayPacketTimingSupported(probe([0,1024,512]),3),true);
+  assert.equal(overlayPacketTimingSupported(probe([0,1024,480]),3),false);
+  assert.equal(overlayPacketTimingSupported(probe([0,1024,1024]),3),false);
+  assert.equal(overlayPacketTimingSupported(probe([0,512]),3),false);
+});
+test('ffprobe devuelve únicamente metadatos técnicos y rechaza duración desconocida', () => {
+  const info = parseProbe(JSON.stringify({format: {duration: '3.0', filename: 'no-publicar'}, streams: [{codec_type:'video', codec_name:'h264', width:1080,height:1920,avg_frame_rate:'30/1'},{codec_type:'audio',codec_name:'aac',sample_rate:'48000'}]}));
+  assert.equal(info.duration_seconds, 3);
+  assert.equal(info.width, 1080);
+  assert.equal(info.has_audio, true);
+  assert.equal('filename' in info, false);
+  assert.throws(() => parseProbe('{"format":{"duration":"N/A"},"streams":[]}'));
+});
+
+test('4K MP4 usa nivel y tasa adecuados; ProRes usa 4444 alfa y PCM sin atribuirse NVENC', () => {
+  const mp4 = encodeOutput('mp4', '4k', 'frames.png', 'audio.wav', 'master.mp4', 90, 3, measured);
+  assert.equal(mp4[mp4.indexOf('-c:v') + 1], 'h264_nvenc');
+  assert.equal(mp4[mp4.indexOf('-level:v') + 1], '5.1');
+  assert.equal(mp4[mp4.indexOf('-b:v') + 1], '24M');
+  const prores = encodeOutput('prores4444', '4k', 'frames.png', 'audio.wav', 'master.mov', 90, 3, measured);
+  assert.equal(prores[prores.indexOf('-c:v') + 1], 'prores_ks');
+  assert.equal(prores[prores.indexOf('-profile:v') + 1], '4444');
+  assert.equal(prores[prores.indexOf('-alpha_bits') + 1], '16');
+  assert.equal(prores[prores.indexOf('-c:a') + 1], 'pcm_s24le');
+  assert.ok(prores[prores.indexOf('-vf') + 1]?.includes('yuva444p10le'));
+  assert.ok(prores[prores.indexOf('-af') + 1]?.includes('measured_I=-21'));
+  assert.ok(!prores.includes('h264_nvenc'));
+});
+
+test('el contrato final valida dimensiones 4K, perfil 4444, alfa y audio del MOV', () => {
+  const request = parseRender({project_id: 'sansevieras', job_id: 'alfa', composition: 'AgencyVertical', plan: 'Ilimitado', format: 'prores4444', resolution: '4k', props: {title: 'Alfa', duration_seconds: 3, audio_path: 'proyectos/sansevieras/03_assets/voz.wav'}});
+  const info = parseProbe(JSON.stringify({format: {duration: '3'}, streams: [{codec_type:'video',codec_name:'prores',profile:'4444',codec_tag_string:'ap4h',width:2160,height:3840,avg_frame_rate:'30/1',pix_fmt:'yuva444p12le',color_space:'bt709',color_transfer:'bt709',color_primaries:'bt709'},{codec_type:'audio',codec_name:'pcm_s24le',sample_rate:'48000'}]}));
+  assert.equal(outputAccepted(info, request), true);
+  for (const change of [{width: 1080}, {pixel_format: 'yuv444p12le'}, {video_profile: 'HQ'}, {codec_tag: 'apch'}, {audio_codec: 'aac'}, {sample_rate: 44100}, {fps: 25}, {duration_seconds: 4}]) {
+    assert.equal(outputAccepted({...info, ...change}, request), false);
+  }
+});
+
+test('alfa se mide en píxeles decodificados y rechaza un plano opaco o truncado', () => {
+  const mask = Buffer.alloc(4096, 255); mask.fill(0, 0, 2048);
+  const result = alphaMaskSummary(mask);
+  assert.equal(result.has_transparency, true); assert.equal(result.alpha_min, 0); assert.equal(result.alpha_max, 255);
+  assert.equal(result.transparent_pixels, 2048);
+  assert.equal(alphaMaskSummary(Buffer.alloc(4096, 255)).has_transparency, false);
+  assert.equal(alphaMaskSummary(Buffer.alloc(4096, 254)).has_transparency, false);
+  assert.throws(() => alphaMaskSummary(Buffer.alloc(4095)));
+  const args = alphaMaskArgs('master.mov', 'alpha.raw', 1.5);
+  assert.ok(args.includes('alphaextract,scale=64:64:flags=area,format=gray'));
+  assert.equal(args[args.indexOf('-ss') + 1], '1.5');
+});
+
+test('PNG sin etiquetas requiere señalización BT709 en cada frame y no se aceptan primarias/transfer ausentes', () => {
+  const request = parseRender({project_id:'sansevieras',job_id:'bt709',composition:'AgencyVertical',plan:'Free',props:{title:'SDR',duration_seconds:3,audio_path:'proyectos/sansevieras/03_assets/tone.wav'}});
+  // Forma real observada con FFmpeg9/NVENC: la matriz existe y las otras dos etiquetas faltan.
+  const info = parseProbe(JSON.stringify({format:{duration:'3'},streams:[{codec_type:'video',codec_name:'h264',width:1080,height:1920,avg_frame_rate:'30/1',pix_fmt:'yuv420p',color_space:'bt709'},{codec_type:'audio',codec_name:'aac',sample_rate:'48000'}]}));
+  assert.equal(outputAccepted(info,request),false);
+  assert.deepEqual(outputViolations(info,request),['color_transfer','color_primaries']);
+  for (const format of ['mp4','prores4444'] as const) {
+    const args = encodeOutput(format,'1080p','frames.png','audio.wav',format==='mp4'?'video.mp4':'video.mov',90,3,measured);
+    const filters = args[args.indexOf('-vf')+1]!;
+    assert.ok(filters.includes('setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709'));
+  }
+  assert.equal(outputAccepted({...info,color_transfer:'bt709',color_primaries:'bt709'},request),true);
+});
+
+test('los dos pases miden y normalizan estéreo48k antes del limitador, en MP4 y ProRes', () => {
+  const preparation = 'aformat=sample_rates=48000:channel_layouts=stereo,';
+  for (const duration of [1,3]) {
+    const measurement = measureAudio('mono-22050.wav',duration);
+    const firstFilter = measurement[measurement.indexOf('-af')+1]!;
+    assert.ok(firstFilter.startsWith(preparation));
+    assert.ok(firstFilter.indexOf('apad=') < firstFilter.indexOf('loudnorm='));
+    assert.ok(firstFilter.indexOf('atrim=') < firstFilter.indexOf('loudnorm='));
+    for (const format of ['mp4','prores4444'] as const) {
+      const encoded = encodeOutput(format,'1080p','frames.png','mono-22050.wav','output',duration*30,duration,measured);
+      const secondFilter = encoded[encoded.indexOf('-af')+1]!;
+      assert.ok(secondFilter.startsWith(preparation));
+      assert.equal(secondFilter.slice(0,secondFilter.indexOf('loudnorm=')),firstFilter.slice(0,firstFilter.indexOf('loudnorm=')));
+      assert.equal(encoded[encoded.indexOf('-ar')+1],'48000');
+      assert.equal(encoded[encoded.indexOf('-ac')+1],'2');
+    }
+  }
+});

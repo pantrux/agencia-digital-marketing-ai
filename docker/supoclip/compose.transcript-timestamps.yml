@@ -1,0 +1,3 @@
+services:
+  worker:
+    image: ${MEDIA_SUPOCLIP_WORKER_TIMESTAMPS_IMAGE:?Falta la imagen del worker con el esquema de timestamps}

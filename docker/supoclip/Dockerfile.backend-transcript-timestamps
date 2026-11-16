@@ -1,0 +1,4 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+COPY --chown=0:0 --chmod=0444 ai.py /opt/supoclip/backend/src/ai.py
+USER 1000:1000

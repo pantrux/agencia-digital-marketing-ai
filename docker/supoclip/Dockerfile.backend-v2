@@ -1,0 +1,13 @@
+# Reutiliza la misma base Wolfi local y los contextos inmutables del ensayo.
+FROM wolfi
+USER 0:0
+COPY --chown=0:0 --chmod=0555 assemble_backend_v2.sh backend_runtime.py backend_runtime_v2.py verify_ffmpeg_ass.py /opt/supoclip/bin/
+ARG SUPOCLIP_WHEEL_MANIFEST_SHA256
+RUN --network=none --mount=type=bind,from=stage,source=.,target=/inputs,ro --mount=type=bind,from=products,source=.,target=/products,ro --mount=type=tmpfs,target=/tmp ["/bin/sh", "-ec", "exec /bin/sh /opt/supoclip/bin/assemble_backend_v2.sh \"$SUPOCLIP_WHEEL_MANIFEST_SHA256\""]
+
+USER 1000:1000
+WORKDIR /opt/supoclip/backend
+RUN --network=none --mount=type=bind,from=products,source=.,target=/products,ro --mount=type=tmpfs,target=/tmp ["/usr/bin/python3.12", "-I", "-S", "-B", "/opt/supoclip/bin/backend_runtime_v2.py", "probe"]
+EXPOSE 8000
+ENTRYPOINT ["/usr/bin/python3.12", "-I", "-S", "-B", "/opt/supoclip/bin/backend_runtime.py"]
+CMD ["api"]

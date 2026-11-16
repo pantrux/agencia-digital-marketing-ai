@@ -1,0 +1,8 @@
+[Unit]
+Description=Activa a Elena cuando se registra un máster
+
+[Path]
+PathChanged=/var/lib/agency-production-lucas
+
+[Install]
+WantedBy=paths.target

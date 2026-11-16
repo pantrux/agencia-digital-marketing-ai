@@ -1,0 +1,10 @@
+[Unit]
+Description=Entrega periódica de órdenes verificadas a OpenClaw
+
+[Timer]
+OnBootSec=35s
+OnUnitInactiveSec=10s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

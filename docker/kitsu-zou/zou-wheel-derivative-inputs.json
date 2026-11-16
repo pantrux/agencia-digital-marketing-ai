@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "owner": "agencia-digital-marketing-ai:zou-wheel-derivative:v1",
+  "root_relative": ".tools/kitsu-zou-wheel-derivative-v1",
+  "root_identity": {
+    "device": 8121725096129312908,
+    "inode": 1407374884209911,
+    "owner": "agencia-digital-marketing-ai:zou-wheel-derivative:v1",
+    "root": "D:\\Proyectos\\Agencia Digital de Marketing AI\\.tools\\kitsu-zou-wheel-derivative-v1",
+    "schema_version": 1
+  },
+  "marker_sha256": "6193eb9c2bf5c36cb5bd2d3e864c0889db4bb0f130a8420ca418a76fd0349830",
+  "original": {
+    "filename": "zou-1.1.1-py3-none-any.whl",
+    "sha256": "4f753a130dde563da7ef48d5ec4b403630740738a9451226e3d0687041a72455",
+    "bytes": 1184439,
+    "metadata_sha256": "fa4e7893307d874bbc122ac3eb9622d490354ecd995c6c8111d7471e15799f53",
+    "license_sha256": "76a97c878c9c7a8321bb395c2b44d3fe2f8d81314d219b20138ed0e2dddd5182",
+    "license": "AGPL-3.0-only",
+    "url": "https://files.pythonhosted.org/packages/30/4c/75bf8b8c1570efb65f4d3672984c2a04447b7ee414d4c1fdec1a49c3bc10/zou-1.1.1-py3-none-any.whl",
+    "source_repository": "https://github.com/cgwire/zou",
+    "source_commit": "8f92792de9faeeb623e383311fa80828492bac37"
+  },
+  "output": {
+    "filename": "zou-1.1.1+agency1-py3-none-any.whl",
+    "version": "1.1.1+agency1"
+  },
+  "access_helper": {
+    "path": "sre/backup_tools_access.py",
+    "sha256": "ae1c6d5e2fbd4550c78d7ea5857b4b4b203a92e2739f9334c831730a1b8cec3b"
+  },
+  "evidence_inputs": [
+    {
+      "role": "inventory",
+      "path": ".tools/evidence/phase4-zou-resolved-inventory.json",
+      "sha256": "2c3d130441d5307b57392747d7d00041e34b3e9da4d086dacc449af95e5b9784"
+    },
+    {
+      "role": "wheelhouse_audit",
+      "path": ".tools/evidence/phase4-zou-wheelhouse-audit.json",
+      "sha256": "cc21e186606568b1491d8d2d8fd9ee53a71080acab396256bd56e47fdee2e965"
+    },
+    {
+      "role": "baseline_osv",
+      "path": ".tools/evidence/phase4-zou-runtime-osv.json",
+      "sha256": "7657e6a6b3fd37602b7bdc845bc3eae8f3f70b9606e1c230909ada07fe9fd1ba"
+    }
+  ],
+  "runtime": {
+    "environment": {
+      "PSYCOPG_IMPL": "python"
+    },
+    "pure_psycopg": {
+      "version": "3.3.4",
+      "sha256": "b6bbc25ccf05c8fad3b061d9db2ef0909a555171b84b07f29458a447253d679a",
+      "url": "https://files.pythonhosted.org/packages/5c/e0/7b3dee031daae7743609ce3c746565d4a3ed7c2c186479eb48e34e838c64/psycopg-3.3.4-py3-none-any.whl"
+    },
+    "system_libpq": {
+      "package": "libpq-18",
+      "version": "18.6-r7",
+      "sha256": "4372b3013045fe0a347cefe77a818d84135d03e22155fa8cbcd741a6f0e0c4f9",
+      "url": "https://packages.wolfi.dev/os/x86_64/libpq-18-18.6-r7.apk",
+      "soname": "libpq.so.5",
+      "elf_sha256": "b508a2eaa593a83c64c6ce054da1d3d57bef5f0c6c60f7db3c67dc57d10ca836"
+    },
+    "native_loader_verified": false,
+    "database_verified": false
+  },
+  "modifications": [
+    {
+      "before": "Version: 1.1.1",
+      "after": "Version: 1.1.1+agency1"
+    },
+    {
+      "before": "Requires-Dist: psycopg[binary]==3.3.4",
+      "after": "Requires-Dist: psycopg==3.3.4"
+    },
+    {
+      "before": "Requires-Dist: psycopg[c]==3.3.4; extra == \"prodpg\"",
+      "after": "Requires-Dist: psycopg==3.3.4; extra == \"prodpg\""
+    }
+  ],
+  "preservation": {
+    "code": "byte-for-byte",
+    "licenses": "byte-for-byte",
+    "entry_points": "byte-for-byte",
+    "other_metadata": "byte-for-byte",
+    "dist_info_directory_renamed": true,
+    "record_regenerated": true,
+    "original_retained": true
+  },
+  "scope": {
+    "sdk_execution": false,
+    "installation": false,
+    "network": false,
+    "image_build": false,
+    "database": false,
+    "runtime_approved": false
+  },
+  "primary_sources": [
+    "https://packaging.python.org/en/latest/specifications/binary-distribution-format/",
+    "https://peps.python.org/pep-0440/#local-version-identifiers",
+    "https://www.psycopg.org/psycopg3/docs/basic/install.html#pure-python-installation",
+    "https://www.psycopg.org/psycopg3/docs/api/pq.html#pq-module-implementations",
+    "https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#module-sqlalchemy.dialects.postgresql.psycopg"
+  ]
+}

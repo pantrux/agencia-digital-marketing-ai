@@ -1,0 +1,27 @@
+[Unit]
+Description=Conector Cloudflare del ingreso audiovisual
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+LoadCredential=tunnel-token:/etc/agency-studio-tunnel/token
+ExecStart=/opt/agency-studio-tunnel/cloudflared --no-autoupdate tunnel --protocol http2 --edge-ip-version 4 --metrics 127.0.0.1:3199 run --token-file ${CREDENTIALS_DIRECTORY}/tunnel-token
+Restart=on-failure
+RestartSec=7s
+TimeoutStopSec=20s
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

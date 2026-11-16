@@ -1,0 +1,11 @@
+[Unit]
+Description=Arranque y reintento del consumidor R2
+
+[Timer]
+OnBootSec=15s
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+Unit=agency-r2-sync.service
+
+[Install]
+WantedBy=timers.target

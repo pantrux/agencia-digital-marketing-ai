@@ -1,0 +1,10 @@
+[Unit]
+Description=Audita los másteres renderizados por Lucas
+
+[Timer]
+OnBootSec=115s
+OnUnitInactiveSec=45s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

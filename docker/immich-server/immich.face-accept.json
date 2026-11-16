@@ -1,0 +1,27 @@
+{
+  "backup": {"database": {"enabled": false}},
+  "job": {"faceDetection": {"concurrency": 1}},
+  "library": {"scan": {"enabled": false}, "watch": {"enabled": false}},
+  "machineLearning": {
+    "enabled": true,
+    "availabilityChecks": {"enabled": true, "timeout": 7000},
+    "clip": {"enabled": false},
+    "duplicateDetection": {"enabled": false},
+    "facialRecognition": {
+      "enabled": true,
+      "modelName": "agency_yunet_auraface_v1",
+      "minScore": 0.7,
+      "maxDistance": 0.575,
+      "minFaces": 3
+    },
+    "ocr": {"enabled": false},
+    "urls": ["http://immich-ml-auth:3003"]
+  },
+  "metadata": {"faces": {"import": false}},
+  "nightlyTasks": {"clusterNewFaces": false, "generateMemories": false},
+  "map": {"enabled": false},
+  "newVersionCheck": {"enabled": false},
+  "oauth": {"enabled": false},
+  "passwordLogin": {"enabled": true},
+  "reverseGeocoding": {"enabled": false}
+}

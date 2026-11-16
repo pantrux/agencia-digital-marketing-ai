@@ -1,0 +1,423 @@
+name: Calidad de la plataforma audiovisual
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Los controles no necesitan secretos de producción ni escritura en GitHub.
+permissions:
+  contents: read
+
+concurrency:
+  group: calidad-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONUTF8: "1"
+  FORCE_COLOR: "0"
+
+jobs:
+  gate-1-secrets:
+    name: "Control 1 · Secretos y plantilla de configuración"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Leer las fuentes sin conservar credenciales
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Preparar Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Instalar el detector con SHA256 fijado
+        run: python scripts/ci/install_tools.py --tools gitleaks
+      - name: Buscar secretos sin consultar el historial ni la bóveda local
+        run: gitleaks dir . --config .gitleaks.toml --redact --no-banner --timeout 120
+      - name: Comprobar la plantilla pública sin credenciales de producción
+        run: python scripts/ci/check_env.py --template-only
+
+  gate-2-lint:
+    name: "Control 2 · Estilo y sintaxis de los lenguajes presentes"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Leer las fuentes sin conservar credenciales
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Preparar Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias declaradas
+        run: npm ci --ignore-scripts
+      - name: Instalar el renderizador aislado sin scripts de paquetes
+        run: npm ci --ignore-scripts --prefix gpu-bridge-win11/render-worker
+      - name: Instalar los validadores fijados
+        run: |
+          python -m pip install ruff==0.17.3
+          python scripts/ci/install_tools.py --tools actionlint shellcheck
+      - name: Revisar JavaScript y TypeScript
+        run: npm run lint
+      - name: Revisar TypeScript del Worker cuando estén sus fuentes
+        if: ${{ hashFiles('cloudflare-saas/studio-api-worker/src/index.ts') != '' }}
+        run: ./node_modules/.bin/eslint cloudflare-saas/studio-api-worker/src
+      - name: Revisar las fuentes y pruebas propias del renderizador
+        run: ./node_modules/.bin/eslint gpu-bridge-win11/render-worker/src gpu-bridge-win11/render-worker/composition gpu-bridge-win11/render-worker/tests
+      - name: Revisar Python
+        run: python -m ruff check scripts tests sre vcenter storage gpu-bridge-win11 docker openclaw-agency-setup
+      - name: Revisar el formato Python
+        run: python -m ruff format --check scripts tests sre vcenter storage gpu-bridge-win11 docker openclaw-agency-setup
+      - name: Revisar estilo y formato de ingress cuando esté su fuente
+        if: ${{ hashFiles('ingress/phase6_ingress.py') != '' }}
+        run: |
+          python -m ruff check ingress
+          python -m ruff format --check ingress
+      - name: Revisar los scripts Bash
+        run: shellcheck sre/*.sh vcenter/*.sh storage/*.sh openclaw-agency-setup/setup.sh
+      - name: Validar el workflow con su esquema y sus comandos Bash
+        run: actionlint .github/workflows/ci-cd-media-platform.yml
+      - name: Revisar PowerShell cuando existan archivos de infraestructura
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $directories = @('scripts', 'vcenter', 'storage', 'gpu-bridge-win11', 'ingress') | Where-Object { Test-Path -LiteralPath $_ }
+          $files = @($directories | ForEach-Object { Get-ChildItem -LiteralPath $_ -Filter '*.ps1' -File -Recurse } | Where-Object { $_.FullName -notmatch '[\\/](node_modules|artifacts|\.cache|__pycache__)[\\/]' })
+          if ($files.Count -eq 0) {
+            Write-Output 'La fase declarada todavía no contiene scripts PowerShell.'
+            exit 0
+          }
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force -Repository PSGallery
+          $findings = @($files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Severity Error,Warning })
+          if ($findings.Count -gt 0) {
+            $findings | Format-Table -AutoSize
+            throw 'La revisión PowerShell encontró errores o advertencias.'
+          }
+
+  gate-3-types:
+    name: "Control 3 · Tipos estrictos de los contratos presentes"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Leer las fuentes sin conservar credenciales
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Instalar dependencias declaradas
+        run: npm ci --ignore-scripts
+      - name: Comprobar tipos sin emitir archivos
+        run: npm run typecheck
+      - name: Instalar el renderizador aislado sin scripts de paquetes
+        run: npm ci --ignore-scripts --prefix gpu-bridge-win11/render-worker
+      - name: Comprobar tipos del renderizador contra su SDK fijado
+        run: npm --prefix gpu-bridge-win11/render-worker run typecheck
+      - name: Instalar, comprobar tipos y construir la exportación estática del portal
+        if: ${{ hashFiles('cloudflare-saas/studio-portal-web/package.json') != '' }}
+        working-directory: cloudflare-saas/studio-portal-web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: |
+          npm ci --ignore-scripts --no-audit
+          ./node_modules/.bin/next typegen
+          ./node_modules/.bin/tsc --noEmit
+          npm --ignore-scripts run build
+          test -s out/index.html
+
+  gate-4-tests:
+    name: "Control 4 · Pruebas de contratos y procedimientos SRE"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Leer las fuentes sin conservar credenciales
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Preparar Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias declaradas
+        run: npm ci --ignore-scripts
+      - name: Ejecutar pruebas TypeScript
+        run: npm run test
+      - name: Ejecutar contrato local del socket privado de Sofía
+        run: node --test tests/test_sofia_owner_plugin.mjs tests/test_mateo_isolated.mjs
+      - name: Instalar el renderizador aislado sin scripts de paquetes
+        run: npm ci --ignore-scripts --prefix gpu-bridge-win11/render-worker
+      - name: Ejecutar contratos del renderizador sin GPU ni servicios
+        run: npm --prefix gpu-bridge-win11/render-worker test
+      - name: Instalar dependencias Python fijadas de las pruebas
+        run: python -m pip install -r requirements-dev.txt
+      - name: Preparar insumos públicos fijados de las pruebas
+        run: python scripts/ci/prepare_test_fixtures.py
+      - name: Ejecutar pruebas Python y escenarios SRE aislados
+        run: python -m pytest tests -m 'not evidencia_operativa' -p no:cacheprovider --disable-plugin-autoload
+
+  gate-5-infra:
+    name: "Control 5 · Infraestructura declarada para la fase actual"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Leer las fuentes sin conservar credenciales
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Preparar Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      # La fase declarada conserva sus mínimos; este control no acredita pruebas reales de VM.
+      - name: Validar los mínimos de la fase declarada con CD deshabilitado
+        id: phase
+        run: |
+          python scripts/ci/validate_phase.py
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          manifest = json.loads(Path('config/phase-capabilities.json').read_text(encoding='utf-8'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"current={manifest['phase']}\n")
+          PY
+      - name: Validar la configuración Compose con datos sintéticos
+        if: ${{ hashFiles('docker/docker-compose.yml') != '' }}
+        run: |
+          python -m pip install --no-deps PyYAML==6.0.3
+          python scripts/ci/check_compose_base.py
+      - name: Preparar Node.js para el emulador de D1
+        if: ${{ hashFiles('cloudflare-saas/studio-api-worker/wrangler.example.jsonc') != '' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Ensayar las migraciones de D1 en almacenamiento local temporal
+        if: ${{ hashFiles('cloudflare-saas/studio-api-worker/wrangler.example.jsonc') != '' }}
+        run: npm exec --yes --package=wrangler@4.162.0 -- python scripts/ci/check_d1_migrations.py
+      # La fase 0 todavía no declara la VM preparada. Las fases 1 a 7 conservan este contrato
+      # del SDK en el runner público, sin secretos ni conexión a vCenter o al laboratorio.
+      - name: Contrastar PowerCLI fijado mediante metadatos sin contactar el laboratorio
+        if: steps.phase.outputs.current == '1' || steps.phase.outputs.current == '2' || steps.phase.outputs.current == '3' || steps.phase.outputs.current == '4' || steps.phase.outputs.current == '5' || steps.phase.outputs.current == '6' || steps.phase.outputs.current == '7'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $requiredVersion = [version] '13.5.0.25380678'
+          # Los manifiestos del SDK declaran versiones mínimas de sus dependencias.
+          # Fijar e importar primero toda la cadena evita validar contra una versión posterior.
+          $pins = [ordered]@{
+            'VMware.VimAutomation.Sdk' = '13.5.0.25380678'
+            'VMware.VimAutomation.Common' = '13.5.0.25380678'
+            'VMware.Vcf.Sso' = '13.5.0.25380678'
+            'VMware.Vim' = '9.1.0.25380678'
+            'VMware.OpenAPI' = '13.5.0.25380678'
+            'VMware.VimAutomation.Cis.Core' = '13.5.0.25380678'
+            'VMware.VimAutomation.Core' = '13.5.0.25380678'
+          }
+          foreach ($pin in $pins.GetEnumerator()) {
+            $version = [version] $pin.Value
+            $available = @(Get-Module -ListAvailable -Name $pin.Key | Where-Object Version -EQ $version)
+            if ($available.Count -eq 0) {
+              Install-Module -Name $pin.Key -RequiredVersion $version -Scope CurrentUser -Repository PSGallery -AcceptLicense -AllowClobber -Force
+            }
+            Import-Module -Name $pin.Key -RequiredVersion $version -ErrorAction Stop
+          }
+          foreach ($pin in $pins.GetEnumerator()) {
+            $loaded = @(Get-Module -Name $pin.Key)
+            if ($loaded.Count -ne 1 -or $loaded[0].Version -ne [version] $pin.Value) {
+              throw ('El módulo cargado no coincide con la versión fijada: ' + $pin.Key)
+            }
+          }
+          $results = @(& ./vcenter/Test-PowerCLIContracts.ps1)
+          if ($results.Count -ne 1 -or $results[0].ContractsValid -ne $true -or $results[0].InfrastructureContacted -ne $false -or $results[0].PowerCliVersion -cne [string] $requiredVersion -or $results[0].CommandsChecked -le 0) {
+            throw 'No se acreditó el contrato local de parámetros de PowerCLI.'
+          }
+          $results[0] | ConvertTo-Json -Compress
+
+  gate-6-security:
+    name: "Control 6 · Dependencias y configuración seguras"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Leer las fuentes sin conservar credenciales
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Preparar Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias declaradas
+        run: npm ci --ignore-scripts
+      - name: Auditar todas las dependencias npm
+        run: npm audit --audit-level=high
+      - name: Auditar el lock propio del portal cuando esté su manifiesto
+        if: ${{ hashFiles('cloudflare-saas/studio-portal-web/package.json') != '' }}
+        run: |
+          mkdir -p .tools/evidence
+          status=0
+          npm --prefix cloudflare-saas/studio-portal-web audit --package-lock-only \
+            --audit-level=high --json > .tools/evidence/studio-portal-npm-audit.json || status=$?
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          portal = Path('cloudflare-saas/studio-portal-web')
+          lock = portal / 'package-lock.json'
+          audit = Path('.tools/evidence/studio-portal-npm-audit.json')
+          packages = json.loads(lock.read_text(encoding='utf-8'))['packages']
+          report = json.loads(audit.read_text(encoding='utf-8'))
+          total = report.get('metadata', {}).get('dependencies', {}).get('total')
+          if 'error' in report or len(packages) <= 1 or type(total) is not int or total != len(packages) - 1:
+              raise SystemExit('La auditoría npm del portal no contabiliza las dependencias del lock.')
+          paths = [portal / 'package.json', lock, audit]
+          receipt = {path.as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
+          Path('.tools/evidence/studio-portal-npm-receipt.json').write_text(
+              json.dumps({'sha256': receipt, 'threshold': 'high', 'dependencies': total}, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          exit "$status"
+      - name: Auditar el grafo Python fijado en un entorno aislado
+        run: |
+          python -m venv .tools/venvs/python-audit
+          .tools/venvs/python-audit/bin/python -m pip install pip-audit==2.10.1
+          mkdir -p .tools/evidence
+          .tools/venvs/python-audit/bin/python -m pip_audit --strict --progress-spinner off --vulnerability-service pypi --requirement requirements-dev.txt --format json --output .tools/evidence/python-sca.json
+          .tools/venvs/python-audit/bin/python scripts/ci/check_python_audit.py --report .tools/evidence/python-sca.json
+      - name: Auditar por OSV los cuatro grafos GPU sin instalar sus ruedas Windows
+        run: |
+          python scripts/ci/check_gpu_dependencies.py prepare --output .tools/evidence/gpu-dependencies
+          audit_status=0
+          for graph in metrics immich-runtime immich-build whisper; do
+            .tools/venvs/python-audit/bin/python -m pip_audit --strict --no-deps --disable-pip \
+              --vulnerability-service osv --progress-spinner off \
+              --requirement ".tools/evidence/gpu-dependencies/${graph}.requirements.txt" \
+              --format json --output ".tools/evidence/gpu-dependencies/${graph}.json" \
+              2> ".tools/evidence/gpu-dependencies/${graph}.stderr.txt" || audit_status=1
+          done
+          python scripts/ci/check_gpu_dependencies.py validate \
+            --inventory .tools/evidence/gpu-dependencies/inventory.json \
+            --reports-dir .tools/evidence/gpu-dependencies
+          exit "$audit_status"
+      - name: Instalar el renderizador aislado sin scripts de paquetes
+        run: npm ci --ignore-scripts --prefix gpu-bridge-win11/render-worker
+      - name: Auditar el lock npm propio del renderizador con el mismo umbral
+        run: npm audit --prefix gpu-bridge-win11/render-worker --audit-level=high --json > .tools/evidence/renderer-npm-audit.json
+      - name: Vincular el informe npm con los inputs exactos del renderizador
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          paths = [
+              'gpu-bridge-win11/render-worker/package.json',
+              'gpu-bridge-win11/render-worker/package-lock.json',
+              '.tools/evidence/renderer-npm-audit.json',
+          ]
+          receipt = {name: hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in paths}
+          Path('.tools/evidence/renderer-npm-receipt.json').write_text(
+              json.dumps({'sha256': receipt, 'threshold': 'high'}, indent=2) + '\n', encoding='utf-8'
+          )
+          PY
+      - name: Instalar el auditor de configuración con SHA256 fijado
+        run: python scripts/ci/install_tools.py --tools trivy
+      - name: Rechazar vulnerabilidades y configuraciones de severidad alta o crítica
+        run: >-
+          trivy fs . --scanners vuln,misconfig --include-dev-deps --severity HIGH,CRITICAL
+          --exit-code 1 --timeout 3m --skip-dirs .git --skip-dirs .tools
+          --skip-dirs node_modules --skip-dirs gpu-bridge-win11/render-worker/node_modules
+          --skip-dirs cloudflare-saas/studio-portal-web/node_modules
+          --skip-dirs cloudflare-saas/studio-portal-web/.next --skip-dirs cloudflare-saas/studio-portal-web/out
+          --skip-dirs gpu-bridge-win11/render-worker/artifacts --skip-dirs coverage --skip-files .env
+      - name: Conservar informes y hashes de seguridad aunque falle un control
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: auditorias-seguridad-${{ github.run_id }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            .tools/evidence/python-sca.json
+            .tools/evidence/gpu-dependencies/
+            .tools/evidence/renderer-npm-audit.json
+            .tools/evidence/renderer-npm-receipt.json
+            .tools/evidence/studio-portal-npm-audit.json
+            .tools/evidence/studio-portal-npm-receipt.json
+
+  gate-7-docs:
+    name: "Control 7 · Documentación y diagramas sincronizados"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    # Solo este control consulta los archivos de una solicitud de cambios por API.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Leer las fuentes sin conservar credenciales
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Preparar Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Verificar enlaces, runbooks y cambios relacionados mediante API de solo lectura
+        run: python scripts/ci/check_docs.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  quality-gates:
+    name: Los siete controles bloqueantes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    if: always()
+    needs:
+      - gate-1-secrets
+      - gate-2-lint
+      - gate-3-types
+      - gate-4-tests
+      - gate-5-infra
+      - gate-6-security
+      - gate-7-docs
+    steps:
+      - name: Rechazar cualquier control fallido, cancelado u omitido
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          results = json.loads(os.environ['RESULTS'])
+          failures = [name for name, result in results.items() if result['result'] != 'success']
+          if len(results) != 7 or failures:
+              raise SystemExit('Controles sin aprobar: ' + ', '.join(failures))
+          print('Siete controles aprobados. Las validaciones declarativas mantienen el despliegue deshabilitado.')
+          PY

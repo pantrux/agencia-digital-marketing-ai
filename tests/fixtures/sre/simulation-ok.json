@@ -1,0 +1,14 @@
+{
+  "probes": {
+    "edge": {"ok": true},
+    "consumer": {"ok": true},
+    "kitsu": {"ok": true},
+    "immich": {"ok": true},
+    "agents": {"ok": true},
+    "immich_ml": {"ok": true},
+    "whisper": {"ok": true},
+    "remotion": {"ok": true},
+    "gpu_metrics": {"ok": true},
+    "monitor": {"ok": true}
+  }
+}

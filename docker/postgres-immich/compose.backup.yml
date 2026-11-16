@@ -1,0 +1,59 @@
+name: agency-media-immich-db
+
+services:
+  postgres-immich:
+    image: sha256:a00b7ac5ed30069abde2702a2b2b3d8321ea0f22d2ba64cc9f836c86b4c47601
+    pull_policy: never
+    platform: linux/amd64
+    labels:
+      agency.owner: agencia-digital-marketing-ai:postgres-immich-backup:v1
+    user: "70:70"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    cpus: "1.0"
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 128
+    shm_size: 128m
+    stop_grace_period: 30s
+    command: [postgres, -c, shared_preload_libraries=vchord.so]
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_USER: postgres
+      POSTGRES_DB: immich
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256 --auth-local=scram-sha-256
+      PGPASSFILE: /run/secrets/postgres_pgpass
+    secrets: [postgres_password, postgres_pgpass]
+    volumes:
+      - type: bind
+        source: ${MEDIA_POSTGRES_IMMICH_BACKUP_DATA_PATH:?Falta ruta local de datos}
+        target: /var/lib/postgresql/data
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m,uid=70,gid=70,mode=0775
+    networks: [data]
+    healthcheck:
+      test: [CMD, /usr/local/bin/psql, -X, -q, -A, -t, -w, -h, 127.0.0.1, -p, "5432", -U, postgres, -d, immich, --set=ON_ERROR_STOP=1, -c, SELECT 1]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 60s
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "2"}
+
+networks:
+  data:
+    external: true
+    name: ${MEDIA_POSTGRES_IMMICH_BACKUP_NETWORK:?Falta red privada de Immich}
+
+secrets:
+  postgres_password:
+    file: ${MEDIA_POSTGRES_IMMICH_BACKUP_PASSWORD_FILE:?Falta archivo de contraseña}
+  postgres_pgpass:
+    file: ${MEDIA_POSTGRES_IMMICH_BACKUP_PGPASS_FILE:?Falta archivo pgpass}

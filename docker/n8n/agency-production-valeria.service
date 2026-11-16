@@ -1,0 +1,22 @@
+[Unit]
+Description=Ensayo visual de escaleta de Valeria en OpenClaw
+After=agency-production-mateo.service network-online.target
+Wants=network-online.target
+RequiresMountsFor=/mnt/producciones
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-valeria
+StateDirectoryMode=0700
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+LoadCredential=dispatch:/etc/agency-production-handoff/dispatch-token
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_valeria.py %d/profile %d/dispatch /var/lib/agency-production-valeria
+TimeoutStartSec=3min
+ProtectSystem=full
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

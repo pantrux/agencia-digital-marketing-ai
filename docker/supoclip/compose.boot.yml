@@ -1,0 +1,5 @@
+services:
+  worker:
+    restart: "no"
+  model:
+    restart: "no"

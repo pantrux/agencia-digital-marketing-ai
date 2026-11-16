@@ -1,0 +1,118 @@
+name: agency-moneyprinter-lan
+
+x-runtime: &runtime
+  image: ${MEDIA_MONEYPRINTER_LAN_IMAGE:?Falta la imagen local de MoneyPrinter}
+  platform: linux/amd64
+  pull_policy: never
+  user: "65532:65532"
+  read_only: true
+  init: true
+  privileged: false
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  cpus: 2.0
+  mem_limit: 1536m
+  memswap_limit: 1536m
+  pids_limit: 256
+  stop_signal: SIGINT
+  restart: "no"
+  dns: ["127.0.0.1"]
+  tmpfs:
+    - /home/nonroot:rw,noexec,nosuid,nodev,size=96m,uid=65532,gid=65532,mode=0700
+    - /tmp:rw,noexec,nosuid,nodev,size=96m,uid=65532,gid=65532,mode=0700
+  networks: [speaches]
+  labels:
+    agency.owner: agencia-digital-marketing-ai:moneyprinter-lan:v1
+  logging:
+    driver: local
+    options: {max-size: "10m", max-file: "2"}
+
+x-bearer: &bearer
+  type: bind
+  source: ${MEDIA_MONEYPRINTER_LAN_BEARER_FILE:?Falta el archivo Bearer de Speaches}
+  target: /run/secrets/moneyprinter-speaches
+  read_only: true
+  bind: {create_host_path: false}
+
+x-health: &health
+  interval: 20s
+  timeout: 4s
+  start_period: 45s
+  retries: 3
+
+services:
+  api:
+    <<: *runtime
+    command: [api]
+    healthcheck:
+      <<: *health
+      test:
+        - CMD
+        - /usr/bin/python3.12
+        - -I
+        - -S
+        - -B
+        - -c
+        - |
+          from http.client import HTTPConnection
+          conn = HTTPConnection('127.0.0.1', 8080, timeout=2)
+          conn.request('GET', '/openapi.json')
+          with conn.getresponse() as response:
+              assert response.status == 200 and response.read(64)
+          conn.close()
+    volumes:
+      - *bearer
+      - type: bind
+        source: ${MEDIA_MONEYPRINTER_LAN_STATE_ROOT:?Falta la raíz de estado}/api
+        target: /run/mpt
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_MONEYPRINTER_LAN_NAS_ROOT:?Falta la raíz NAS de medios}/api/tasks
+        target: /run/mpt/storage/tasks
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_MONEYPRINTER_LAN_NAS_ROOT:?Falta la raíz NAS de medios}/api/local_videos
+        target: /run/mpt/storage/local_videos
+        bind: {create_host_path: false}
+
+  ui:
+    <<: *runtime
+    command: [ui]
+    environment:
+      STREAMLIT_GLOBAL_DEVELOPMENT_MODE: "false"
+    ports: ["192.168.0.85:8501:8501"]
+    healthcheck:
+      <<: *health
+      test:
+        - CMD
+        - /usr/bin/python3.12
+        - -I
+        - -S
+        - -B
+        - -c
+        - |
+          from http.client import HTTPConnection
+          conn = HTTPConnection('127.0.0.1', 8501, timeout=2)
+          conn.request('GET', '/_stcore/health')
+          with conn.getresponse() as response:
+              assert response.status == 200 and response.read(64)
+          conn.close()
+    volumes:
+      - *bearer
+      - type: bind
+        source: ${MEDIA_MONEYPRINTER_LAN_STATE_ROOT:?Falta la raíz de estado}/ui
+        target: /run/mpt
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_MONEYPRINTER_LAN_NAS_ROOT:?Falta la raíz NAS de medios}/ui/tasks
+        target: /run/mpt/storage/tasks
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_MONEYPRINTER_LAN_NAS_ROOT:?Falta la raíz NAS de medios}/ui/local_videos
+        target: /run/mpt/storage/local_videos
+        bind: {create_host_path: false}
+
+networks:
+  speaches:
+    external: true
+    name: ${MEDIA_MONEYPRINTER_LAN_NETWORK_NAME:?Falta la red LAN aprobada}

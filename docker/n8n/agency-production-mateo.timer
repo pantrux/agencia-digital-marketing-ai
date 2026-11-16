@@ -1,0 +1,10 @@
+[Unit]
+Description=Procesa los briefs confirmados en Studio
+
+[Timer]
+OnBootSec=100s
+OnUnitInactiveSec=10s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

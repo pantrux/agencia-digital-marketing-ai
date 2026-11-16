@@ -1,0 +1,430 @@
+{
+  "schema_version": 1,
+  "status": "candidate",
+  "as_of_utc": "2026-11-06T03:39:46.475180Z",
+  "platform": "linux/amd64",
+  "target": {
+    "hostname": "vm-media-01",
+    "ip": "192.168.0.85",
+    "application_root": "/opt/media-platform",
+    "data_root": "/var/lib/media-platform",
+    "media_root": "/mnt/producciones",
+    "media_source": "192.168.0.8:/volume2/producciones"
+  },
+  "security_clean": false,
+  "runtime_verified": false,
+  "production_ready": false,
+  "deployment_enabled": false,
+  "audit_status": "not_verified",
+  "artifacts": [
+    {
+      "role": "postgres-apps",
+      "kind": "image",
+      "version": "16.15",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/postgres/postgres",
+        "revision": "7d3e000c5961a544302072058a1184e9a588837b",
+        "license_url": "https://raw.githubusercontent.com/postgres/postgres/7d3e000c5961a544302072058a1184e9a588837b/COPYRIGHT",
+        "license_sha256": "3d6af92ff8a4c2cdf69afb1cf44edea727922f5cd0cf8b5f72b11cdecac8fdfd"
+      },
+      "license": {
+        "spdx": "PostgreSQL",
+        "declared_expression": "PostgreSQL",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "docker.io/library/postgres",
+        "tag": "16.15-alpine3.24",
+        "index_digest": "sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139",
+        "platform_digest": "sha256:ac838714b7d794185a866e5a6b479b954e7d8a070568aa0acac6fe07c3070bf5",
+        "observed_versions": {
+          "postgresql": "16.15"
+        }
+      }
+    },
+    {
+      "role": "postgres-immich-base",
+      "kind": "image",
+      "version": "16.15",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/postgres/postgres",
+        "revision": "7d3e000c5961a544302072058a1184e9a588837b",
+        "license_url": "https://raw.githubusercontent.com/postgres/postgres/7d3e000c5961a544302072058a1184e9a588837b/COPYRIGHT",
+        "license_sha256": "3d6af92ff8a4c2cdf69afb1cf44edea727922f5cd0cf8b5f72b11cdecac8fdfd"
+      },
+      "license": {
+        "spdx": "PostgreSQL",
+        "declared_expression": "PostgreSQL",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "docker.io/library/postgres",
+        "tag": "16.15-trixie",
+        "index_digest": "sha256:933463a6c8eba2b9f5cd414138738cd8d5519cd2c471214c222652f547a66a32",
+        "platform_digest": "sha256:43f9275df91e012c3da3d86bea5d7bb5e67a473296cc906c5f9e80b8176b1a37",
+        "observed_versions": {
+          "postgresql": "16.15"
+        }
+      }
+    },
+    {
+      "role": "immich-server",
+      "kind": "image",
+      "version": "3.3.6",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/immich-app/immich",
+        "revision": "587f549f46f1cd1822a06e16dcccecef04ea4565",
+        "license_url": "https://raw.githubusercontent.com/immich-app/immich/587f549f46f1cd1822a06e16dcccecef04ea4565/LICENSE",
+        "license_sha256": "a3bad629f67f442b23b5224419e49edafc32e6b9c876b89464f7aafe6091ccde"
+      },
+      "license": {
+        "spdx": "AGPL-3.0-only",
+        "declared_expression": "AGPL-3.0-only",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "ghcr.io/immich-app/immich-server",
+        "tag": "v3.3.6",
+        "index_digest": "sha256:e1981983b1c13f6024b57d72e7ecae3342eed1581201ab09fb248932d86c593a",
+        "platform_digest": "sha256:c0a8e008ad9befe8af0e3a515e3b3661e98d38c37eadb6efee18a6d5098136c1",
+        "observed_versions": {}
+      }
+    },
+    {
+      "role": "valkey",
+      "kind": "image",
+      "version": "9.1.3",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/valkey-io/valkey",
+        "revision": "29173b67508b2de4c0f0ed551f3b47cf19fc3ca8",
+        "license_url": "https://raw.githubusercontent.com/valkey-io/valkey/29173b67508b2de4c0f0ed551f3b47cf19fc3ca8/COPYING",
+        "license_sha256": "1a53dca3aab7ce048e91e77b03c0342f3075366f9dede8ec4d19d0cf229e12a0"
+      },
+      "license": {
+        "spdx": "BSD-3-Clause",
+        "declared_expression": "BSD-3-Clause",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "docker.io/valkey/valkey",
+        "tag": "9.1.3",
+        "index_digest": "sha256:3add1a336a920ea54770a001ab6feb3da5fceea96a40373a3a2cd469b815f0b7",
+        "platform_digest": "sha256:b94f4063db6015ab2fd39a764c241a107aa176c5e7801742af81f4f8f3cb532a",
+        "observed_versions": {}
+      }
+    },
+    {
+      "role": "n8n",
+      "kind": "image",
+      "version": "2.46.6",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/n8n-io/n8n",
+        "revision": "bb72d756104542adb549b6966a57e21459bd52a2",
+        "license_url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/LICENSE.md",
+        "license_sha256": "d2f621f59aa4c10eab79b6333e59d9d3d5b53307dcfd16dbd75e40e679e84965"
+      },
+      "license": {
+        "spdx": "LicenseRef-Sustainable-Use",
+        "declared_expression": "LicenseRef-Sustainable-Use",
+        "classification": "restricted",
+        "use": "agency-internal",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "docker.io/n8nio/n8n",
+        "tag": "2.46.6",
+        "index_digest": "sha256:8602f5dfacbe2c931eeafd010de0e68182310e9f309921e780ab69182e92b3ae",
+        "platform_digest": "sha256:256a0fca38c4f0ab02524bcebf77b8ed5acc7aa99a28c4cbca7a4034a76d4b97",
+        "observed_versions": {}
+      }
+    },
+    {
+      "role": "n8n-runners",
+      "kind": "image",
+      "version": "2.46.6",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/n8n-io/n8n",
+        "revision": "bb72d756104542adb549b6966a57e21459bd52a2",
+        "license_url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/LICENSE.md",
+        "license_sha256": "d2f621f59aa4c10eab79b6333e59d9d3d5b53307dcfd16dbd75e40e679e84965"
+      },
+      "license": {
+        "spdx": "LicenseRef-Sustainable-Use",
+        "declared_expression": "LicenseRef-Sustainable-Use",
+        "classification": "restricted",
+        "use": "agency-internal",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "docker.io/n8nio/runners",
+        "tag": "2.46.6",
+        "index_digest": "sha256:b1fe87a59b712a03e5a4fbb46a18ea5ca9487add602f8749941a69f4ab322612",
+        "platform_digest": "sha256:c4b43bc62c6dcce8053817f492f0bf434547651ad3def4b680bd2ccb44f11257",
+        "observed_versions": {}
+      }
+    },
+    {
+      "role": "moneyprinter",
+      "kind": "image",
+      "version": "1.3.9",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/harry0703/MoneyPrinterTurbo",
+        "revision": "6992380c5e82f07f3e1fc46b90927b6f1c655407",
+        "license_url": "https://raw.githubusercontent.com/harry0703/MoneyPrinterTurbo/6992380c5e82f07f3e1fc46b90927b6f1c655407/LICENSE",
+        "license_sha256": "87dd19b6a0779e14a91c1b06423ef251df37e89666160c031130a26bae68c229"
+      },
+      "license": {
+        "spdx": "MIT",
+        "declared_expression": "MIT",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "ghcr.io/harry0703/moneyprinterturbo",
+        "tag": "v1.3.9",
+        "index_digest": "sha256:c458010bede86d15cdf065a817998211b3d6660a9a3a3ece78ab9899d7b0aa4a",
+        "platform_digest": "sha256:2547b9b5ba2577bd00e1508ef52497226c776b56f344767466d795b7c0ea4c1d",
+        "observed_versions": {}
+      }
+    },
+    {
+      "role": "otel-collector",
+      "kind": "image",
+      "version": "0.164.0",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/open-telemetry/opentelemetry-collector-releases",
+        "revision": "bf626fce5c8053ac6ae9c6c5f4c408c8c182740e",
+        "license_url": "https://raw.githubusercontent.com/open-telemetry/opentelemetry-collector-releases/bf626fce5c8053ac6ae9c6c5f4c408c8c182740e/LICENSE",
+        "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      "license": {
+        "spdx": "Apache-2.0",
+        "declared_expression": "Apache-2.0",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib",
+        "tag": "0.164.0",
+        "index_digest": "sha256:340c9ca6a36617084c6661bdc4f0fe92b7cda5a805d61673ec8db375fddc522b",
+        "platform_digest": "sha256:ac0bb9cdc844b55d2fd2655d03e596243787d6a8c52dd408b1dc96dd1bd372ee",
+        "observed_versions": {}
+      }
+    },
+    {
+      "role": "node-exporter",
+      "kind": "image",
+      "version": "1.12.1",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/prometheus/node_exporter",
+        "revision": "6044da783597cc3b57aef7580ddcdcff58a4ee99",
+        "license_url": "https://raw.githubusercontent.com/prometheus/node_exporter/6044da783597cc3b57aef7580ddcdcff58a4ee99/LICENSE",
+        "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      "license": {
+        "spdx": "Apache-2.0",
+        "declared_expression": "Apache-2.0",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "quay.io/prometheus/node-exporter",
+        "tag": "v1.12.1",
+        "index_digest": "sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0",
+        "platform_digest": "sha256:da83fae85603c4e47e6c68369a7d746e2dda683dc35ea2e234b4f171e0d92798",
+        "observed_versions": {}
+      }
+    },
+    {
+      "role": "cadvisor",
+      "kind": "image",
+      "version": "0.60.6",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/google/cadvisor",
+        "revision": "5bf5d43ac6f60d7ee36a13b4d5b4a78ad2d0abc7",
+        "license_url": "https://raw.githubusercontent.com/google/cadvisor/5bf5d43ac6f60d7ee36a13b4d5b4a78ad2d0abc7/LICENSE",
+        "license_sha256": "1d0e6c88b109130755ed46ea261745192813ad175eff727c2ee77bbb220104c8"
+      },
+      "license": {
+        "spdx": "Apache-2.0",
+        "declared_expression": "Apache-2.0",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "image": {
+        "repository": "ghcr.io/google/cadvisor",
+        "tag": "v0.60.6",
+        "index_digest": "sha256:b8e7d1093144fd088f425ff003d75a4aa405de075db78dae3bc563730b1bd07a",
+        "platform_digest": "sha256:bd7c00644d65e6c9fc2c151cab70d2e86d7fe3e0182cfb9863120ec2e017cf01",
+        "observed_versions": {}
+      }
+    },
+    {
+      "role": "kitsu-ui",
+      "kind": "download",
+      "version": "1.0.77",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/cgwire/kitsu",
+        "revision": "c1edc91a3e2bfcefabf6f9abf682e2c420f0831f",
+        "license_url": "https://raw.githubusercontent.com/cgwire/kitsu/c1edc91a3e2bfcefabf6f9abf682e2c420f0831f/LICENSE",
+        "license_sha256": "76a97c878c9c7a8321bb395c2b44d3fe2f8d81314d219b20138ed0e2dddd5182"
+      },
+      "license": {
+        "spdx": "AGPL-3.0-only",
+        "declared_expression": "AGPL-3.0-only",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "download": {
+        "url": "https://github.com/cgwire/kitsu/releases/download/v1.0.77/kitsu-1.0.77.tgz",
+        "sha256": "f030dc59ae28155d3686c09ce35a2855381582ab42fcc983158c727ec5f1204e",
+        "size": 12163231
+      }
+    },
+    {
+      "role": "zou-api",
+      "kind": "download",
+      "version": "1.1.1",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/cgwire/zou",
+        "revision": "8f92792de9faeeb623e383311fa80828492bac37",
+        "license_url": "https://raw.githubusercontent.com/cgwire/zou/8f92792de9faeeb623e383311fa80828492bac37/LICENSE",
+        "license_sha256": "76a97c878c9c7a8321bb395c2b44d3fe2f8d81314d219b20138ed0e2dddd5182"
+      },
+      "license": {
+        "spdx": "AGPL-3.0-only",
+        "declared_expression": "AGPL-3.0-only",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "download": {
+        "url": "https://files.pythonhosted.org/packages/30/4c/75bf8b8c1570efb65f4d3672984c2a04447b7ee414d4c1fdec1a49c3bc10/zou-1.1.1-py3-none-any.whl",
+        "sha256": "4f753a130dde563da7ef48d5ec4b403630740738a9451226e3d0687041a72455",
+        "size": 1184439
+      }
+    },
+    {
+      "role": "supoclip",
+      "kind": "download",
+      "version": "unreleased-20261105",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/FujiwaraChoki/supoclip",
+        "revision": "f6cb7e2ea9fb290519bb1aac2138d9d8722a6e38",
+        "license_url": "https://raw.githubusercontent.com/FujiwaraChoki/supoclip/f6cb7e2ea9fb290519bb1aac2138d9d8722a6e38/LICENSE",
+        "license_sha256": "2d57b88304ae76aa40722515c6f740ee8f6473e9d057c3e29b8ba08eeebd4e38"
+      },
+      "license": {
+        "spdx": "AGPL-3.0-only",
+        "declared_expression": "AGPL-3.0-only",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "download": {
+        "url": "https://codeload.github.com/FujiwaraChoki/supoclip/tar.gz/f6cb7e2ea9fb290519bb1aac2138d9d8722a6e38",
+        "sha256": "be5429721b58f1b477226dd186e7fcbec280802ec8a768bf5e3ce99e9f079605",
+        "size": 31704580
+      }
+    },
+    {
+      "role": "vectorchord-extension",
+      "kind": "download",
+      "version": "1.1.1",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/supervc-stack/VectorChord",
+        "revision": "f9b5e234c44cee69b266b8431f92b7deed4e99d3",
+        "license_url": "https://raw.githubusercontent.com/supervc-stack/VectorChord/f9b5e234c44cee69b266b8431f92b7deed4e99d3/LICENSE",
+        "license_sha256": "19e530f3f1af21643497906f22a52a5c136059983ae379ba5c7055831f32c862"
+      },
+      "license": {
+        "spdx": "AGPL-3.0-only",
+        "declared_expression": "AGPL-3.0-only OR Elastic-2.0",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "download": {
+        "url": "https://github.com/supervc-stack/VectorChord/releases/download/1.1.1/postgresql-16-vchord_1.1.1-1_amd64.deb",
+        "sha256": "0109f45cc84e91927f1d8782a2fbe3149a25f03ace7697970fd4860944e7199d",
+        "size": 2151176
+      }
+    },
+    {
+      "role": "pgvector-extension",
+      "kind": "download",
+      "version": "0.8.5",
+      "platform": "linux/amd64",
+      "source": {
+        "repository": "https://github.com/pgvector/pgvector",
+        "revision": "159b79aaad5983fb7459c1e3df2897fbb2d11788",
+        "license_url": "https://raw.githubusercontent.com/pgvector/pgvector/159b79aaad5983fb7459c1e3df2897fbb2d11788/LICENSE",
+        "license_sha256": "6bba9ebeb73e27477463b05e5ef1bf303bccbddb3db9bbc95905d351604d6a87"
+      },
+      "license": {
+        "spdx": "PostgreSQL",
+        "declared_expression": "PostgreSQL",
+        "classification": "osi",
+        "use": "application-use",
+        "scope": "upstream-project-only"
+      },
+      "download": {
+        "url": "https://codeload.github.com/pgvector/pgvector/tar.gz/159b79aaad5983fb7459c1e3df2897fbb2d11788",
+        "sha256": "9a483fad70ae2e0a50b3dccb6c4b4931d9a07375a1d5815e82b57870448a7d52",
+        "size": 127785
+      }
+    }
+  ],
+  "postgres_immich_build": {
+    "base_role": "postgres-immich-base",
+    "postgresql": "16.15",
+    "extension_roles": [
+      "pgvector-extension",
+      "vectorchord-extension"
+    ],
+    "preload": [
+      "vchord.so"
+    ],
+    "built_image_digest": null,
+    "runtime_verified": false
+  },
+  "observations": [
+    "Inventario candidato de identidad. No instala ni acredita auditoría, compatibilidad o producción. Los hashes de licencia sólo cubren el documento del proyecto upstream.",
+    "PostgreSQL Immich propio aún no está construido. Requiere dependencias fijadas, escaneo final y carga SQL de vchord/vector sobre PostgreSQL 16.15.",
+    "VectorChord amd64 declara glibc >= 2.35. La biblioteca tiene símbolos hasta GLIBC_2.34; no se presupone compatible con Alpine/musl.",
+    "TensorChord pg16-v1.1.1 observado contiene PostgreSQL 16.13; Immich VectorChord 1.1.1 contiene PostgreSQL 16.14. No se adoptan como PostgreSQL 16.15.",
+    "Auditorías remotas reales de PostgreSQL 16.15: Bookworm detectó 72 HIGH y 4 CRITICAL; Trixie 88 HIGH y 2 CRITICAL; Alpine 25 HIGH y 1 CRITICAL. Ninguna variante está aprobada.",
+    "En Alpine, los hallazgos HIGH/CRITICAL observados proceden exclusivamente de gosu y su stdlib Go. La posible eliminación real del helper exige usuario PostgreSQL sin root y prueba del entrypoint/init/reinicio; no se ocultan metadatos ni hallazgos.",
+    "Las aplicaciones y las imágenes derivadas requieren auditorías completas y pruebas propias. Ningún tag, digest o versión declarada basta para acreditar seguridad.",
+    "n8n se limita al uso interno bajo SUL. VectorChord selecciona AGPLv3 entre las alternativas de su licencia dual.",
+    "cAdvisor requiere revisión explícita de accesos al host y misconfiguración, sin exenciones generales.",
+    "SupoClip y MoneyPrinterTurbo requieren adaptadores Speaches independientes. El inventario no acredita autenticación, rutas NAS ni transcripción remota."
+  ]
+}

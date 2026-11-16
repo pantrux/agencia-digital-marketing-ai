@@ -1,0 +1,22 @@
+[Unit]
+Description=Tres ángulos de Mateo para un brief confirmado
+After=agency-production-sofia.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-mateo
+StateDirectoryMode=0700
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+LoadCredential=dispatch:/etc/agency-production-handoff/dispatch-token
+LoadCredential=socket-key:/etc/agency-production-handoff/mateo-socket-key
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_mateo.py %d/profile %d/dispatch %d/socket-key /var/lib/agency-production-mateo
+TimeoutStartSec=3min
+ProtectSystem=full
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

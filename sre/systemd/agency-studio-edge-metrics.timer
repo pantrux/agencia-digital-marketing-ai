@@ -1,0 +1,11 @@
+[Unit]
+Description=Medición cada cinco minutos del tráfico HTTP de Studio
+
+[Timer]
+OnCalendar=*:4/5
+AccuracySec=15s
+Persistent=true
+Unit=agency-studio-edge-metrics.service
+
+[Install]
+WantedBy=timers.target

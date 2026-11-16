@@ -1,0 +1,37 @@
+FROM docker.io/library/node:26.12.1-alpine3.24@sha256:65fb44a19eb983bc475aebef8ca3416da172e5b7b0e52418cca100997959ca6e
+
+# El launcher invoca Node directamente. El runtime JavaScript sólo usa el árbol fijado.
+RUN --network=none set -eu; \
+    test "$(readlink /usr/local/bin/npm)" = ../lib/node_modules/npm/bin/npm-cli.js; \
+    test "$(readlink /usr/local/bin/npx)" = ../lib/node_modules/npm/bin/npx-cli.js; \
+    npm_root=/usr/local/lib/node_modules/npm; \
+    test "$(readlink -f "$npm_root")" = "$npm_root"; \
+    rm -rf -- "$npm_root"; \
+    rm /usr/local/bin/npm /usr/local/bin/npx; \
+    mkdir -p /home/runner; \
+    chown 1000:1000 /home/runner; \
+    chmod 0700 /home/runner
+
+ADD --chown=0:0 runner-javascript.tar.gz /opt/runners/
+COPY --chown=0:0 --chmod=0555 task-runner-launcher /usr/local/bin/task-runner-launcher
+COPY --chown=0:0 --chmod=0444 n8n-task-runners.json /etc/n8n-task-runners.json
+COPY --chown=0:0 --chmod=0444 launcher-license/ /usr/local/share/licenses/task-runner-launcher/
+
+ENV HOME=/home/runner NODE_ENV=production N8N_RELEASE_TYPE=stable SHELL=/bin/sh
+WORKDIR /home/runner
+USER 1000:1000
+
+RUN --network=none --mount=type=bind,source=verify,target=/verify,ro \
+    set -eu; \
+    root=/opt/runners/task-runner-javascript; \
+    test -r "$root/dist/start.js"; \
+    test ! -e /usr/local/lib/node_modules/npm; \
+    ! command -v npm; \
+    ! command -v npx; \
+    node /verify/verify-runner-javascript-runtime.cjs "$root"; \
+    node /verify/verify-quickjs-wasm-sdk.mjs "$root" /verify/quickjs-build.json
+
+EXPOSE 5680/tcp
+# Usar init: true o --init como en el ensayo de cierre del launcher.
+ENTRYPOINT ["/usr/local/bin/task-runner-launcher"]
+CMD ["javascript"]

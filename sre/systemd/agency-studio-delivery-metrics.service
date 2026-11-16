@@ -1,0 +1,25 @@
+[Unit]
+Description=Medición de entregas de Studio en una ventana de 30 días
+After=network-online.target
+Wants=network-online.target
+ConditionHost=vm-media-01
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+ExecStart=/usr/bin/python3 -I -B /usr/local/lib/agency-studio-latency/studio_production_metrics.py
+LoadCredential=cloudflare-token:/var/lib/media-platform/backup-321-daily-config-v1/cloudflare.token
+LoadCredential=nas-ca:/opt/media-platform/observability-nas-v1/collector-tls/server-ca.pem
+LoadCredential=nas-client:/opt/media-platform/observability-nas-v1/collector-tls/client.pem
+LoadCredential=nas-key:/opt/media-platform/observability-nas-v1/collector-tls/client.key
+TimeoutStartSec=85s
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=128M
+TasksMax=16

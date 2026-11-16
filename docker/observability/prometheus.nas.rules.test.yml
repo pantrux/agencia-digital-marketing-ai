@@ -1,0 +1,580 @@
+rule_files:
+  - prometheus.nas.rules.yml
+evaluation_interval: 15s
+tests:
+  - name: una copia diaria de D1 pierde un destino y luego se confirma
+    interval: 1m
+    input_series:
+      - series: 'studio_d1_backup_expected_day_confirmed{job="agency-studio-d1-backup",instance="vm-media-01"}'
+        values: '1+0x3 0+0x4 1+0x4'
+      - series: 'studio_d1_backup_report_unixtime_seconds{job="agency-studio-d1-backup",instance="vm-media-01"}'
+        values: '0+60x13'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AgenciaD1CopiaDiariaSinConfirmar
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: AgenciaD1CopiaDiariaSinConfirmar
+        exp_alerts:
+          - exp_labels:
+              instance: vm-media-01
+              job: agency-studio-d1-backup
+              severity: warning
+            exp_annotations:
+              summary: "Faltan los dos recibos válidos de la copia diaria de D1"
+      - eval_time: 6m
+        alertname: AgenciaD1MonitorCopiaSinMuestras
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: AgenciaD1CopiaDiariaSinConfirmar
+        exp_alerts: []
+  - name: el monitor de D1 deja de enviar el informe y vuelve
+    interval: 1m
+    input_series:
+      - series: 'studio_d1_backup_expected_day_confirmed{job="agency-studio-d1-backup",instance="vm-media-01"}'
+        values: '0 _x16 1'
+      - series: 'studio_d1_backup_report_unixtime_seconds{job="agency-studio-d1-backup",instance="vm-media-01"}'
+        values: '0 _x16 1020'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AgenciaD1MonitorCopiaSinMuestras
+        exp_alerts:
+          - exp_labels:
+              instance: vm-media-01
+              job: agency-studio-d1-backup
+              severity: warning
+            exp_annotations:
+              summary: "Prometheus dejó de recibir informes del respaldo diario de D1"
+      - eval_time: 15m
+        alertname: AgenciaD1CopiaDiariaSinConfirmar
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: AgenciaD1MonitorCopiaSinMuestras
+        exp_alerts: []
+  - name: errores de servidor de R2 con consulta vigente
+    interval: 1m
+    input_series:
+      - series: 'studio_edge_r2_query_ok{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}'
+        values: '1+0x3 0+0x6'
+      - series: 'studio_edge_r2_report_unixtime_seconds{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}'
+        values: '0+60x3 _x6'
+      - series: 'studio_edge_r2_15m_server_errors{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}'
+        values: '1+0x3 _x6'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AgenciaStudioR2ServidorDegradado
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: AgenciaStudioR2ServidorDegradado
+        exp_alerts:
+          - exp_labels: {job: agency-studio-edge, instance: vm-media-01, bucket: studio-media-bucket, severity: warning}
+            exp_annotations:
+              summary: "R2 registró errores de servidor en las cargas multipart de Studio"
+      - eval_time: 4m
+        alertname: AgenciaStudioR2ServidorDegradado
+        exp_alerts: []
+  - name: analítica de R2 ausente y regreso con cero operaciones
+    interval: 1m
+    input_series:
+      - series: 'studio_edge_r2_query_ok{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}'
+        values: '_x5 1+0x6'
+      - series: 'studio_edge_r2_report_unixtime_seconds{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}'
+        values: '_x5 300+60x6'
+      - series: 'studio_edge_r2_15m_server_errors{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}'
+        values: '_x5 0+0x6'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AgenciaStudioR2AnaliticaInaccesible
+        exp_alerts:
+          - exp_labels: {job: agency-studio-edge, instance: vm-media-01, bucket: studio-media-bucket, severity: warning}
+            exp_annotations:
+              summary: "Prometheus dejó de recibir consultas válidas de la analítica de R2"
+      - eval_time: 5m
+        alertname: AgenciaStudioR2AnaliticaInaccesible
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: AgenciaStudioR2ServidorDegradado
+        exp_alerts: []
+  - name: integridad del portal bajo objetivo y recuperación en el límite
+    interval: 1m
+    input_series:
+      - series: 'studio_delivery_report_unixtime_seconds{job="agency-studio-delivery",instance="vm-media-01"}'
+        values: '0+60x15'
+      - series: 'studio_upload_30d_sessions{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion",resultado="verificada"}'
+        values: '999+0x3 998+0x4 999+0x5'
+      - series: 'studio_upload_30d_sessions{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion",resultado="sha256_distinto"}'
+        values: '1+0x12'
+      - series: 'studio_upload_30d_sessions{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion",resultado="metadatos_distintos"}'
+        values: '0+0x3 1+0x4 0+0x5'
+      - series: 'studio_upload_30d_sessions{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion",resultado="cancelada"}'
+        values: '5000+0x12'
+      - series: 'studio_upload_30d_sessions{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_ensayo",resultado="sha256_distinto"}'
+        values: '100+0x12'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: AgenciaStudioIntegridadIngestaFueraObjetivo
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: AgenciaStudioIntegridadIngestaFueraObjetivo
+        exp_alerts:
+          - exp_labels: {job: agency-studio-delivery, instance: vm-media-01, cohorte: portal_produccion, severity: warning}
+            exp_annotations:
+              summary: "Los fallos confirmados de integridad en cargas de producción superan el 0,1 %"
+      - eval_time: 9m
+        alertname: AgenciaStudioIntegridadIngestaFueraObjetivo
+        exp_alerts: []
+  - name: latencia de Whisper tras reiniciar el contador
+    interval: 1m
+    input_series:
+      - series: 'agency_whisper_inference_seconds_per_minute_count{job="agency-whisper"}'
+        values: '0 20 0 20+0x10'
+      - series: 'agency_whisper_inference_seconds_per_minute_bucket{job="agency-whisper",le="8"}'
+        values: '0 20 0+0x11'
+      - series: 'agency_whisper_inference_seconds_per_minute_bucket{job="agency-whisper",le="16"}'
+        values: '0 20 0 20+0x10'
+      - series: 'agency_whisper_inference_seconds_per_minute_bucket{job="agency-whisper",le="+Inf"}'
+        values: '0 20 0 20+0x10'
+      - series: 'up{job="agency-whisper"}'
+        values: '1+0x9 0+0x4'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AgenciaWhisperLatenciaFueraObjetivo
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: AgenciaWhisperLatenciaFueraObjetivo
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: AgenciaWhisperLatenciaFueraObjetivo
+        exp_alerts:
+          - exp_labels: {job: agency-whisper, severity: warning}
+            exp_annotations:
+              summary: "El p95 observado de Whisper alcanza ocho segundos por minuto de audio"
+      - eval_time: 12m
+        alertname: AgenciaWhisperLatenciaFueraObjetivo
+        exp_alerts: []
+  - name: los contadores de Whisper vacíos no representan una demora
+    interval: 1m
+    input_series:
+      - series: 'agency_whisper_inference_seconds_per_minute_count{job="agency-whisper"}'
+        values: '0+0x10'
+      - series: 'agency_whisper_inference_seconds_per_minute_bucket{job="agency-whisper",le="8"}'
+        values: '0+0x10'
+      - series: 'agency_whisper_inference_seconds_per_minute_bucket{job="agency-whisper",le="+Inf"}'
+        values: '0+0x10'
+      - series: 'up{job="agency-whisper"}'
+        values: '1+0x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AgenciaWhisperLatenciaFueraObjetivo
+        exp_alerts: []
+  - name: conformidad de audio NVENC por debajo del 99,5 por ciento
+    interval: 1m
+    input_series:
+      - series: 'studio_render_audio_report_unixtime_seconds{job="agency-studio-render-audio",instance="vm-media-01"}'
+        values: '0+60x16'
+      - series: 'studio_render_audio_30d_samples{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_produccion"}'
+        values: '200+0x16'
+      - series: 'studio_render_audio_30d_compliant{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_produccion"}'
+        values: '199+0x1 198+0x7 199+0x6'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AgenciaStudioAudioFueraObjetivo
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: AgenciaStudioAudioFueraObjetivo
+        exp_alerts:
+          - exp_labels: {job: agency-studio-render-audio, instance: vm-media-01, codec: nvenc, cohorte: portal_produccion, severity: warning}
+            exp_annotations:
+              summary: "La conformidad de audio NVENC de producción cayó bajo el 99,5 %"
+      - eval_time: 10m
+        alertname: AgenciaStudioAudioFueraObjetivo
+        exp_alerts: []
+  - name: audio sin muestras de producción y con ensayos fuera del objetivo
+    interval: 1m
+    input_series:
+      - series: 'studio_render_audio_report_unixtime_seconds{job="agency-studio-render-audio",instance="vm-media-01"}'
+        values: '0+60x12'
+      - series: 'studio_render_audio_30d_samples{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_produccion"}'
+        values: '0+0x12'
+      - series: 'studio_render_audio_30d_compliant{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_produccion"}'
+        values: '0+0x12'
+      - series: 'studio_render_audio_30d_samples{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_ensayo"}'
+        values: '100+0x12'
+      - series: 'studio_render_audio_30d_compliant{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_ensayo"}'
+        values: '90+0x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AgenciaStudioAudioFueraObjetivo
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: AgenciaStudioMedicionAudioDesactualizada
+        exp_alerts: []
+  - name: informe de audio antiguo y recuperación por informe nuevo
+    interval: 1m
+    input_series:
+      - series: 'studio_render_audio_report_unixtime_seconds{job="agency-studio-render-audio",instance="vm-media-01"}'
+        values: '0+0x16 1020'
+      - series: 'studio_render_audio_30d_samples{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_produccion"}'
+        values: '10+0x17'
+      - series: 'studio_render_audio_30d_compliant{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_produccion"}'
+        values: '8+0x17'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: AgenciaStudioMedicionAudioDesactualizada
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AgenciaStudioMedicionAudioDesactualizada
+        exp_alerts:
+          - exp_labels: {job: agency-studio-render-audio, instance: vm-media-01, severity: warning}
+            exp_annotations:
+              summary: "Prometheus dejó de recibir informes recientes de audio de Studio"
+      - eval_time: 15m
+        alertname: AgenciaStudioAudioFueraObjetivo
+        exp_alerts: []
+      - eval_time: 17m
+        alertname: AgenciaStudioMedicionAudioDesactualizada
+        exp_alerts: []
+  - name: informe de audio ausente desde el inicio
+    interval: 1m
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AgenciaStudioMedicionAudioDesactualizada
+        exp_alerts:
+          - exp_labels: {job: agency-studio-render-audio, instance: vm-media-01, severity: warning}
+            exp_annotations:
+              summary: "Prometheus dejó de recibir informes recientes de audio de Studio"
+  - name: Sofía alerta ante dos fallos y se recupera con una sonda correcta
+    interval: 5m
+    input_series:
+      - series: 'studio_edge_sofia_ingress_healthy{job="agency-studio-edge",instance="vm-media-01"}'
+        values: '1 0 0 1'
+      - series: 'studio_edge_sofia_probe_unixtime_seconds{job="agency-studio-edge",instance="vm-media-01"}'
+        values: '0+300x3'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AgenciaStudioSofiaIngresoDegradado
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: AgenciaStudioSofiaIngresoDegradado
+        exp_alerts:
+          - exp_labels:
+              job: agency-studio-edge
+              instance: vm-media-01
+              severity: warning
+            exp_annotations:
+              summary: "El ingreso público de Sofía falló en dos comprobaciones consecutivas"
+      - eval_time: 15m
+        alertname: AgenciaStudioSofiaIngresoDegradado
+        exp_alerts: []
+  - name: la sonda de Sofía desactualizada tiene su propia alerta
+    interval: 5m
+    input_series:
+      - series: 'studio_edge_sofia_ingress_healthy{job="agency-studio-edge",instance="vm-media-01"}'
+        values: '0 0'
+      - series: 'studio_edge_sofia_probe_unixtime_seconds{job="agency-studio-edge",instance="vm-media-01"}'
+        values: '0+300x1'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: AgenciaStudioSofiaIngresoDegradado
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: AgenciaStudioSofiaSondaDesactualizada
+        exp_alerts:
+          - exp_labels:
+              job: agency-studio-edge
+              instance: vm-media-01
+              severity: warning
+            exp_annotations:
+              summary: "Prometheus dejó de recibir comprobaciones recientes del ingreso de Sofía"
+  - name: demoras y latencia de entregas del portal se recuperan
+    interval: 1m
+    input_series:
+      - series: 'studio_delivery_report_unixtime_seconds{job="agency-studio-delivery",instance="vm-media-01"}'
+        values: '0+60x12'
+      - series: 'studio_delivery_30d_pending_overdue{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion"}'
+        values: '2+0x7 0+0x4'
+      - series: 'studio_delivery_30d_pending_overdue{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_sandbox"}'
+        values: '1+0x7 0+0x4'
+      - series: 'studio_delivery_30d_pending_overdue{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_ensayo"}'
+        values: '9+0x12'
+      - series: 'studio_delivery_30d_reel_samples{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion"}'
+        values: '20+0x12'
+      - series: 'studio_delivery_30d_brief_p95_seconds{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion"}'
+        values: '360+0x7 359+0x4'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: AgenciaStudioEntregasConDemora
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: AgenciaStudioEntregasConDemora
+        exp_alerts:
+          - exp_labels: {job: agency-studio-delivery, instance: vm-media-01, cohorte: portal_produccion, severity: warning}
+            exp_annotations:
+              summary: "Hay pedidos de Studio con al menos seis minutos desde el brief"
+          - exp_labels: {job: agency-studio-delivery, instance: vm-media-01, cohorte: portal_sandbox, severity: warning}
+            exp_annotations:
+              summary: "Hay pedidos de Studio con al menos seis minutos desde el brief"
+      - eval_time: 5m
+        alertname: AgenciaStudioLatenciaFueraObjetivo
+        exp_alerts:
+          - exp_labels: {job: agency-studio-delivery, instance: vm-media-01, cohorte: portal_produccion, severity: warning}
+            exp_annotations:
+              summary: "El p95 de entrega de reels de 60 s alcanza o supera seis minutos"
+      - eval_time: 8m
+        alertname: AgenciaStudioLatenciaFueraObjetivo
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: AgenciaStudioEntregasConDemora
+        exp_alerts: []
+  - name: interrupción de medición de entregas y recuperación
+    interval: 1m
+    input_series:
+      - series: 'studio_delivery_report_unixtime_seconds{job="agency-studio-delivery",instance="vm-media-01"}'
+        values: '0 _x15 960+60x4'
+      - series: 'studio_delivery_30d_pending_overdue{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion"}'
+        values: '_x9 4+0x10'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: AgenciaStudioMedicionEntregasDesactualizada
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AgenciaStudioMedicionEntregasDesactualizada
+        exp_alerts:
+          - exp_labels: {job: agency-studio-delivery, instance: vm-media-01, severity: warning}
+            exp_annotations:
+              summary: "Prometheus dejó de recibir informes recientes de entregas de Studio"
+      - eval_time: 15m
+        alertname: AgenciaStudioEntregasConDemora
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: AgenciaStudioMedicionEntregasDesactualizada
+        exp_alerts: []
+  - name: medición de entregas ausente desde el inicio
+    interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AgenciaStudioMedicionEntregasDesactualizada
+        exp_alerts:
+          - exp_labels: {job: agency-studio-delivery, instance: vm-media-01, severity: warning}
+            exp_annotations:
+              summary: "Prometheus dejó de recibir informes recientes de entregas de Studio"
+  - name: ausencia de reels de producción y p95 alto de ensayo
+    interval: 1m
+    input_series:
+      - series: 'studio_delivery_report_unixtime_seconds{job="agency-studio-delivery",instance="vm-media-01"}'
+        values: '0+60x7'
+      - series: 'studio_delivery_30d_reel_samples{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion"}'
+        values: '0+0x7'
+      - series: 'studio_delivery_30d_brief_p95_seconds{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion"}'
+        values: '940+0x7'
+      - series: 'studio_delivery_30d_reel_samples{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_ensayo"}'
+        values: '3+0x7'
+      - series: 'studio_delivery_30d_brief_p95_seconds{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_ensayo"}'
+        values: '1619+0x7'
+    alert_rule_test:
+      - eval_time: 7m
+        alertname: AgenciaStudioLatenciaFueraObjetivo
+        exp_alerts: []
+  - name: alerta de reversión reciente y retiro al vencer la ventana
+    interval: 15s
+    input_series:
+      - series: 'agency_studio_rollback_timestamp_seconds{job="agency-studio-sre",instance="vm-media-01",entrega="aaaaaaaaaaaa",modo="ensayo",resultado="restaurado",sondas="edge",componentes="ninguno",duracion_segundos="40.3"}'
+        values: '_ 15 _x13'
+    alert_rule_test:
+      - eval_time: 15s
+        alertname: AgenciaReversionStudio
+        exp_alerts:
+          - exp_labels: {job: agency-studio-sre, instance: vm-media-01, entrega: aaaaaaaaaaaa, modo: ensayo, resultado: restaurado, sondas: edge, componentes: ninguno, duracion_segundos: '40.3', severity: critical}
+            exp_annotations:
+              summary: "Reversión de Studio (ensayo). Resultado restaurado"
+              description: "Entrega aaaaaaaaaaaa. Sondas fallidas: edge. Componentes pendientes: ninguno. Tiempo de recuperación: 40.3 s."
+      - eval_time: 3m15s
+        alertname: AgenciaReversionStudio
+        exp_alerts: []
+  - name: espacio del disco raíz bajo durante cinco minutos y recuperación
+    interval: 15s
+    input_series:
+      - series: 'system_filesystem_usage_bytes{job="agency-media-host",mountpoint="/",type="ext4",state="free"}'
+        values: '4294967296 1073741824+0x24 4294967296+0x2'
+      - series: 'system_filesystem_usage_bytes{job="agency-media-host",mountpoint="/boot",type="ext4",state="free"}'
+        values: '2147483648+0x28'
+      - series: 'system_filesystem_usage_bytes{job="agency-media-host",mountpoint="/",type="ext4",state="reserved"}'
+        values: '1073741824+0x28'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AgenciaDiscoMediaEspacioBajo
+        exp_alerts: []
+      - eval_time: 5m15s
+        alertname: AgenciaDiscoMediaEspacioBajo
+        exp_alerts:
+          - exp_labels: {job: agency-media-host, mountpoint: '/', severity: warning}
+            exp_annotations:
+              summary: "Menos de 3 GiB disponibles en el disco raíz de vm-media-01"
+      - eval_time: 7m
+        alertname: AgenciaDiscoMediaEspacioBajo
+        exp_alerts: []
+  - name: ausencia de muestras de disco y recuperación
+    interval: 15s
+    input_series:
+      - series: 'system_filesystem_usage_bytes{job="agency-media-host",mountpoint="/",type="ext4",state="free"}'
+        values: '4294967296+0x4 _x39 4294967296+0x4'
+    alert_rule_test:
+      - eval_time: 6m30s
+        alertname: AgenciaDiscoMediaSinMuestras
+        exp_alerts: []
+      - eval_time: 9m30s
+        alertname: AgenciaDiscoMediaSinMuestras
+        exp_alerts:
+          - exp_labels: {job: agency-media-host, mountpoint: '/', severity: warning}
+            exp_annotations:
+              summary: "Prometheus dejó de recibir muestras del disco raíz de vm-media-01"
+      - eval_time: 11m30s
+        alertname: AgenciaDiscoMediaSinMuestras
+        exp_alerts: []
+  - name: puente GPU inaccesible seguido de silencio y recuperación
+    interval: 15s
+    input_series:
+      - series: 'up{job="agency-gpu-bridge",instance="192.168.0.6:9835"}'
+        values: '1+0x4 0+0x13 _x12 1+0x7'
+      - series: 'gpu_bridge_service_healthy{job="agency-gpu-bridge",instance="192.168.0.6:9835",service="whisper"}'
+        values: '1+0x4 0+0x35'
+    alert_rule_test:
+      - eval_time: 3m30s
+        alertname: AgenciaPuenteGPUSinMuestras
+        exp_alerts: []
+      - eval_time: 4m15s
+        alertname: AgenciaPuenteGPUSinMuestras
+        exp_alerts:
+          - exp_labels: {job: agency-gpu-bridge, severity: warning}
+            exp_annotations:
+              summary: "Prometheus no recibe métricas saludables del puente GPU"
+      - eval_time: 7m
+        alertname: AgenciaPuenteGPUSinMuestras
+        exp_alerts:
+          - exp_labels: {job: agency-gpu-bridge, severity: warning}
+            exp_annotations:
+              summary: "Prometheus no recibe métricas saludables del puente GPU"
+      - eval_time: 4m15s
+        alertname: AgenciaServicioGPUDegradado
+        exp_alerts: []
+      - eval_time: 7m45s
+        alertname: AgenciaPuenteGPUSinMuestras
+        exp_alerts: []
+  - name: un servicio GPU se degrada y se recupera con el puente accesible
+    interval: 15s
+    input_series:
+      - series: 'up{job="agency-gpu-bridge",instance="192.168.0.6:9835"}'
+        values: '1+0x24'
+      - series: 'gpu_bridge_service_healthy{job="agency-gpu-bridge",instance="192.168.0.6:9835",service="whisper"}'
+        values: '1+0x4 0+0x7 1+0x12'
+      - series: 'gpu_bridge_service_healthy{job="agency-gpu-bridge",instance="192.168.0.6:9835",service="render"}'
+        values: '1+0x24'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AgenciaServicioGPUDegradado
+        exp_alerts: []
+      - eval_time: 2m30s
+        alertname: AgenciaServicioGPUDegradado
+        exp_alerts:
+          - exp_labels:
+              instance: '192.168.0.6:9835'
+              job: agency-gpu-bridge
+              service: whisper
+              severity: warning
+            exp_annotations:
+              summary: "Servicio GPU degradado en whisper"
+      - eval_time: 2m30s
+        alertname: AgenciaPuenteGPUSinMuestras
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: AgenciaServicioGPUDegradado
+        exp_alerts: []
+  - name: ambos exportadores saludables
+    interval: 15s
+    input_series:
+      - series: 'up{job="agency-node",instance="node-exporter:9100"}'
+        values: '1+0x20'
+      - series: 'up{job="agency-cgroups",instance="cadvisor:8080"}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: AgenciaNodeExporterSinMuestras
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: AgenciaCAdvisorSinMuestras
+        exp_alerts: []
+  - name: interrupción sostenida y recuperación de node-exporter
+    interval: 15s
+    input_series:
+      - series: 'up{job="agency-node",instance="node-exporter:9100"}'
+        values: '1+0x4 _x16 1+0x8'
+      - series: 'up{job="agency-cgroups",instance="cadvisor:8080"}'
+        values: '1+0x30'
+    alert_rule_test:
+      - eval_time: 3m30s
+        alertname: AgenciaNodeExporterSinMuestras
+        exp_alerts: []
+      - eval_time: 4m15s
+        alertname: AgenciaNodeExporterSinMuestras
+        exp_alerts:
+          - exp_labels:
+              job: agency-node
+              severity: warning
+            exp_annotations:
+              summary: "Prometheus no recibe métricas saludables de node-exporter"
+      - eval_time: 4m15s
+        alertname: AgenciaCAdvisorSinMuestras
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: AgenciaNodeExporterSinMuestras
+        exp_alerts: []
+  - name: fallos de cAdvisor seguidos de recuperación
+    interval: 15s
+    input_series:
+      - series: 'up{job="agency-node",instance="node-exporter:9100"}'
+        values: '1+0x30'
+      - series: 'up{job="agency-cgroups",instance="cadvisor:8080"}'
+        values: '1+0x4 0+0x14 1+0x9'
+    alert_rule_test:
+      - eval_time: 3m30s
+        alertname: AgenciaCAdvisorSinMuestras
+        exp_alerts: []
+      - eval_time: 4m15s
+        alertname: AgenciaCAdvisorSinMuestras
+        exp_alerts:
+          - exp_labels:
+              job: agency-cgroups
+              severity: warning
+            exp_annotations:
+              summary: "Prometheus no recibe métricas saludables de cAdvisor"
+      - eval_time: 4m15s
+        alertname: AgenciaNodeExporterSinMuestras
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: AgenciaCAdvisorSinMuestras
+        exp_alerts: []
+  - name: cAdvisor sigue en alerta al pasar de fallos a ausencia
+    interval: 15s
+    input_series:
+      - series: 'up{job="agency-node",instance="node-exporter:9100"}'
+        values: '1+0x36'
+      - series: 'up{job="agency-cgroups",instance="cadvisor:8080"}'
+        values: '0+0x12 _x24'
+    alert_rule_test:
+      - eval_time: 4m45s
+        alertname: AgenciaCAdvisorSinMuestras
+        exp_alerts:
+          - exp_labels:
+              job: agency-cgroups
+              severity: warning
+            exp_annotations:
+              summary: "Prometheus no recibe métricas saludables de cAdvisor"
+      - eval_time: 5m
+        alertname: AgenciaCAdvisorSinMuestras
+        exp_alerts:
+          - exp_labels:
+              job: agency-cgroups
+              severity: warning
+            exp_annotations:
+              summary: "Prometheus no recibe métricas saludables de cAdvisor"

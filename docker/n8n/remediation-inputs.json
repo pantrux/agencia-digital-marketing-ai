@@ -1,0 +1,2962 @@
+{
+  "schema_version": 1,
+  "owner": "agencia-digital-marketing-ai:n8n-remediation-research:v1",
+  "as_of_date": "2026-11-06",
+  "build_allowed": false,
+  "deployment_allowed": false,
+  "sca_final_verified": false,
+  "blanket_ignores": [],
+  "scope": "Propuesta de remediación; no contiene lock regenerado ni imagen corregida.",
+  "release": {
+    "n8n": "2.46.6",
+    "stable_verified_url": "https://api.github.com/repos/n8n-io/n8n/releases/latest",
+    "commit": "bb72d756104542adb549b6966a57e21459bd52a2",
+    "source_archive": {
+      "path": ".tools/n8n-remediation/n8n-bb72d756104542adb549b6966a57e21459bd52a2.tar.gz",
+      "url": "https://codeload.github.com/n8n-io/n8n/tar.gz/bb72d756104542adb549b6966a57e21459bd52a2",
+      "sha256": "ed4976ca4a4a8647f7c2f58cc6c93182031214e55f5985ce33bdf3961f5f19b6",
+      "bytes": 59602956
+    },
+    "source_files": [
+      {
+        "path": "package.json",
+        "sha256": "71ca9d3b6f4c3b2615a7ede791aada3da401a8510e24376d72be97a419c58ba5",
+        "bytes": 7711,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/package.json"
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "sha256": "1f449b8ceab7ab69a83a48e88fb0e1b0d959e6695f6a4ef802539db69c19f26e",
+        "bytes": 1609103,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/pnpm-lock.yaml"
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "sha256": "9b05cb1e5a3e4dca43b18706fd413aff50b90063d565b884883cb345137ce4d4",
+        "bytes": 17525,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/pnpm-workspace.yaml"
+      },
+      {
+        "path": "turbo.json",
+        "sha256": "fa70ec4f7eabc89d2eaf17b32b0274cfee4e61382c7bbff723d0dc942b6204a3",
+        "bytes": 3508,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/turbo.json"
+      },
+      {
+        "path": "LICENSE.md",
+        "sha256": "d2f621f59aa4c10eab79b6333e59d9d3d5b53307dcfd16dbd75e40e679e84965",
+        "bytes": 4445,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/LICENSE.md"
+      },
+      {
+        "path": "scripts/prepare.mjs",
+        "sha256": "b20cc15b145cc004a6d51613daeb9fd97857cd3e9d53379fae80a30a1bc7265d",
+        "bytes": 658,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/scripts/prepare.mjs"
+      },
+      {
+        "path": "scripts/build-n8n.mjs",
+        "sha256": "ceb5e50e540a648dc54e3eddb1ecf2aa2faef06f473f749dbeb7dc8966430b25",
+        "bytes": 33562,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/scripts/build-n8n.mjs"
+      },
+      {
+        "path": "scripts/dockerize-n8n.mjs",
+        "sha256": "81f085440cfba2f9b6f9e4c41e57e42d1148232d938f5cbdbf49e790d0fe75da",
+        "bytes": 10317,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/scripts/dockerize-n8n.mjs"
+      },
+      {
+        "path": "docker/docker-bake.hcl",
+        "sha256": "9ec7eda89c47c48f61bae2ef57a6d7396c6db64fd3736f48b7c3dd703e92a2c7",
+        "bytes": 3413,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/docker/docker-bake.hcl"
+      },
+      {
+        "path": "docker/images/n8n/Dockerfile",
+        "sha256": "9490c2f084408d6a6e956983f4e457d994170d6aa53d5c64195d25a208cd9ef9",
+        "bytes": 5625,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/docker/images/n8n/Dockerfile"
+      },
+      {
+        "path": "docker/images/n8n/docker-entrypoint.sh",
+        "sha256": "9aa246571e1614b2169b4dc72ff8ac02dba0e9240cc6eaea7f0ae411443b8a3e",
+        "bytes": 386,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/docker/images/n8n/docker-entrypoint.sh"
+      },
+      {
+        "path": "docker/images/n8n-base/Dockerfile",
+        "sha256": "e59a2139b1dfd2326ea739f8b61c650fda7085bf4a7ea7d46a55ba516a4c965e",
+        "bytes": 1766,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/docker/images/n8n-base/Dockerfile"
+      },
+      {
+        "path": "docker/images/runners/Dockerfile",
+        "sha256": "cfd27772b3417ef3a28321bd6a0865cb6d9059a0501ab88a1fe6f6a8e20b6df9",
+        "bytes": 7455,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/docker/images/runners/Dockerfile"
+      },
+      {
+        "path": "docker/images/runners/n8n-task-runners.json",
+        "sha256": "968482d51c077adb6fd261c0932efc9732cb13ac04eb6aa35147cca0f2371365",
+        "bytes": 1580,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/docker/images/runners/n8n-task-runners.json"
+      },
+      {
+        "path": "packages/cli/package.json",
+        "sha256": "6fd0635efeb843393f04ef9b594985b8de77ac825cb1622e65a9167dc9c43568",
+        "bytes": 12500,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/cli/package.json"
+      },
+      {
+        "path": "packages/cli/scripts/build.mjs",
+        "sha256": "7f2d7f66970fa75dfc5a7639d6585a7eddf381c38df474756411b99a6f773a56",
+        "bytes": 6911,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/cli/scripts/build.mjs"
+      },
+      {
+        "path": "packages/cli/scripts/bundle-agent-library.mjs",
+        "sha256": "c6d12b0141b57c1ff9bc6763e58c34d3e10251feb632914781dab4749f2b87be",
+        "bytes": 3261,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/cli/scripts/bundle-agent-library.mjs"
+      },
+      {
+        "path": "packages/@n8n/task-runner/package.json",
+        "sha256": "01e98189643f4ff0dec7f4c74b858b842f782b621a4ee4a4853b8a80854ee518",
+        "bytes": 2111,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/@n8n/task-runner/package.json"
+      },
+      {
+        "path": "packages/@n8n/task-runner-python/pyproject.toml",
+        "sha256": "1e5ff5242329fa5f6cc1d0c42480a456620521bfd07a35f8471bccef3be7cdb2",
+        "bytes": 804,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/@n8n/task-runner-python/pyproject.toml"
+      },
+      {
+        "path": "packages/@n8n/task-runner-python/uv.lock",
+        "sha256": "3c7ad6d53993a34c8dd7d936017fa853abc0c7f8392d2e26bd3fb11412f5876a",
+        "bytes": 97322,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/@n8n/task-runner-python/uv.lock"
+      },
+      {
+        "path": "packages/frontend/editor-ui/package.json",
+        "sha256": "e90a7dac4ba7feb99e65ab625da0499a51d41ec7f3d43366f57da6287cafcede",
+        "bytes": 7536,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/frontend/editor-ui/package.json"
+      },
+      {
+        "path": "packages/frontend/editor-ui/vite.config.mts",
+        "sha256": "3a73ad107f4f04a9d41ebbdfb34a91eb1f89f7a96dff78318b5b38d7e3ef8212",
+        "bytes": 8992,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/frontend/editor-ui/vite.config.mts"
+      },
+      {
+        "path": "packages/frontend/@n8n/design-system/src/components/N8nMarkdown/youtube.ts",
+        "sha256": "81a5426aa99c7cab09abe03bab00ec2c33ecd5564b78edb661ad07812d793d0c",
+        "bytes": 2398,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/frontend/@n8n/design-system/src/components/N8nMarkdown/youtube.ts"
+      },
+      {
+        "path": "packages/frontend/editor-ui/src/features/ai/chatHub/composables/useChatHubMarkdownOptions.ts",
+        "sha256": "73ebf857516152c89adbd4d214182bfbef5576cbf216a1cbf76fa6cdfa2e95af",
+        "bytes": 7842,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/frontend/editor-ui/src/features/ai/chatHub/composables/useChatHubMarkdownOptions.ts"
+      },
+      {
+        "path": "packages/frontend/@n8n/i18n/src/index.ts",
+        "sha256": "05ec9533bdf427864af288cbf3449014ccbde6126bc0c742749faf7d2a8682a0",
+        "bytes": 14677,
+        "url": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/packages/frontend/@n8n/i18n/src/index.ts"
+      }
+    ],
+    "pnpm_lock_documents": 2,
+    "runtime_node": "26.12.1",
+    "pnpm": "12.4.2",
+    "launcher_shipped": "1.5.1",
+    "launcher_latest_observed": "1.6.0",
+    "launcher_latest_commit": "a569a0d2ef40c936fbd36d628cfc2b17856a261d",
+    "launcher_latest_url": "https://github.com/n8n-io/task-runner-launcher/releases/tag/1.6.0"
+  },
+  "reports": [
+    {
+      "image": "n8n",
+      "path": ".tools/evidence/phase4-n8n-candidate-trivy.json",
+      "sha256": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613",
+      "artifact": "docker.io/n8nio/n8n@sha256:256a0fca38c4f0ab02524bcebf77b8ed5acc7aa99a28c4cbca7a4034a76d4b97",
+      "high_critical_rows": 29
+    },
+    {
+      "image": "n8n-runners",
+      "path": ".tools/evidence/phase4-n8n-runners-candidate-trivy.json",
+      "sha256": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961",
+      "artifact": "docker.io/n8nio/runners@sha256:c4b43bc62c6dcce8053817f492f0bf434547651ad3def4b680bd2ccb44f11257",
+      "high_critical_rows": 25
+    }
+  ],
+  "fix_rows": [
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:0:0",
+      "image": "n8n",
+      "target": "docker.io/n8nio/n8n@sha256:256a0fca38c4f0ab02524bcebf77b8ed5acc7aa99a28c4cbca7a4034a76d4b97 (alpine 3.24)",
+      "type": "alpine",
+      "vulnerability_id": "CVE-2026-111497",
+      "severity": "CRITICAL",
+      "package": "brotli-libs",
+      "installed_version": "1.2.0-r1",
+      "reported_fixed_version": "1.2.1-r0",
+      "package_path": null,
+      "package_id": "brotli-libs@1.2.0-r1",
+      "package_identifier": {
+        "PURL": "pkg:apk/alpine/brotli-libs@1.2.0-r1?arch=x86_64&distro=3.24",
+        "UID": "138c3699edb28b3b"
+      },
+      "layer": {
+        "Digest": "sha256:091a19af52d7dba49c113ee22077b6fa83a308d8d399c3430e81ed3c6b0e19f2",
+        "DiffID": "sha256:a5268dfebd2a4648e3636d70f10503884965334ab0b68ee4cae2560bbc1caf1e"
+      },
+      "data_source": {
+        "ID": "alpine",
+        "Name": "Alpine Secdb",
+        "URL": "https://secdb.alpinelinux.org/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-111497",
+      "proposed_version": "1.2.1-r0",
+      "action": "actualizar_apk_fijado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:0:1",
+      "image": "n8n",
+      "target": "docker.io/n8nio/n8n@sha256:256a0fca38c4f0ab02524bcebf77b8ed5acc7aa99a28c4cbca7a4034a76d4b97 (alpine 3.24)",
+      "type": "alpine",
+      "vulnerability_id": "CVE-2026-92392",
+      "severity": "HIGH",
+      "package": "libcurl",
+      "installed_version": "8.22.0-r0",
+      "reported_fixed_version": "8.23.0-r0",
+      "package_path": null,
+      "package_id": "libcurl@8.22.0-r0",
+      "package_identifier": {
+        "PURL": "pkg:apk/alpine/libcurl@8.22.0-r0?arch=x86_64&distro=3.24",
+        "UID": "4833885681486222"
+      },
+      "layer": {
+        "Digest": "sha256:091a19af52d7dba49c113ee22077b6fa83a308d8d399c3430e81ed3c6b0e19f2",
+        "DiffID": "sha256:a5268dfebd2a4648e3636d70f10503884965334ab0b68ee4cae2560bbc1caf1e"
+      },
+      "data_source": {
+        "ID": "alpine",
+        "Name": "Alpine Secdb",
+        "URL": "https://secdb.alpinelinux.org/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-92392",
+      "proposed_version": "8.23.0-r0",
+      "action": "actualizar_apk_fijado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:0:2",
+      "image": "n8n",
+      "target": "docker.io/n8nio/n8n@sha256:256a0fca38c4f0ab02524bcebf77b8ed5acc7aa99a28c4cbca7a4034a76d4b97 (alpine 3.24)",
+      "type": "alpine",
+      "vulnerability_id": "CVE-2026-113351",
+      "severity": "HIGH",
+      "package": "libexpat",
+      "installed_version": "2.9.0-r1",
+      "reported_fixed_version": "2.10.0-r0",
+      "package_path": null,
+      "package_id": "libexpat@2.9.0-r1",
+      "package_identifier": {
+        "PURL": "pkg:apk/alpine/libexpat@2.9.0-r1?arch=x86_64&distro=3.24",
+        "UID": "6705905dc6e00775"
+      },
+      "layer": {
+        "Digest": "sha256:091a19af52d7dba49c113ee22077b6fa83a308d8d399c3430e81ed3c6b0e19f2",
+        "DiffID": "sha256:a5268dfebd2a4648e3636d70f10503884965334ab0b68ee4cae2560bbc1caf1e"
+      },
+      "data_source": {
+        "ID": "alpine",
+        "Name": "Alpine Secdb",
+        "URL": "https://secdb.alpinelinux.org/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-113351",
+      "proposed_version": "2.10.0-r0",
+      "action": "actualizar_apk_fijado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:0:3",
+      "image": "n8n",
+      "target": "docker.io/n8nio/n8n@sha256:256a0fca38c4f0ab02524bcebf77b8ed5acc7aa99a28c4cbca7a4034a76d4b97 (alpine 3.24)",
+      "type": "alpine",
+      "vulnerability_id": "CVE-2026-117610",
+      "severity": "HIGH",
+      "package": "libexpat",
+      "installed_version": "2.9.0-r1",
+      "reported_fixed_version": "2.10.0-r0",
+      "package_path": null,
+      "package_id": "libexpat@2.9.0-r1",
+      "package_identifier": {
+        "PURL": "pkg:apk/alpine/libexpat@2.9.0-r1?arch=x86_64&distro=3.24",
+        "UID": "6705905dc6e00775"
+      },
+      "layer": {
+        "Digest": "sha256:091a19af52d7dba49c113ee22077b6fa83a308d8d399c3430e81ed3c6b0e19f2",
+        "DiffID": "sha256:a5268dfebd2a4648e3636d70f10503884965334ab0b68ee4cae2560bbc1caf1e"
+      },
+      "data_source": {
+        "ID": "alpine",
+        "Name": "Alpine Secdb",
+        "URL": "https://secdb.alpinelinux.org/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-117610",
+      "proposed_version": "2.10.0-r0",
+      "action": "actualizar_apk_fijado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:0:4",
+      "image": "n8n",
+      "target": "docker.io/n8nio/n8n@sha256:256a0fca38c4f0ab02524bcebf77b8ed5acc7aa99a28c4cbca7a4034a76d4b97 (alpine 3.24)",
+      "type": "alpine",
+      "vulnerability_id": "CVE-2026-118370",
+      "severity": "HIGH",
+      "package": "libexpat",
+      "installed_version": "2.9.0-r1",
+      "reported_fixed_version": "2.10.0-r0",
+      "package_path": null,
+      "package_id": "libexpat@2.9.0-r1",
+      "package_identifier": {
+        "PURL": "pkg:apk/alpine/libexpat@2.9.0-r1?arch=x86_64&distro=3.24",
+        "UID": "6705905dc6e00775"
+      },
+      "layer": {
+        "Digest": "sha256:091a19af52d7dba49c113ee22077b6fa83a308d8d399c3430e81ed3c6b0e19f2",
+        "DiffID": "sha256:a5268dfebd2a4648e3636d70f10503884965334ab0b68ee4cae2560bbc1caf1e"
+      },
+      "data_source": {
+        "ID": "alpine",
+        "Name": "Alpine Secdb",
+        "URL": "https://secdb.alpinelinux.org/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-118370",
+      "proposed_version": "2.10.0-r0",
+      "action": "actualizar_apk_fijado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:0",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109461",
+      "severity": "HIGH",
+      "package": "@azure/msal-node",
+      "installed_version": "5.1.5",
+      "reported_fixed_version": "7.1.0",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/@azure+msal-node@5.1.5/node_modules/@azure/msal-node/package.json",
+      "package_id": "@azure/msal-node@5.1.5",
+      "package_identifier": {
+        "PURL": "pkg:npm/%40azure/msal-node@5.1.5",
+        "UID": "966e104a87501385"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109461",
+      "proposed_version": "7.1.0",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:1",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109461",
+      "severity": "HIGH",
+      "package": "@azure/msal-node",
+      "installed_version": "5.6.0",
+      "reported_fixed_version": "7.1.0",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/@azure+msal-node@5.6.0/node_modules/@azure/msal-node/package.json",
+      "package_id": "@azure/msal-node@5.6.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/%40azure/msal-node@5.6.0",
+        "UID": "5470cc039c6d38a3"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109461",
+      "proposed_version": "7.1.0",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:2",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-118257",
+      "severity": "HIGH",
+      "package": "@intlify/core-base",
+      "installed_version": "11.4.5",
+      "reported_fixed_version": "11.4.14, 12.0.0-alpha.5",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/@intlify+core-base@11.4.5/node_modules/@intlify/core-base/package.json",
+      "package_id": "@intlify/core-base@11.4.5",
+      "package_identifier": {
+        "PURL": "pkg:npm/%40intlify/core-base@11.4.5",
+        "UID": "18efb6c38bd6d4f0"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-118257",
+      "proposed_version": "11.4.14",
+      "action": "recompilar_ui_y_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:3",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-118257",
+      "severity": "HIGH",
+      "package": "@intlify/shared",
+      "installed_version": "11.4.5",
+      "reported_fixed_version": "11.4.14, 12.0.0-alpha.5",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/@intlify+shared@11.4.5/node_modules/@intlify/shared/package.json",
+      "package_id": "@intlify/shared@11.4.5",
+      "package_identifier": {
+        "PURL": "pkg:npm/%40intlify/shared@11.4.5",
+        "UID": "d99e4724e6b08269"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-118257",
+      "proposed_version": "11.4.14",
+      "action": "recompilar_ui_y_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:4",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "GHSA-f897-62hf-6gxq",
+      "severity": "HIGH",
+      "package": "@modelcontextprotocol/node",
+      "installed_version": "2.0.0",
+      "reported_fixed_version": "2.1.0",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/@modelcontextprotocol+node@2.0.0_@modelcontextprotocol+server@2.3.0_hono@4.13.11/node_modules/@modelcontextprotocol/node/package.json",
+      "package_id": "@modelcontextprotocol/node@2.0.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/%40modelcontextprotocol/node@2.0.0",
+        "UID": "58f6c434937ff0f9"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://github.com/advisories/GHSA-f897-62hf-6gxq",
+      "proposed_version": "2.1.0",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:5",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-111767",
+      "severity": "HIGH",
+      "package": "@modelcontextprotocol/sdk",
+      "installed_version": "1.31.0",
+      "reported_fixed_version": "1.32.0",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/@modelcontextprotocol+sdk@1.31.0_supports-color@8.1.1_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/package.json",
+      "package_id": "@modelcontextprotocol/sdk@1.31.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/%40modelcontextprotocol/sdk@1.31.0",
+        "UID": "19010386e15e70ee"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-111767",
+      "proposed_version": "1.32.0",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:6",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-111768",
+      "severity": "HIGH",
+      "package": "@modelcontextprotocol/sdk",
+      "installed_version": "1.31.0",
+      "reported_fixed_version": "1.32.0",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/@modelcontextprotocol+sdk@1.31.0_supports-color@8.1.1_zod@3.25.76/node_modules/@modelcontextprotocol/sdk/package.json",
+      "package_id": "@modelcontextprotocol/sdk@1.31.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/%40modelcontextprotocol/sdk@1.31.0",
+        "UID": "19010386e15e70ee"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-111768",
+      "proposed_version": "1.32.0",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:7",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-111181",
+      "severity": "HIGH",
+      "package": "body-parser",
+      "installed_version": "2.3.0",
+      "reported_fixed_version": "2.4.0, 1.20.9",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/body-parser@2.3.0_supports-color@8.1.1/node_modules/body-parser/package.json",
+      "package_id": "body-parser@2.3.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/body-parser@2.3.0",
+        "UID": "2778902c6763a8e7"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-111181",
+      "proposed_version": "2.4.0",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:8",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-116689",
+      "severity": "HIGH",
+      "package": "follow-redirects",
+      "installed_version": "1.16.1",
+      "reported_fixed_version": "1.16.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/follow-redirects@1.16.1_debug@4.3.4_supports-color@8.1.1_/node_modules/follow-redirects/package.json",
+      "package_id": "follow-redirects@1.16.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/follow-redirects@1.16.1",
+        "UID": "f53146c57d3e62a7"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-116689",
+      "proposed_version": "1.16.2",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:9",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-116689",
+      "severity": "HIGH",
+      "package": "follow-redirects",
+      "installed_version": "1.16.1",
+      "reported_fixed_version": "1.16.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/follow-redirects@1.16.1_debug@4.4.3_supports-color@8.1.1_/node_modules/follow-redirects/package.json",
+      "package_id": "follow-redirects@1.16.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/follow-redirects@1.16.1",
+        "UID": "61e6f158ec430a8f"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-116689",
+      "proposed_version": "1.16.2",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:10",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-111759",
+      "severity": "HIGH",
+      "package": "markdown-it",
+      "installed_version": "13.0.2",
+      "reported_fixed_version": "15.0.2, 14.3.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/markdown-it@13.0.2/node_modules/markdown-it/package.json",
+      "package_id": "markdown-it@13.0.2",
+      "package_identifier": {
+        "PURL": "pkg:npm/markdown-it@13.0.2",
+        "UID": "f588e660344748cb"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-111759",
+      "proposed_version": "14.3.2",
+      "action": "recompilar_ui_y_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:11",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-113872",
+      "severity": "HIGH",
+      "package": "multer",
+      "installed_version": "2.4.0",
+      "reported_fixed_version": "2.5.0",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/multer@2.4.0/node_modules/multer/package.json",
+      "package_id": "multer@2.4.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/multer@2.4.0",
+        "UID": "a34369816c52abbe"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-113872",
+      "proposed_version": "2.5.0",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:12",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-114141",
+      "severity": "HIGH",
+      "package": "toml",
+      "installed_version": "4.2.0",
+      "reported_fixed_version": "5.0.1",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/toml@4.2.0/node_modules/toml/package.json",
+      "package_id": "toml@4.2.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/toml@4.2.0",
+        "UID": "cd1c7343ee9cfb13"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-114141",
+      "proposed_version": "5.0.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:13",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-114142",
+      "severity": "HIGH",
+      "package": "toml",
+      "installed_version": "4.2.0",
+      "reported_fixed_version": "5.0.1",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/toml@4.2.0/node_modules/toml/package.json",
+      "package_id": "toml@4.2.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/toml@4.2.0",
+        "UID": "cd1c7343ee9cfb13"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-114142",
+      "proposed_version": "5.0.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:14",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-114143",
+      "severity": "HIGH",
+      "package": "toml",
+      "installed_version": "4.2.0",
+      "reported_fixed_version": "5.0.1",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/toml@4.2.0/node_modules/toml/package.json",
+      "package_id": "toml@4.2.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/toml@4.2.0",
+        "UID": "cd1c7343ee9cfb13"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-114143",
+      "proposed_version": "5.0.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:15",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-114144",
+      "severity": "HIGH",
+      "package": "toml",
+      "installed_version": "4.2.0",
+      "reported_fixed_version": "5.0.1",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/toml@4.2.0/node_modules/toml/package.json",
+      "package_id": "toml@4.2.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/toml@4.2.0",
+        "UID": "cd1c7343ee9cfb13"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-114144",
+      "proposed_version": "5.0.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:16",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109383",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "6.29.0",
+      "reported_fixed_version": "6.29.1, 7.30.1, 8.12.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/undici@6.29.0/node_modules/undici/package.json",
+      "package_id": "undici@6.29.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@6.29.0",
+        "UID": "71f63c793a0627f3"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109383",
+      "proposed_version": "6.29.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:17",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109869",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "6.29.0",
+      "reported_fixed_version": "6.29.1, 7.30.1, 8.12.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/undici@6.29.0/node_modules/undici/package.json",
+      "package_id": "undici@6.29.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@6.29.0",
+        "UID": "71f63c793a0627f3"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109869",
+      "proposed_version": "6.29.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:18",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-87018",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "6.29.0",
+      "reported_fixed_version": "6.29.1, 7.30.1, 8.12.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/undici@6.29.0/node_modules/undici/package.json",
+      "package_id": "undici@6.29.0",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@6.29.0",
+        "UID": "71f63c793a0627f3"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-87018",
+      "proposed_version": "6.29.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:19",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109383",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "7.29.1",
+      "reported_fixed_version": "6.29.1, 7.30.1, 8.12.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/undici@7.29.1/node_modules/undici/package.json",
+      "package_id": "undici@7.29.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@7.29.1",
+        "UID": "a7730bc92885a5bc"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109383",
+      "proposed_version": "7.30.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:20",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109829",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "7.29.1",
+      "reported_fixed_version": "7.30.1, 8.12.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/undici@7.29.1/node_modules/undici/package.json",
+      "package_id": "undici@7.29.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@7.29.1",
+        "UID": "a7730bc92885a5bc"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109829",
+      "proposed_version": "7.30.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:21",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109869",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "7.29.1",
+      "reported_fixed_version": "6.29.1, 7.30.1, 8.12.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/undici@7.29.1/node_modules/undici/package.json",
+      "package_id": "undici@7.29.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@7.29.1",
+        "UID": "a7730bc92885a5bc"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109869",
+      "proposed_version": "7.30.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:22",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-87018",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "7.29.1",
+      "reported_fixed_version": "6.29.1, 7.30.1, 8.12.2",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/undici@7.29.1/node_modules/undici/package.json",
+      "package_id": "undici@7.29.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@7.29.1",
+        "UID": "a7730bc92885a5bc"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-87018",
+      "proposed_version": "7.30.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "a0cf7f6416a9540ed663f51a39ba4365108d92151457aee634792ec310d47613:1:23",
+      "image": "n8n",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-118257",
+      "severity": "HIGH",
+      "package": "vue-i18n",
+      "installed_version": "11.4.5",
+      "reported_fixed_version": "11.4.14, 12.0.0-alpha.5",
+      "package_path": "usr/local/lib/node_modules/n8n/node_modules/.pnpm/vue-i18n@11.4.5_vue@3.5.26_typescript@6.0.2_/node_modules/vue-i18n/package.json",
+      "package_id": "vue-i18n@11.4.5",
+      "package_identifier": {
+        "PURL": "pkg:npm/vue-i18n@11.4.5",
+        "UID": "97bbc5d704b518ba"
+      },
+      "layer": {
+        "Digest": "sha256:f4c997d23492db623371ae3f4a13ffefeec2777531209e7a32318978d702ee23",
+        "DiffID": "sha256:b4bf7e23c8ea2db99332e1da70126f6368ab5377d1c363d4e95bd39422df4872"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-118257",
+      "proposed_version": "11.4.14",
+      "action": "recompilar_ui_y_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:1:0",
+      "image": "n8n-runners",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-116689",
+      "severity": "HIGH",
+      "package": "follow-redirects",
+      "installed_version": "1.16.1",
+      "reported_fixed_version": "1.16.2",
+      "package_path": "opt/runners/task-runner-javascript/node_modules/.pnpm/follow-redirects@1.16.1_debug@4.4.3_supports-color@8.1.1_/node_modules/follow-redirects/package.json",
+      "package_id": "follow-redirects@1.16.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/follow-redirects@1.16.1",
+        "UID": "68816f81bfe5e28d"
+      },
+      "layer": {
+        "Digest": "sha256:45492c9aa5488065bc6ec10b4741ec48996c3b779632e1269e4c6fb846b93989",
+        "DiffID": "sha256:68b3a5cf3d2b382ef77dcd81a096254551ecf822c4bb0092581996284e55caba"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-116689",
+      "proposed_version": "1.16.2",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:1:1",
+      "image": "n8n-runners",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109383",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "7.29.1",
+      "reported_fixed_version": "6.29.1, 7.30.1, 8.12.2",
+      "package_path": "opt/runners/task-runner-javascript/node_modules/.pnpm/undici@7.29.1/node_modules/undici/package.json",
+      "package_id": "undici@7.29.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@7.29.1",
+        "UID": "db8de31fdc91251"
+      },
+      "layer": {
+        "Digest": "sha256:45492c9aa5488065bc6ec10b4741ec48996c3b779632e1269e4c6fb846b93989",
+        "DiffID": "sha256:68b3a5cf3d2b382ef77dcd81a096254551ecf822c4bb0092581996284e55caba"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109383",
+      "proposed_version": "7.30.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:1:2",
+      "image": "n8n-runners",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109829",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "7.29.1",
+      "reported_fixed_version": "7.30.1, 8.12.2",
+      "package_path": "opt/runners/task-runner-javascript/node_modules/.pnpm/undici@7.29.1/node_modules/undici/package.json",
+      "package_id": "undici@7.29.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@7.29.1",
+        "UID": "db8de31fdc91251"
+      },
+      "layer": {
+        "Digest": "sha256:45492c9aa5488065bc6ec10b4741ec48996c3b779632e1269e4c6fb846b93989",
+        "DiffID": "sha256:68b3a5cf3d2b382ef77dcd81a096254551ecf822c4bb0092581996284e55caba"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109829",
+      "proposed_version": "7.30.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:1:3",
+      "image": "n8n-runners",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-109869",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "7.29.1",
+      "reported_fixed_version": "6.29.1, 7.30.1, 8.12.2",
+      "package_path": "opt/runners/task-runner-javascript/node_modules/.pnpm/undici@7.29.1/node_modules/undici/package.json",
+      "package_id": "undici@7.29.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@7.29.1",
+        "UID": "db8de31fdc91251"
+      },
+      "layer": {
+        "Digest": "sha256:45492c9aa5488065bc6ec10b4741ec48996c3b779632e1269e4c6fb846b93989",
+        "DiffID": "sha256:68b3a5cf3d2b382ef77dcd81a096254551ecf822c4bb0092581996284e55caba"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-109869",
+      "proposed_version": "7.30.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:1:4",
+      "image": "n8n-runners",
+      "target": "Node.js",
+      "type": "node-pkg",
+      "vulnerability_id": "CVE-2026-87018",
+      "severity": "HIGH",
+      "package": "undici",
+      "installed_version": "7.29.1",
+      "reported_fixed_version": "6.29.1, 7.30.1, 8.12.2",
+      "package_path": "opt/runners/task-runner-javascript/node_modules/.pnpm/undici@7.29.1/node_modules/undici/package.json",
+      "package_id": "undici@7.29.1",
+      "package_identifier": {
+        "PURL": "pkg:npm/undici@7.29.1",
+        "UID": "db8de31fdc91251"
+      },
+      "layer": {
+        "Digest": "sha256:45492c9aa5488065bc6ec10b4741ec48996c3b779632e1269e4c6fb846b93989",
+        "DiffID": "sha256:68b3a5cf3d2b382ef77dcd81a096254551ecf822c4bb0092581996284e55caba"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory npm",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-87018",
+      "proposed_version": "7.30.1",
+      "action": "regenerar_cierre_node",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:2:0",
+      "image": "n8n-runners",
+      "target": "Python",
+      "type": "python-pkg",
+      "vulnerability_id": "CVE-2026-114613",
+      "severity": "HIGH",
+      "package": "msgpack",
+      "installed_version": "1.1.2",
+      "reported_fixed_version": "1.2.3",
+      "package_path": null,
+      "package_id": "msgpack@1.1.2",
+      "package_identifier": {
+        "PURL": "pkg:pypi/msgpack@1.1.2",
+        "UID": "33820b693fb1213e",
+        "BOMRef": "pkg:pypi/msgpack@1.1.2"
+      },
+      "layer": {
+        "Digest": "sha256:932709760b042cb7be5fff55bb3ffd613331f5482614ab0e6f4a8dbbff813a61",
+        "DiffID": "sha256:2addde02c3f4dd1c51aed79e3beeda5fd492bc4c9ffcfccf53c63bdaa1ed7364"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory pip",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-114613",
+      "proposed_version": "1.2.3",
+      "action": "eliminar_tooling_vendorizado_del_runtime_o_revendor_verificado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:2:1",
+      "image": "n8n-runners",
+      "target": "Python",
+      "type": "python-pkg",
+      "vulnerability_id": "GHSA-6v7p-g79w-8964",
+      "severity": "HIGH",
+      "package": "msgpack",
+      "installed_version": "1.1.2",
+      "reported_fixed_version": "1.2.1",
+      "package_path": null,
+      "package_id": "msgpack@1.1.2",
+      "package_identifier": {
+        "PURL": "pkg:pypi/msgpack@1.1.2",
+        "UID": "33820b693fb1213e",
+        "BOMRef": "pkg:pypi/msgpack@1.1.2"
+      },
+      "layer": {
+        "Digest": "sha256:932709760b042cb7be5fff55bb3ffd613331f5482614ab0e6f4a8dbbff813a61",
+        "DiffID": "sha256:2addde02c3f4dd1c51aed79e3beeda5fd492bc4c9ffcfccf53c63bdaa1ed7364"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory pip",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
+      "primary_url": "https://github.com/advisories/GHSA-6v7p-g79w-8964",
+      "proposed_version": "1.2.3",
+      "action": "eliminar_tooling_vendorizado_del_runtime_o_revendor_verificado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:2:2",
+      "image": "n8n-runners",
+      "target": "Python",
+      "type": "python-pkg",
+      "vulnerability_id": "CVE-2025-47273",
+      "severity": "HIGH",
+      "package": "setuptools",
+      "installed_version": "70.3.0",
+      "reported_fixed_version": "78.1.1",
+      "package_path": null,
+      "package_id": "setuptools@70.3.0",
+      "package_identifier": {
+        "PURL": "pkg:pypi/setuptools@70.3.0",
+        "UID": "ed58bcdeda2bae2f",
+        "BOMRef": "pkg:pypi/setuptools@70.3.0"
+      },
+      "layer": {
+        "Digest": "sha256:932709760b042cb7be5fff55bb3ffd613331f5482614ab0e6f4a8dbbff813a61",
+        "DiffID": "sha256:2addde02c3f4dd1c51aed79e3beeda5fd492bc4c9ffcfccf53c63bdaa1ed7364"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory pip",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2025-47273",
+      "proposed_version": "84.2.1",
+      "action": "eliminar_tooling_vendorizado_del_runtime_o_revendor_verificado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:2:3",
+      "image": "n8n-runners",
+      "target": "Python",
+      "type": "python-pkg",
+      "vulnerability_id": "CVE-2026-97687",
+      "severity": "HIGH",
+      "package": "urllib3",
+      "installed_version": "2.7.0",
+      "reported_fixed_version": "2.8.0",
+      "package_path": "opt/runners/task-runner-python/.venv/lib/python3.13/site-packages/urllib3-2.7.0.dist-info/METADATA",
+      "package_id": null,
+      "package_identifier": {
+        "PURL": "pkg:pypi/urllib3@2.7.0",
+        "UID": "d00f8ccff224bf26"
+      },
+      "layer": {
+        "Digest": "sha256:7d1aa220f53fd84f6bfcb68ccc5fde909d1e9eb0990004d35e0d4718c7424558",
+        "DiffID": "sha256:94014c695ca1b9f44163af3338014e02e578b0dd20c03f72589d83925e97fb1d"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory pip",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-97687",
+      "proposed_version": "2.8.0",
+      "action": "actualizar_venv_python",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:2:4",
+      "image": "n8n-runners",
+      "target": "Python",
+      "type": "python-pkg",
+      "vulnerability_id": "CVE-2026-97689",
+      "severity": "HIGH",
+      "package": "urllib3",
+      "installed_version": "2.7.0",
+      "reported_fixed_version": "2.8.0",
+      "package_path": "opt/runners/task-runner-python/.venv/lib/python3.13/site-packages/urllib3-2.7.0.dist-info/METADATA",
+      "package_id": null,
+      "package_identifier": {
+        "PURL": "pkg:pypi/urllib3@2.7.0",
+        "UID": "d00f8ccff224bf26"
+      },
+      "layer": {
+        "Digest": "sha256:7d1aa220f53fd84f6bfcb68ccc5fde909d1e9eb0990004d35e0d4718c7424558",
+        "DiffID": "sha256:94014c695ca1b9f44163af3338014e02e578b0dd20c03f72589d83925e97fb1d"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory pip",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-97689",
+      "proposed_version": "2.8.0",
+      "action": "actualizar_venv_python",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:2:5",
+      "image": "n8n-runners",
+      "target": "Python",
+      "type": "python-pkg",
+      "vulnerability_id": "CVE-2026-97687",
+      "severity": "HIGH",
+      "package": "urllib3",
+      "installed_version": "2.7.0",
+      "reported_fixed_version": "2.8.0",
+      "package_path": null,
+      "package_id": "urllib3@2.7.0",
+      "package_identifier": {
+        "PURL": "pkg:pypi/urllib3@2.7.0",
+        "UID": "19c2344f95ca9f4c",
+        "BOMRef": "pkg:pypi/urllib3@2.7.0"
+      },
+      "layer": {
+        "Digest": "sha256:932709760b042cb7be5fff55bb3ffd613331f5482614ab0e6f4a8dbbff813a61",
+        "DiffID": "sha256:2addde02c3f4dd1c51aed79e3beeda5fd492bc4c9ffcfccf53c63bdaa1ed7364"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory pip",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-97687",
+      "proposed_version": "2.8.0",
+      "action": "eliminar_tooling_vendorizado_del_runtime_o_revendor_verificado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:2:6",
+      "image": "n8n-runners",
+      "target": "Python",
+      "type": "python-pkg",
+      "vulnerability_id": "CVE-2026-97689",
+      "severity": "HIGH",
+      "package": "urllib3",
+      "installed_version": "2.7.0",
+      "reported_fixed_version": "2.8.0",
+      "package_path": null,
+      "package_id": "urllib3@2.7.0",
+      "package_identifier": {
+        "PURL": "pkg:pypi/urllib3@2.7.0",
+        "UID": "19c2344f95ca9f4c",
+        "BOMRef": "pkg:pypi/urllib3@2.7.0"
+      },
+      "layer": {
+        "Digest": "sha256:932709760b042cb7be5fff55bb3ffd613331f5482614ab0e6f4a8dbbff813a61",
+        "DiffID": "sha256:2addde02c3f4dd1c51aed79e3beeda5fd492bc4c9ffcfccf53c63bdaa1ed7364"
+      },
+      "data_source": {
+        "ID": "ghsa",
+        "Name": "GitHub Security Advisory pip",
+        "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-97689",
+      "proposed_version": "2.8.0",
+      "action": "eliminar_tooling_vendorizado_del_runtime_o_revendor_verificado",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:0",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-56851",
+      "severity": "HIGH",
+      "package": "golang.org/x/text",
+      "installed_version": "v0.39.0",
+      "reported_fixed_version": "0.41.0",
+      "package_path": null,
+      "package_id": "golang.org/x/text@v0.39.0",
+      "package_identifier": {
+        "PURL": "pkg:golang/golang.org/x/text@v0.39.0",
+        "UID": "1551b1877263d7c1"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-56851",
+      "proposed_version": "v0.41.0",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:1",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-111943",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.26.10, 1.27.3",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-111943",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:2",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-33818",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-33818",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:3",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-39821",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-39821",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:4",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-39822",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.25.12, 1.26.5, 1.27.0-rc.2",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-39822",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:5",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-56853",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-56853",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:6",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-56858",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-56858",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:7",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-56859",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-56859",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:8",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-56860",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-56860",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:9",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-56862",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-56862",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:10",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-78667",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.26.9, 1.27.2",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-78667",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:11",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-78669",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.26.9, 1.27.2",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-78669",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    },
+    {
+      "row_id": "0c2e3794faa3c23397e17b3dd1cb912c2ce7187a4ece0139c4a72233c0a0e961:3:12",
+      "image": "n8n-runners",
+      "target": "usr/local/bin/task-runner-launcher",
+      "type": "gobinary",
+      "vulnerability_id": "CVE-2026-97031",
+      "severity": "HIGH",
+      "package": "stdlib",
+      "installed_version": "v1.25.11",
+      "reported_fixed_version": "1.26.9, 1.27.2",
+      "package_path": null,
+      "package_id": "stdlib@v1.25.11",
+      "package_identifier": {
+        "PURL": "pkg:golang/stdlib@v1.25.11",
+        "UID": "2ce1f49bb2b7ea59"
+      },
+      "layer": {
+        "Digest": "sha256:15e555e4b02a048ed8616f790189d2ad3b49515c55e8c9aad89f529d05ae0889",
+        "DiffID": "sha256:ab2adfc6afa7d007caef9efc4b2c40c0551caac0ee60bd198000b7e863fcef48"
+      },
+      "data_source": {
+        "ID": "govulndb",
+        "Name": "The Go Vulnerability Database",
+        "URL": "https://pkg.go.dev/vuln/"
+      },
+      "primary_url": "https://avd.aquasec.com/nvd/cve-2026-97031",
+      "proposed_version": "1.27.3",
+      "action": "recompilar_launcher",
+      "state": "propuesto_sin_build_ni_SCA_final"
+    }
+  ],
+  "npm_candidates": [
+    {
+      "name": "@azure/msal-node",
+      "version": "7.1.0",
+      "metadata_url": "https://registry.npmjs.org/@azure%2fmsal-node/7.1.0",
+      "metadata_sha256": "e4e626d7e137f493d3a2067fbaad57e08f288488f387027aa1659809a3d7c8a0",
+      "tarball_url": "https://registry.npmjs.org/@azure/msal-node/-/msal-node-7.1.0.tgz",
+      "tarball_sha256": "af182f49ec88eabac794f612a3acc8865f72dd81b91ffd8c12faadd66e7ed535",
+      "integrity": "sha512-s1O6hSY/C/dmqykTmmeHY6GhSkDuY8N1gxyhuLyaCwbY7N+UBvU2Wu4flas7+NxZiAPcXNPVpgt3n/HP/5yL+w==",
+      "archive_bytes": 475955,
+      "engines": {
+        "node": ">=20"
+      },
+      "peer_dependencies": {},
+      "dependencies": {
+        "jsonwebtoken": "^9.0.0",
+        "@azure/msal-common": "16.14.2"
+      },
+      "scripts": {
+        "lint": "eslint src --ext .ts",
+        "test": "jest",
+        "build": "npm run clean && rollup -c --strictDeprecations --bundleConfigAsCjs && npm run build:types",
+        "clean": "shx rm -rf dist types lib",
+        "prepack": "npm run build:all",
+        "lint:fix": "npm run lint -- --fix",
+        "build:all": "cd ../.. && npm run build --workspace=@azure/msal-common --workspace=@azure/msal-node",
+        "format:fix": "prettier --ignore-path .gitignore --write src test",
+        "test:watch": "jest --watch",
+        "build:types": "tsc -p tsconfig.build.types.json && npm run test:types:no-dom",
+        "build:watch": "rollup -c --watch --strictDeprecations --bundleConfigAsCjs",
+        "apiExtractor": "api-extractor run",
+        "format:check": "prettier --ignore-path .gitignore --check src test",
+        "test:coverage": "jest --coverage",
+        "test:types:no-dom": "tsc -p test/type-check/no-dom/tsconfig.json"
+      },
+      "executed": false
+    },
+    {
+      "name": "@intlify/core-base",
+      "version": "11.4.14",
+      "metadata_url": "https://registry.npmjs.org/@intlify%2fcore-base/11.4.14",
+      "metadata_sha256": "e3808039d59dd4ec7b8eb1493f32d41083d3e3e8df7aa51fd93c49664d8ed663",
+      "tarball_url": "https://registry.npmjs.org/@intlify/core-base/-/core-base-11.4.14.tgz",
+      "tarball_sha256": "516582153900ec46f7b94d003d38d17c424b4acc1672475a45d82ada3611e987",
+      "integrity": "sha512-Lox+qRGBLnEYfNz4iajqKpw1zuvSAWl4PtzEk654bEM+0NT1GBy9AbOecxzSh7krsyqn9mGKhgmvtuyBsqS6oQ==",
+      "archive_bytes": 131802,
+      "engines": {
+        "node": ">= 22"
+      },
+      "peer_dependencies": {},
+      "dependencies": {
+        "@intlify/shared": "11.4.14",
+        "@intlify/devtools-types": "11.4.14",
+        "@intlify/message-compiler": "11.4.14"
+      },
+      "scripts": {},
+      "executed": false
+    },
+    {
+      "name": "@intlify/shared",
+      "version": "11.4.14",
+      "metadata_url": "https://registry.npmjs.org/@intlify%2fshared/11.4.14",
+      "metadata_sha256": "92a27a73d18328550bcd90242d34578cc3c3b657a95cf34945f4deeb3d43f1c9",
+      "tarball_url": "https://registry.npmjs.org/@intlify/shared/-/shared-11.4.14.tgz",
+      "tarball_sha256": "defe0c1d2508d593c76ffd237b9693d8afa8af3b5c05037a72f97bc08e02dc17",
+      "integrity": "sha512-f8zSlPs4+Yd9za3CPQfW9OHxAJBOeRQzB/hhOhkbGA7hlqWk0W0bUtSV/LmyrGNwdl8JriBnFtJqZyF140bjGg==",
+      "archive_bytes": 10900,
+      "engines": {
+        "node": ">= 22"
+      },
+      "peer_dependencies": {},
+      "dependencies": {},
+      "scripts": {},
+      "executed": false
+    },
+    {
+      "name": "@intlify/message-compiler",
+      "version": "11.4.14",
+      "metadata_url": "https://registry.npmjs.org/@intlify%2fmessage-compiler/11.4.14",
+      "metadata_sha256": "8f1bee535a75a538b131ab1525a19cbdf444ead2cc2c32f22fc46c8349c5da30",
+      "tarball_url": "https://registry.npmjs.org/@intlify/message-compiler/-/message-compiler-11.4.14.tgz",
+      "tarball_sha256": "a12986498243fe8437e1db6333974ec0dee32e544592cf3a8507a037e14dca5c",
+      "integrity": "sha512-y79GatHfMhN672Vooxw0v6mgX/vclFHggO1ENL6aH/QubLXiV529WXu/+FhVUbYF+HLTeDDkQpmnpfvSJddBCg==",
+      "archive_bytes": 70979,
+      "engines": {
+        "node": ">= 22"
+      },
+      "peer_dependencies": {},
+      "dependencies": {
+        "source-map-js": "^1.0.2",
+        "@intlify/shared": "11.4.14"
+      },
+      "scripts": {},
+      "executed": false
+    },
+    {
+      "name": "@intlify/devtools-types",
+      "version": "11.4.14",
+      "metadata_url": "https://registry.npmjs.org/@intlify%2fdevtools-types/11.4.14",
+      "metadata_sha256": "b06675031e7b773def4d4d9e059230808239dcba19a7ec6ebb574436e3bafe6d",
+      "tarball_url": "https://registry.npmjs.org/@intlify/devtools-types/-/devtools-types-11.4.14.tgz",
+      "tarball_sha256": "3cb5c4877965537554c0d8ff1c12ca1ed0345bcf49f641c96578e0f36e4ed55e",
+      "integrity": "sha512-EQHRYveQg6yHQ51kePfsFyaW2WW+0hk3FdVxSpLDyuKtqFtsRFoyQR2QzASZPmY767ujs9ipuxc2DiGJARkuiQ==",
+      "archive_bytes": 2489,
+      "engines": {
+        "node": ">= 22"
+      },
+      "peer_dependencies": {},
+      "dependencies": {
+        "@intlify/shared": "11.4.14",
+        "@intlify/core-base": "11.4.14"
+      },
+      "scripts": {},
+      "executed": false
+    },
+    {
+      "name": "vue-i18n",
+      "version": "11.4.14",
+      "metadata_url": "https://registry.npmjs.org/vue-i18n/11.4.14",
+      "metadata_sha256": "1be19f2a1f7c00e02fbb7f54bfffa3f062472aadab460ff59417ce1eccadd531",
+      "tarball_url": "https://registry.npmjs.org/vue-i18n/-/vue-i18n-11.4.14.tgz",
+      "tarball_sha256": "d4b2327f9cafcc3f5ad0af39da71d64524531196ded109aed16ddcf29509d457",
+      "integrity": "sha512-oRFZtQjRDRQtfxu7tFlsZlnCa5gPkg/KX89kJDKdC9bz4GIYgo3cAMaD0XFeUx/WHuKoVbDMRTIo9Hvg67HnPw==",
+      "archive_bytes": 344832,
+      "engines": {
+        "node": ">= 22"
+      },
+      "peer_dependencies": {
+        "vue": "^3.0.0"
+      },
+      "dependencies": {
+        "@intlify/shared": "11.4.14",
+        "@vue/devtools-api": "^6.5.0",
+        "@intlify/core-base": "11.4.14",
+        "@intlify/devtools-types": "11.4.14"
+      },
+      "scripts": {},
+      "executed": false
+    },
+    {
+      "name": "@modelcontextprotocol/node",
+      "version": "2.1.0",
+      "metadata_url": "https://registry.npmjs.org/@modelcontextprotocol%2fnode/2.1.0",
+      "metadata_sha256": "20321025b5265771dbe80694a6df5db23c788b264dfa86b7ef0b8cee08c7edcd",
+      "tarball_url": "https://registry.npmjs.org/@modelcontextprotocol/node/-/node-2.1.0.tgz",
+      "tarball_sha256": "e7313b4843d700a278ffdaa4f5e60810f04344713320091bc9aaefa3f4e81d06",
+      "integrity": "sha512-6xg3iWVcOfiL8Y7rI6xUqXD0lI2AY5q3djsa/cOi1IJUSwx06t0gvhSwU/6mIIohrFlt40/ANUG56DQ0HLhILQ==",
+      "archive_bytes": 36074,
+      "engines": {
+        "node": ">=20"
+      },
+      "peer_dependencies": {
+        "hono": "^4.11.4",
+        "@modelcontextprotocol/server": "^2.1.0"
+      },
+      "dependencies": {
+        "@hono/node-server": "^1.19.9"
+      },
+      "scripts": {
+        "lint": "eslint src/ && prettier --ignore-path ../../../.prettierignore --check .",
+        "test": "vitest run",
+        "build": "tsdown",
+        "check": "pnpm run typecheck && pnpm run lint",
+        "lint:fix": "eslint src/ --fix && prettier --ignore-path ../../../.prettierignore --write .",
+        "typecheck": "tsgo -p tsconfig.json --noEmit",
+        "test:watch": "vitest",
+        "build:watch": "tsdown --watch"
+      },
+      "executed": false
+    },
+    {
+      "name": "@modelcontextprotocol/sdk",
+      "version": "1.32.0",
+      "metadata_url": "https://registry.npmjs.org/@modelcontextprotocol%2fsdk/1.32.0",
+      "metadata_sha256": "f7e8ca36086a232e2204873bd896986ff92161bb3b133f20968a0139a99331aa",
+      "tarball_url": "https://registry.npmjs.org/@modelcontextprotocol/sdk/-/sdk-1.32.0.tgz",
+      "tarball_sha256": "41dd4776a00ed50eaaa43ee335e27363ad1f53c3b7fa27fd0f75c0520f5342ec",
+      "integrity": "sha512-8BviX/hK4Gd2eL1KdTwm0gfl4d3wdoErW0Jd00h6nomUAtk6IJk5vwQJc6kfWtJTzN5OEV/lgIiJKI8fiDGAlA==",
+      "archive_bytes": 615487,
+      "engines": {
+        "node": ">=18"
+      },
+      "peer_dependencies": {
+        "zod": "^3.25 || ^4.0",
+        "@cfworker/json-schema": "^4.1.1"
+      },
+      "dependencies": {
+        "ajv": "^8.17.1",
+        "zod": "^3.25 || ^4.0",
+        "cors": "^2.8.5",
+        "hono": "^4.11.4",
+        "jose": "^6.1.3",
+        "express": "^5.2.1",
+        "raw-body": "^3.0.0",
+        "ajv-formats": "^3.0.1",
+        "cross-spawn": "^7.0.5",
+        "eventsource": "^3.0.2",
+        "content-type": "^1.0.5",
+        "pkce-challenge": "^5.0.0",
+        "@hono/node-server": "^1.19.9 || ^2.0.5",
+        "json-schema-typed": "^8.0.2",
+        "eventsource-parser": "^3.0.0",
+        "express-rate-limit": "^8.2.1",
+        "zod-to-json-schema": "^3.25.1"
+      },
+      "scripts": {
+        "lint": "eslint src/ && prettier --check .",
+        "test": "vitest run --exclude \"test/e2e/**\"",
+        "build": "npm run build:esm && npm run build:cjs",
+        "check": "npm run typecheck && npm run lint",
+        "start": "npm run server",
+        "client": "tsx scripts/cli.ts client",
+        "server": "tsx watch --clear-screen=false scripts/cli.ts server",
+        "prepack": "npm run build:esm && npm run build:cjs",
+        "lint:fix": "eslint src/ --fix && prettier --write .",
+        "test:e2e": "vitest run test/e2e",
+        "build:cjs": "mkdir -p dist/cjs && echo '{\"type\": \"commonjs\"}' > dist/cjs/package.json && tsc -p tsconfig.cjs.json",
+        "build:esm": "mkdir -p dist/esm && echo '{\"type\": \"module\"}' > dist/esm/package.json && tsc -p tsconfig.prod.json",
+        "typecheck": "tsgo --noEmit",
+        "test:watch": "vitest",
+        "build:cjs:w": "npm run build:cjs -- -w",
+        "build:esm:w": "npm run build:esm -- -w",
+        "fetch:spec-types": "tsx scripts/fetch-spec-types.ts",
+        "test:conformance:client": "npx @modelcontextprotocol/conformance client --command 'npx tsx test/conformance/src/everythingClient.ts' --expected-failures test/conformance/conformance-baseline.yml",
+        "test:conformance:server": "test/conformance/scripts/run-server-conformance.sh --expected-failures test/conformance/conformance-baseline.yml",
+        "examples:simple-server:w": "tsx --watch src/examples/server/simpleStreamableHttp.ts --oauth",
+        "test:conformance:client:all": "npx @modelcontextprotocol/conformance client --command 'npx tsx test/conformance/src/everythingClient.ts' --suite all --expected-failures test/conformance/conformance-baseline.yml",
+        "test:conformance:server:all": "test/conformance/scripts/run-server-conformance.sh --suite all --expected-failures test/conformance/conformance-baseline.yml",
+        "test:conformance:server:run": "npx tsx test/conformance/src/everythingServer.ts"
+      },
+      "executed": false
+    },
+    {
+      "name": "body-parser",
+      "version": "2.4.0",
+      "metadata_url": "https://registry.npmjs.org/body-parser/2.4.0",
+      "metadata_sha256": "1f08dc77ebc2d54d4f283fee5f6af5d9dbd15cc020eeb3339911f5c48be228dd",
+      "tarball_url": "https://registry.npmjs.org/body-parser/-/body-parser-2.4.0.tgz",
+      "tarball_sha256": "3f6e22dc9710a8bd5942fee8dfbd4632b54980cc2f33854f1ec1e314b17b2357",
+      "integrity": "sha512-Ifk1KcLrxaGt1occQagQNFNNOqRt1LFuehEnHHzB8Z6cRgIxRU1TBaiIsUiCdA+gy5PL7Y1IX31DNKkRmxtXjQ==",
+      "archive_bytes": 11417,
+      "engines": {
+        "node": ">=18"
+      },
+      "peer_dependencies": {},
+      "dependencies": {
+        "qs": "^6.16.1",
+        "bytes": "^3.1.2",
+        "debug": "^4.4.3",
+        "type-is": "^2.1.0",
+        "raw-body": "^3.0.2",
+        "iconv-lite": "^0.7.3",
+        "http-errors": "^2.0.1",
+        "on-finished": "^2.4.1",
+        "content-type": "^2.1.0"
+      },
+      "scripts": {
+        "lint": "eslint .",
+        "test": "mocha --reporter spec --check-leaks test/",
+        "test-ci": "nyc --reporter=lcovonly --reporter=text npm test",
+        "test-cov": "nyc --reporter=html --reporter=text npm test"
+      },
+      "executed": false
+    },
+    {
+      "name": "follow-redirects",
+      "version": "1.16.2",
+      "metadata_url": "https://registry.npmjs.org/follow-redirects/1.16.2",
+      "metadata_sha256": "073784c4f671115ef8c7530f0ac8992c11bdbf272cc83bc6193f4ea8228fa62d",
+      "tarball_url": "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.16.2.tgz",
+      "tarball_sha256": "97926c99452df68ec21aa3d518101b6d93a803652d6e1e7d70b273a8930224c8",
+      "integrity": "sha512-/kVP2U8z596Ia0gwFrwyIeo74ta5aVmSeU1FfAUMAmcEP5EP7zydmag3SLiN64NaRKef3lxsq7i/g7ltJQDGow==",
+      "archive_bytes": 10606,
+      "engines": {
+        "node": ">=4.0"
+      },
+      "peer_dependencies": {},
+      "dependencies": {},
+      "scripts": {
+        "lint": "eslint *.js test",
+        "test": "nyc mocha"
+      },
+      "executed": false
+    },
+    {
+      "name": "markdown-it",
+      "version": "14.3.2",
+      "metadata_url": "https://registry.npmjs.org/markdown-it/14.3.2",
+      "metadata_sha256": "ee9063ccd89cb11f5d66199484fd6729cec366b050675f2a08ac522b2b3cc60a",
+      "tarball_url": "https://registry.npmjs.org/markdown-it/-/markdown-it-14.3.2.tgz",
+      "tarball_sha256": "2646dd49007c7c5594dd9e910ce6b1ab4083b39eba3e6254889c02ef455ea97a",
+      "integrity": "sha512-sHHjZ5fJKlgrG4qns2YwVcdNep35h5fERrfkD2YNsb9UFk0UIHarbiTaHKVMlPuWAoiilyK8Fv/jAm11slsY7Q==",
+      "archive_bytes": 457032,
+      "engines": null,
+      "peer_dependencies": {},
+      "dependencies": {
+        "mdurl": "^2.0.0",
+        "argparse": "^2.0.1",
+        "entities": "^4.5.0",
+        "uc.micro": "^2.1.0",
+        "linkify-it": "^5.0.2",
+        "punycode.js": "^2.3.1"
+      },
+      "scripts": {
+        "doc": "node support/build_doc.mjs",
+        "demo": "npm run lint && node support/build_demo.mjs",
+        "lint": "eslint .",
+        "test": "npm run lint && npm run test:cmspec && npm run test:markdown-it && npm run test:build",
+        "todo": "grep 'TODO' -n -r ./lib 2>/dev/null",
+        "build": "node support/build-dist.mjs",
+        "gh-doc": "npm run doc && gh-pages -d apidoc -f",
+        "gh-demo": "npm run demo && gh-pages -d demo -f -b master -r git@github.com:markdown-it/markdown-it.github.io.git",
+        "prepack": "npm test && npm run build",
+        "coverage": "npm run build && c8 --include 'lib/**' -r text -r html -r lcov node --test --test-reporter=dot",
+        "specsplit": "support/specsplit.mjs good -o test/fixtures/commonmark/good.txt && support/specsplit.mjs bad -o test/fixtures/commonmark/bad.txt && support/specsplit.mjs",
+        "test:build": "npm run build && node --test test/build/**/*.test.mjs",
+        "test:cmspec": "node --test --test-reporter=dot test/cmspec/**/*.test.mjs",
+        "benchmark-deps": "npm install --prefix benchmark/extra/",
+        "test:markdown-it": "node --test test/markdown-it/**/*.test.mjs",
+        "pathological:track-ref": "node support/track-ref-pathological.mjs",
+        "pathological:update-hash": "node support/track-ref-pathological.mjs --update"
+      },
+      "executed": false
+    },
+    {
+      "name": "@types/markdown-it",
+      "version": "14.1.2",
+      "metadata_url": "https://registry.npmjs.org/@types%2fmarkdown-it/14.1.2",
+      "metadata_sha256": "4f406a61daa99cb23410a76b17c4238ad363c65692dad98608c006c6d67f2597",
+      "tarball_url": "https://registry.npmjs.org/@types/markdown-it/-/markdown-it-14.1.2.tgz",
+      "tarball_sha256": "f5eb60e320f46f1bb2cd78e465201a79a2720e7d5622d8678ec0513e3c118cc7",
+      "integrity": "sha512-promo4eFwuiW+TfGxhi+0x3czqTYJkG8qB17ZUJiVF10Xm7NLVRSLUsfRTU/6h1e24VvRnXCx+hG7li58lkzog==",
+      "archive_bytes": 17099,
+      "engines": null,
+      "peer_dependencies": {},
+      "dependencies": {
+        "@types/mdurl": "^2",
+        "@types/linkify-it": "^5"
+      },
+      "scripts": {},
+      "executed": false
+    },
+    {
+      "name": "multer",
+      "version": "2.5.0",
+      "metadata_url": "https://registry.npmjs.org/multer/2.5.0",
+      "metadata_sha256": "c77635d904030999387571c4b3141bdadc66352f1a8025489996422696607999",
+      "tarball_url": "https://registry.npmjs.org/multer/-/multer-2.5.0.tgz",
+      "tarball_sha256": "b6a535ae5fa87f6cffc90fb213b43c2ea34fdc21dc7ccad3f25caaf009d7fcaa",
+      "integrity": "sha512-BsqOzYGVq49JcW2IzoSAxeKYRevb+dGGPPWleOR8Lrlk4igwxu1/9pwSXlByhCb7MVZDrNJFC0IBP5/O5nLYRw==",
+      "archive_bytes": 17451,
+      "engines": {
+        "node": ">= 10.16.0"
+      },
+      "peer_dependencies": {},
+      "dependencies": {
+        "busboy": "^1.6.0",
+        "type-is": "^1.6.18",
+        "append-field": "^1.0.0"
+      },
+      "scripts": {
+        "lint": "standard",
+        "test": "mocha --reporter spec --exit --check-leaks test/",
+        "test-ci": "nyc --reporter=lcov --reporter=text npm test",
+        "lint:fix": "standard --fix",
+        "test-cov": "nyc --reporter=html --reporter=text npm test"
+      },
+      "executed": false
+    },
+    {
+      "name": "toml",
+      "version": "5.0.1",
+      "metadata_url": "https://registry.npmjs.org/toml/5.0.1",
+      "metadata_sha256": "4ffcc2f368d6a835a124a83b8c22884c22d687d60b8251d28e657fbf598f9265",
+      "tarball_url": "https://registry.npmjs.org/toml/-/toml-5.0.1.tgz",
+      "tarball_sha256": "e9dd3f26a6f7c5fcfcf3fb13cca67f641da5c7fc144471c7ceec5accedbda323",
+      "integrity": "sha512-EqYNA/YvUNndrA2B3O2ojzLQoTQrBxeZ9UIjQwk8t10oe6n7dwclBwd9IdZQTOKwe6vWX+AXtl6IntXRbepdxQ==",
+      "archive_bytes": 19565,
+      "engines": {
+        "node": ">=20"
+      },
+      "peer_dependencies": {},
+      "dependencies": {},
+      "scripts": {
+        "test": "node --test test/test_toml.js",
+        "build": "peggy -o lib/parser.js src/toml.pegjs",
+        "test:all": "node --test test/test_toml.js && node test/spec-test.js",
+        "test:spec": "node test/spec-test.js",
+        "prepublishOnly": "npm run build",
+        "test:spec:fresh": "node scripts/test-spec-fresh.js",
+        "test:spec:failures": "node test/spec-test.js --failures"
+      },
+      "executed": false
+    },
+    {
+      "name": "undici",
+      "version": "6.29.1",
+      "metadata_url": "https://registry.npmjs.org/undici/6.29.1",
+      "metadata_sha256": "a99cc14c0d4db2d3b73142a4a6119cbb690b6f0f7ae2696d3b8b556863aec290",
+      "tarball_url": "https://registry.npmjs.org/undici/-/undici-6.29.1.tgz",
+      "tarball_sha256": "29c4b8e0b2d86cb8795571c1959012ce057a14ecfd34858335f47c31e770a04f",
+      "integrity": "sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==",
+      "archive_bytes": 297796,
+      "engines": {
+        "node": ">=18.17"
+      },
+      "peer_dependencies": {},
+      "dependencies": {},
+      "scripts": {
+        "lint": "standard | snazzy",
+        "test": "npm run test:javascript && cross-env NODE_V8_COVERAGE=  npm run test:typescript",
+        "bench": "echo \"Error: Benchmarks have been moved to '/benchmarks'\" && exit 1",
+        "prepare": "husky && node ./scripts/platform-shell.js",
+        "test:h2": "npm run test:h2:core && npm run test:h2:fetch",
+        "coverage": "npm run coverage:clean && cross-env NODE_V8_COVERAGE=./coverage/tmp npm run test:javascript && npm run coverage:report",
+        "lint:fix": "standard --fix | snazzy",
+        "test:tdd": "borp --expose-gc -p \"test/*.js\"",
+        "test:wpt": "node test/wpt/start-fetch.mjs && node test/wpt/start-FileAPI.mjs && node test/wpt/start-mimesniff.mjs && node test/wpt/start-xhr.mjs && node test/wpt/start-websockets.mjs && node test/wpt/start-cacheStorage.mjs && node test/wpt/start-eventsource.mjs",
+        "test:jest": "cross-env NODE_V8_COVERAGE= jest",
+        "test:unit": "borp --expose-gc -p \"test/*.js\"",
+        "build:node": "npx esbuild@0.19.10 index-fetch.js --bundle --platform=node --outfile=undici-fetch.js --define:esbuildDetection=1 --keep-names && node scripts/strip-comments.js",
+        "build:wasm": "node build/wasm.js --docker",
+        "test:cache": "borp -p \"test/cache/*.js\"",
+        "test:fetch": "npm run build:node && npm run test:fetch:nobuild",
+        "coverage:ci": "npm run coverage:clean && cross-env NODE_V8_COVERAGE=./coverage/tmp npm run test:javascript && npm run coverage:report:ci",
+        "test:busboy": "borp -p \"test/busboy/*.js\"",
+        "test:webidl": "borp -p \"test/webidl/*.js\"",
+        "test:cookies": "borp -p \"test/cookie/*.js\"",
+        "test:fuzzing": "node test/fuzzing/fuzzing.test.js",
+        "test:h2:core": "borp -p \"test/http2*.js\"",
+        "prebuild:wasm": "node build/wasm.js --prebuild",
+        "serve:website": "echo \"Error: Documentation has been moved to '/docs'\" && exit 1",
+        "test:h2:fetch": "npm run build:node && borp -p \"test/fetch/http2*.js\"",
+        "coverage:clean": "node ./scripts/clean-coverage.js",
+        "test:node-test": "borp -p \"test/node-test/**/*.js\"",
+        "test:websocket": "borp -p \"test/websocket/*.js\"",
+        "coverage:report": "cross-env NODE_V8_COVERAGE= c8 report",
+        "test:javascript": "node scripts/generate-pem && npm run test:unit && npm run test:node-fetch && npm run test:cache && npm run test:interceptors && npm run test:fetch && npm run test:cookies && npm run test:eventsource && npm run test:wpt && npm run test:websocket && npm run test:node-test && npm run test:jest",
+        "test:node-fetch": "borp -p \"test/node-fetch/**/*.js\"",
+        "test:typescript": "tsd && tsc test/imports/undici-import.ts --typeRoots ./types && tsc ./types/*.d.ts --noEmit --typeRoots ./types",
+        "test:eventsource": "npm run build:node && npm run test:eventsource:nobuild",
+        "test:interceptors": "borp -p \"test/interceptors/*.js\"",
+        "coverage:report:ci": "c8 report",
+        "test:fetch:nobuild": "borp --timeout 180000 --expose-gc --concurrency 1 -p \"test/fetch/*.js\" && npm run test:webidl && npm run test:busboy",
+        "test:tdd:node-test": "borp -p \"test/node-test/**/*.js\" -w",
+        "test:wpt:withoutintl": "node test/wpt/start-fetch.mjs && node test/wpt/start-mimesniff.mjs && node test/wpt/start-xhr.mjs && node test/wpt/start-cacheStorage.mjs && node test/wpt/start-eventsource.mjs",
+        "test:websocket:autobahn": "node test/autobahn/client.js",
+        "test:eventsource:nobuild": "borp --expose-gc -p \"test/eventsource/*.js\"",
+        "test:javascript:withoutintl": "node scripts/generate-pem && npm run test:unit && npm run test:node-fetch && npm run test:fetch:nobuild && npm run test:cache && npm run test:interceptors && npm run test:cookies && npm run test:eventsource:nobuild && npm run test:wpt:withoutintl && npm run test:node-test",
+        "test:websocket:autobahn:report": "node test/autobahn/report.js"
+      },
+      "executed": false
+    },
+    {
+      "name": "undici",
+      "version": "7.30.1",
+      "metadata_url": "https://registry.npmjs.org/undici/7.30.1",
+      "metadata_sha256": "1bdb8d9221dd4a6b72723d8c8144823b682015c31b4d3e91437d53ade3f8730c",
+      "tarball_url": "https://registry.npmjs.org/undici/-/undici-7.30.1.tgz",
+      "tarball_sha256": "c98bd3881137c11341e8be8d2ec509ebf973b6f8b36d0a4c6d2afcda15e0d712",
+      "integrity": "sha512-03KrMbjIFDWQR5RNPrSw3bd1r12JpyFQl9/yxjUbJtqkjmllqC5lFjZh6ujeuJCKr8EOQvRW872Oy/az+nLYxg==",
+      "archive_bytes": 405247,
+      "engines": {
+        "node": ">=20.18.1"
+      },
+      "peer_dependencies": {},
+      "dependencies": {},
+      "scripts": {
+        "lint": "eslint --cache",
+        "test": "npm run test:javascript && cross-env NODE_V8_COVERAGE= npm run test:typescript",
+        "bench": "echo \"Error: Benchmarks have been moved to '/benchmarks'\" && exit 1",
+        "prepare": "husky && node ./scripts/platform-shell.js",
+        "test:h2": "npm run test:h2:core && npm run test:h2:fetch",
+        "coverage": "npm run coverage:clean && cross-env NODE_V8_COVERAGE=./coverage/tmp npm run test:javascript && npm run coverage:report",
+        "lint:fix": "eslint --fix --cache",
+        "test:tdd": "borp --timeout 180000 --expose-gc -p \"test/*.js\"",
+        "test:wpt": "npm run test:wpt:setup && node test/web-platform-tests/wpt-runner.mjs run /fetch /mimesniff /xhr /websockets /serviceWorkers /eventsource",
+        "test:jest": "cross-env NODE_V8_COVERAGE= jest",
+        "test:unit": "borp --timeout 180000 --expose-gc -p \"test/*.js\"",
+        "build:node": "esbuild index-fetch.js --bundle --platform=node --outfile=undici-fetch.js --define:esbuildDetection=1 --keep-names && node scripts/strip-comments.js",
+        "build:wasm": "node build/wasm.js --docker",
+        "test:cache": "borp --timeout 180000 -p \"test/cache/*.js\"",
+        "test:fetch": "npm run build:node && borp --timeout 180000 --expose-gc --concurrency 1 -p \"test/fetch/*.js\" && npm run test:webidl && npm run test:busboy",
+        "test:infra": "borp --timeout 180000 -p \"test/infra/*.js\"",
+        "coverage:ci": "npm run coverage:clean && cross-env NODE_V8_COVERAGE=./coverage/tmp npm run test:javascript && npm run coverage:report:ci",
+        "test:busboy": "borp --timeout 180000 -p \"test/busboy/*.js\"",
+        "test:webidl": "borp --timeout 180000 -p \"test/webidl/*.js\"",
+        "generate-pem": "node scripts/generate-pem.js",
+        "test:cookies": "borp --timeout 180000 -p \"test/cookie/*.js\"",
+        "test:fuzzing": "node test/fuzzing/fuzzing.test.js",
+        "test:h2:core": "borp --timeout 180000 -p \"test/+(http2|h2)*.js\"",
+        "serve:website": "echo \"Error: Documentation has been moved to '/docs'\" && exit 1",
+        "test:h2:fetch": "npm run build:node && borp --timeout 180000 -p \"test/fetch/http2*.js\"",
+        "coverage:clean": "node ./scripts/clean-coverage.js",
+        "test:node-test": "borp --timeout 180000 -p \"test/node-test/**/*.js\"",
+        "test:websocket": "borp --timeout 180000 -p \"test/websocket/**/*.js\"",
+        "test:wpt:setup": "node test/web-platform-tests/wpt-runner.mjs setup",
+        "coverage:report": "cross-env NODE_V8_COVERAGE= c8 report",
+        "test:javascript": "npm run test:javascript:no-jest && npm run test:jest",
+        "test:node-fetch": "borp --timeout 180000 -p \"test/node-fetch/**/*.js\"",
+        "test:typescript": "tsd && tsc test/imports/undici-import.ts --typeRoots ./types --noEmit && tsc ./types/*.d.ts --noEmit --typeRoots ./types",
+        "test:cache-tests": "node test/cache-interceptor/cache-tests.mjs --ci",
+        "test:eventsource": "npm run build:node && borp --timeout 180000 --expose-gc -p \"test/eventsource/*.js\"",
+        "test:interceptors": "borp --timeout 180000 -p \"test/interceptors/*.js\"",
+        "coverage:report:ci": "c8 report",
+        "test:tdd:node-test": "borp --timeout 180000 -p \"test/node-test/**/*.js\" -w",
+        "test:cache-interceptor": "borp --timeout 180000 -p \"test/cache-interceptor/*.js\"",
+        "test:javascript:no-jest": "npm run generate-pem && npm run test:unit && npm run test:fetch && npm run test:node-fetch && npm run test:infra && npm run test:cache && npm run test:cache-interceptor && npm run test:interceptors && npm run test:cookies && npm run test:eventsource && npm run test:subresource-integrity && npm run test:wpt && npm run test:websocket && npm run test:node-test && npm run test:cache-tests",
+        "test:websocket:autobahn": "node test/autobahn/client.js",
+        "test:subresource-integrity": "borp --timeout 180000 -p \"test/subresource-integrity/*.js\"",
+        "test:javascript:without-intl": "npm run test:javascript:no-jest",
+        "test:cache-interceptor:sqlite": "cross-env NODE_OPTIONS=--experimental-sqlite npm run test:cache-interceptor",
+        "test:websocket:autobahn:report": "node test/autobahn/report.js"
+      },
+      "executed": false
+    },
+    {
+      "name": "pnpm",
+      "version": "12.4.2",
+      "metadata_url": "https://registry.npmjs.org/pnpm/12.4.2",
+      "metadata_sha256": "3385f22c75eaf4edff515ef577b19f4f2acabbaa7139ec43cc178e1843f24221",
+      "tarball_url": "https://registry.npmjs.org/pnpm/-/pnpm-12.4.2.tgz",
+      "tarball_sha256": "3bb1683c7bff8bf8a810284d8b38af46ac22e2a732fca88de299fdc6b88af814",
+      "integrity": "sha512-CK3GYTGAJ1x8ntraOdzwjJxhrU5+rzMKTzRh8QKw+QdCNFTRF/mOctR/7wYWBwZE17/8lzpqV/UJCm18NosHyQ==",
+      "archive_bytes": 991163,
+      "engines": {
+        "node": ">=18.*"
+      },
+      "peer_dependencies": {},
+      "dependencies": {},
+      "scripts": {
+        "preinstall": "node install.js",
+        "postinstall": "node install.js",
+        "bundle-node-gyp": "node scripts/bundle-node-gyp.mjs"
+      },
+      "executed": false
+    },
+    {
+      "name": "@microsoft/agents-hosting",
+      "version": "1.6.1",
+      "metadata_url": "https://registry.npmjs.org/@microsoft%2fagents-hosting/1.6.1",
+      "metadata_sha256": "793c9d7a616ce762fa83d693f7dec50324b57daade2d2039ed7a398b3f2e584d",
+      "tarball_url": "https://registry.npmjs.org/@microsoft/agents-hosting/-/agents-hosting-1.6.1.tgz",
+      "tarball_sha256": "80a5b88f3419a618255b0e05b88147a44a98bb2fadbed4bafe5711bb8eb03f89",
+      "integrity": "sha512-qOvuBNIeSrS93KuaWmAFqnjUbvpZhjy/rz9jF8fPE+1rY/Kyi3o+TtODSX5gy1moZ0/nwVwl10XhIXXRF882SQ==",
+      "archive_bytes": 364611,
+      "engines": {
+        "node": ">=20.0.0"
+      },
+      "peer_dependencies": {},
+      "dependencies": {
+        "zod": "3.25.75",
+        "jwks-rsa": "4.0.1",
+        "jsonwebtoken": "9.0.3",
+        "@azure/core-auth": "1.10.1",
+        "@azure/msal-node": "5.1.5",
+        "@microsoft/agents-activity": "1.6.1",
+        "@microsoft/agents-telemetry": "1.6.1"
+      },
+      "scripts": {},
+      "executed": false
+    },
+    {
+      "name": "@microsoft/teams.apps",
+      "version": "2.0.16",
+      "metadata_url": "https://registry.npmjs.org/@microsoft%2fteams.apps/2.0.16",
+      "metadata_sha256": "4eef82af12b31a3764420f9dd8b091a5482f763a2661a1b8899ebc00a87328db",
+      "tarball_url": "https://registry.npmjs.org/@microsoft/teams.apps/-/teams.apps-2.0.16.tgz",
+      "tarball_sha256": "4a092e691fcbfde1202f86f5d53261cc091e64a905cac265eedd77ba5b8df00f",
+      "integrity": "sha512-LwNy2MgP92ZZziGs/8f+17xttjgdzxgP2IYQCwNQ5ENoBFoQewRb53mARxeLEBhKtVfAtDG2yKHAqRuQvvltEg==",
+      "archive_bytes": 120357,
+      "engines": {
+        "node": ">=20"
+      },
+      "peer_dependencies": {},
+      "dependencies": {
+        "cors": "^2.8.5",
+        "axios": "^1.18.1",
+        "express": "^5.0.0",
+        "jwks-rsa": "^3.2.0",
+        "jsonwebtoken": "^9.0.2",
+        "@azure/msal-node": "^5.2.2",
+        "reflect-metadata": "^0.2.2",
+        "@microsoft/teams.api": "2.0.16",
+        "@microsoft/teams.graph": "2.0.16",
+        "@microsoft/teams.common": "2.0.16"
+      },
+      "scripts": {
+        "lint": "npx eslint",
+        "test": "npx jest",
+        "build": "npx tsc",
+        "clean": "npx rimraf ./dist",
+        "lint:fix": "npx eslint --fix"
+      },
+      "executed": false
+    },
+    {
+      "name": "snowflake-sdk",
+      "version": "3.3.0",
+      "metadata_url": "https://registry.npmjs.org/snowflake-sdk/3.3.0",
+      "metadata_sha256": "bcde0494da9084a7977f19dab298d823acb5613b67414e9a16ae6080e76d369a",
+      "tarball_url": "https://registry.npmjs.org/snowflake-sdk/-/snowflake-sdk-3.3.0.tgz",
+      "tarball_sha256": "03da020c9ae8e8d7499dd5531cafa9f166dac9b0829b7faedb672ea1dce9f776",
+      "integrity": "sha512-WJV5BZpYzNuReafTJuHLO5sjYFnrRvqB1T1/xW64UpRDo0GAgLbfKIVZP+S5iBQ0ick8nY9Cqbka2uowQC+JMA==",
+      "archive_bytes": 1920095,
+      "engines": {
+        "node": ">=20"
+      },
+      "peer_dependencies": {
+        "asn1.js": "^5.4.1"
+      },
+      "dependencies": {
+        "open": "^7.3.1",
+        "toml": "^3.0.0",
+        "axios": "^1.15.1",
+        "moment": "^2.29.4",
+        "asn1.js": "^5.0.0",
+        "winston": "^3.1.0",
+        "mime-types": "^2.1.29",
+        "big-integer": "^1.6.43",
+        "bignumber.js": "^9.1.2",
+        "expand-tilde": "^2.0.2",
+        "generic-pool": "^3.8.2",
+        "jsonwebtoken": "^9.0.3",
+        "oauth4webapi": "^3.0.1",
+        "@azure/identity": "^4.10.1",
+        "asn1.js-rfc2560": "^5.0.0",
+        "asn1.js-rfc5280": "^3.0.0",
+        "fast-xml-parser": "^5.4.1",
+        "moment-timezone": "^0.5.15",
+        "@techteamer/ocsp": "1.0.1",
+        "simple-lru-cache": "^0.0.2",
+        "https-proxy-agent": "^7.0.2",
+        "@aws-sdk/client-s3": "^3.1051.0",
+        "@aws-sdk/client-sts": "^3.1051.0",
+        "@azure/storage-blob": "12.26.x",
+        "fastest-levenshtein": "^1.0.16",
+        "google-auth-library": "^10.1.0",
+        "@smithy/signature-v4": "^5.3.8",
+        "@aws-crypto/sha256-js": "^5.2.0",
+        "@smithy/protocol-http": "^5.3.8",
+        "@smithy/node-http-handler": "^4.4.9",
+        "@aws-sdk/ec2-metadata-service": "^3.1051.0",
+        "@aws-sdk/credential-provider-node": "^3.972.43"
+      },
+      "scripts": {
+        "test": "mocha 'test/unit/**/*.{js,ts}'",
+        "prepack": "node ci/build_typescript.js",
+        "prepare": "husky",
+        "test:ci": "mocha 'test/{unit,integration}/**/*.{js,ts}'",
+        "check-ts": "npm run prepack && tsc --noEmit dist/index.d.ts",
+        "lint:fix": "oxlint --fix .",
+        "wiremock": "npm run serve-wiremock",
+        "test:unit": "mocha 'test/unit/**/*.{js,ts}'",
+        "lint:check": "oxlint .",
+        "test:manual": "mocha test/integration/testManualConnection.js",
+        "test:single": "mocha",
+        "minicore:build": "node ci/build_minicore.js",
+        "prettier:check": "prettier --check .",
+        "serve-wiremock": "wiremock --enable-browser-proxying --proxy-pass-through  false --port 8081",
+        "prettier:format": "prettier -w .",
+        "test:ci:coverage": "nyc npm run test:ci",
+        "test:integration": "mocha 'test/integration/**/*.{js,ts}'",
+        "test:unit:coverage": "nyc npm run test:unit",
+        "test:authentication": "mocha 'test/authentication/**/*.{js,ts}'",
+        "test:auth-workload-identity-e2e": "mocha test/auth-workload-identity-e2e.ts"
+      },
+      "executed": false
+    },
+    {
+      "name": "toml",
+      "version": "4.2.0",
+      "metadata_url": "https://registry.npmjs.org/toml/4.2.0",
+      "metadata_sha256": "ea8240d82d4942e1c4be54dbbf89784fc4e895d5b0f94459e7a56ed2b602893d",
+      "tarball_url": "https://registry.npmjs.org/toml/-/toml-4.2.0.tgz",
+      "tarball_sha256": "4b8e61c24936a1d20b048bdf1fc73fb11794b1df4e8eb9634cd57a9dbf4d4eb5",
+      "integrity": "sha512-TvAJjbHZlYmI323+srtqHQFyJsoWy6mI09ppkuj9+iRsqsVKG9fvTcOP7FHF2UCb0QSYtjEavffrKzdd0XgClg==",
+      "archive_bytes": 16874,
+      "engines": {
+        "node": ">=20"
+      },
+      "peer_dependencies": {},
+      "dependencies": {},
+      "scripts": {
+        "test": "node --test test/test_toml.js",
+        "build": "peggy -o lib/parser.js src/toml.pegjs",
+        "test:all": "node --test test/test_toml.js && node test/spec-test.js",
+        "test:spec": "node test/spec-test.js",
+        "prepublishOnly": "npm run build",
+        "test:spec:fresh": "node scripts/test-spec-fresh.js",
+        "test:spec:failures": "node test/spec-test.js --failures"
+      },
+      "executed": false
+    }
+  ],
+  "lock_reverse_edges": [
+    {
+      "parent": "@actions/github@6.0.1",
+      "dependency": "undici",
+      "version": "6.29.0"
+    },
+    {
+      "parent": "@actions/http-client@2.2.3",
+      "dependency": "undici",
+      "version": "6.29.0"
+    },
+    {
+      "parent": "@ai-sdk/provider-utils@5.0.41(zod@3.25.76)",
+      "dependency": "undici",
+      "version": "7.29.1"
+    },
+    {
+      "parent": "@ai-sdk/provider-utils@5.0.67(zod@3.25.76)",
+      "dependency": "undici",
+      "version": "7.29.1"
+    },
+    {
+      "parent": "@azure/identity@4.13.0(supports-color@8.1.1)",
+      "dependency": "@azure/msal-node",
+      "version": "3.8.4"
+    },
+    {
+      "parent": "@chat-adapter/teams@4.37.0(patch_hash=af5fb1d38a2af55399bd8b6934e77348a9b061fec6177c101dd9d7a787ae8a6c)(ai@7.0.150(zod@3.25.76))(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)(zod@3.25.76)",
+      "dependency": "@microsoft/teams.apps",
+      "version": "2.0.16(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)"
+    },
+    {
+      "parent": "@discordjs/rest@2.6.3",
+      "dependency": "undici",
+      "version": "6.29.0"
+    },
+    {
+      "parent": "@google/genai@1.19.0(@modelcontextprotocol/sdk@1.31.0(supports-color@8.1.1)(zod@3.25.76))(bufferutil@4.0.9)(supports-color@8.1.1)(utf-8-validate@5.0.10)",
+      "dependency": "@modelcontextprotocol/sdk",
+      "version": "1.31.0(supports-color@8.1.1)(zod@3.25.76)"
+    },
+    {
+      "parent": "@intlify/core-base@11.4.5",
+      "dependency": "@intlify/devtools-types",
+      "version": "11.4.5"
+    },
+    {
+      "parent": "@intlify/core-base@11.4.5",
+      "dependency": "@intlify/message-compiler",
+      "version": "11.4.5"
+    },
+    {
+      "parent": "@intlify/core-base@11.4.5",
+      "dependency": "@intlify/shared",
+      "version": "11.4.5"
+    },
+    {
+      "parent": "@intlify/devtools-types@11.4.5",
+      "dependency": "@intlify/core-base",
+      "version": "11.4.5"
+    },
+    {
+      "parent": "@intlify/devtools-types@11.4.5",
+      "dependency": "@intlify/shared",
+      "version": "11.4.5"
+    },
+    {
+      "parent": "@intlify/message-compiler@11.4.5",
+      "dependency": "@intlify/shared",
+      "version": "11.4.5"
+    },
+    {
+      "parent": "@microsoft/agents-a365-runtime@1.0.0(@opentelemetry/api-logs@0.221.0)(@opentelemetry/api@1.9.1)(supports-color@8.1.1)",
+      "dependency": "@microsoft/agents-hosting",
+      "version": "1.6.1(@opentelemetry/api-logs@0.221.0)(@opentelemetry/api@1.9.1)(supports-color@8.1.1)"
+    },
+    {
+      "parent": "@microsoft/agents-a365-tooling@1.0.0(@opentelemetry/api-logs@0.221.0)(@opentelemetry/api@1.9.1)(supports-color@8.1.1)(zod@3.25.76)",
+      "dependency": "@microsoft/agents-hosting",
+      "version": "1.6.1(@opentelemetry/api-logs@0.221.0)(@opentelemetry/api@1.9.1)(supports-color@8.1.1)"
+    },
+    {
+      "parent": "@microsoft/agents-a365-tooling@1.0.0(@opentelemetry/api-logs@0.221.0)(@opentelemetry/api@1.9.1)(supports-color@8.1.1)(zod@3.25.76)",
+      "dependency": "@modelcontextprotocol/sdk",
+      "version": "1.31.0(supports-color@8.1.1)(zod@3.25.76)"
+    },
+    {
+      "parent": "@microsoft/agents-hosting@1.6.1(@opentelemetry/api-logs@0.221.0)(@opentelemetry/api@1.9.1)(supports-color@8.1.1)",
+      "dependency": "@azure/msal-node",
+      "version": "5.1.5"
+    },
+    {
+      "parent": "@microsoft/teams.apps@2.0.16(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)",
+      "dependency": "@azure/msal-node",
+      "version": "5.6.0"
+    },
+    {
+      "parent": "@modelcontextprotocol/ext-apps@1.3.2(@modelcontextprotocol/sdk@1.31.0(supports-color@8.1.1)(zod@3.25.76))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(zod@3.25.76)",
+      "dependency": "@modelcontextprotocol/sdk",
+      "version": "1.31.0(supports-color@8.1.1)(zod@3.25.76)"
+    },
+    {
+      "parent": "@n8n_io/license-sdk@3.3.0",
+      "dependency": "undici",
+      "version": "7.29.1"
+    },
+    {
+      "parent": "@qdrant/js-client-rest@1.19.0(@typescript/typescript6@6.0.2)",
+      "dependency": "undici",
+      "version": "7.29.1"
+    },
+    {
+      "parent": "@qdrant/js-client-rest@1.19.0(typescript@7.0.2)",
+      "dependency": "undici",
+      "version": "7.29.1"
+    },
+    {
+      "parent": "@redocly/respect-core@1.34.21(ajv@8.20.0)(supports-color@8.1.1)",
+      "dependency": "undici",
+      "version": "6.29.0"
+    },
+    {
+      "parent": "@types/markdown-it-emoji@2.0.5",
+      "dependency": "@types/markdown-it",
+      "version": "13.0.9"
+    },
+    {
+      "parent": "@types/markdown-it-link-attributes@3.0.5",
+      "dependency": "@types/markdown-it",
+      "version": "13.0.9"
+    },
+    {
+      "parent": "axios@1.20.0(debug@4.3.4(supports-color@8.1.1))(supports-color@8.1.1)",
+      "dependency": "follow-redirects",
+      "version": "1.16.1(debug@4.3.4(supports-color@8.1.1))"
+    },
+    {
+      "parent": "axios@1.20.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)",
+      "dependency": "follow-redirects",
+      "version": "1.16.1(debug@4.4.3(supports-color@8.1.1))"
+    },
+    {
+      "parent": "cheerio@1.1.0",
+      "dependency": "undici",
+      "version": "7.29.1"
+    },
+    {
+      "parent": "discord.js@14.27.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)",
+      "dependency": "undici",
+      "version": "6.29.0"
+    },
+    {
+      "parent": "express@5.1.0(supports-color@8.1.1)",
+      "dependency": "body-parser",
+      "version": "2.3.0(supports-color@8.1.1)"
+    },
+    {
+      "parent": "express@5.2.1(supports-color@8.1.1)",
+      "dependency": "body-parser",
+      "version": "2.3.0(supports-color@8.1.1)"
+    },
+    {
+      "parent": "http-proxy@1.18.1(debug@4.4.3(supports-color@8.1.1))",
+      "dependency": "follow-redirects",
+      "version": "1.16.1(debug@4.4.3(supports-color@8.1.1))"
+    },
+    {
+      "parent": "snowflake-sdk@3.3.0(asn1.js@5.4.1)(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)",
+      "dependency": "toml",
+      "version": "4.2.0"
+    },
+    {
+      "parent": "testcontainers@11.13.0(supports-color@8.1.1)",
+      "dependency": "undici",
+      "version": "7.29.1"
+    },
+    {
+      "parent": "vue-i18n@11.4.5(vue@3.5.26(typescript@6.0.2))",
+      "dependency": "@intlify/core-base",
+      "version": "11.4.5"
+    },
+    {
+      "parent": "vue-i18n@11.4.5(vue@3.5.26(typescript@6.0.2))",
+      "dependency": "@intlify/devtools-types",
+      "version": "11.4.5"
+    },
+    {
+      "parent": "vue-i18n@11.4.5(vue@3.5.26(typescript@6.0.2))",
+      "dependency": "@intlify/shared",
+      "version": "11.4.5"
+    },
+    {
+      "parent": "vue-markdown-render@2.2.1(vue@3.5.26(typescript@6.0.2))",
+      "dependency": "markdown-it",
+      "version": "13.0.2"
+    }
+  ],
+  "python_candidates": [
+    {
+      "name": "pip",
+      "version": "26.2.2",
+      "metadata_url": "https://pypi.org/pypi/pip/26.2.2/json",
+      "metadata_sha256": "d0b07879e414dc3347bf20a492a9e8a15cfb1962e3cae3843b93453d9940f5f9",
+      "filename": "pip-26.2.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl",
+      "sha256": "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70",
+      "bytes": 1819850,
+      "requires_python": ">=3.10",
+      "executed": false,
+      "vendor_txt_sha256": "2b44b4bc5b7da9dcda38099dc92c52cc3dda2a714cd189b439c0668401418630",
+      "vendored": {
+        "CacheControl": "0.14.4",
+        "distlib": "0.4.2",
+        "distro": "1.9.0",
+        "msgpack": "1.1.2",
+        "packaging": "26.2",
+        "platformdirs": "4.10.0",
+        "pyproject-hooks": "1.2.0",
+        "requests": "2.34.2",
+        "certifi": "2026.10.19",
+        "idna": "3.18",
+        "urllib3": "2.7.0",
+        "rich": "14.2.0",
+        "pygments": "2.20.0",
+        "resolvelib": "1.2.1",
+        "setuptools": "70.3.0",
+        "tomli": "2.4.1",
+        "tomli-w": "1.2.0",
+        "truststore": "0.10.4"
+      }
+    },
+    {
+      "name": "pip",
+      "version": "26.3",
+      "metadata_url": "https://pypi.org/pypi/pip/26.3/json",
+      "metadata_sha256": "9cee103938ec9d9fb6201ecd0eb8a51b1893e01358f75c162d7c7cf6a9d8fa20",
+      "filename": "pip-26.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/07/25/ee8c38ae72d66b844ce8eb9711ba905dba21ca1a8a0c960057c41cd23337/pip-26.3-py3-none-any.whl",
+      "sha256": "f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13",
+      "bytes": 1950951,
+      "requires_python": ">=3.10",
+      "executed": false,
+      "vendor_txt_sha256": "11885a895536bbc3dbf956f493d775fab0ba0bcde182b8d2549f2cbd2ed9fd76",
+      "vendored": {
+        "CacheControl": "0.14.4",
+        "distlib": "0.4.4",
+        "distro": "1.9.0",
+        "msgpack": "1.2.4",
+        "packaging": "26.3",
+        "platformdirs": "4.12.4",
+        "pyproject-hooks": "1.3.3",
+        "requests": "2.34.2",
+        "certifi": "2026.10.23",
+        "idna": "3.20",
+        "urllib3": "2.8.0",
+        "rich": "15.0.0",
+        "pygments": "2.21.0",
+        "resolvelib": "1.2.1",
+        "setuptools": "70.3.0",
+        "tomli": "2.3.2",
+        "tomli-w": "1.2.0",
+        "truststore": "0.10.5"
+      }
+    },
+    {
+      "name": "urllib3",
+      "version": "2.8.0",
+      "metadata_url": "https://pypi.org/pypi/urllib3/2.8.0/json",
+      "metadata_sha256": "5315e7401db3cacccd0c2ce5daf81f752a9cc3614b18c37f2b79930b7159ce2f",
+      "filename": "urllib3-2.8.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl",
+      "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+      "bytes": 135717,
+      "requires_python": ">=3.10",
+      "executed": false
+    },
+    {
+      "name": "msgpack",
+      "version": "1.2.3",
+      "metadata_url": "https://pypi.org/pypi/msgpack/1.2.3/json",
+      "metadata_sha256": "f5ee786a4e5e8af2692c26c9e95d5cfc5970141c219cec9db2b96c96f791c1ba",
+      "filename": "msgpack-1.2.3-cp313-cp313-musllinux_1_2_x86_64.whl",
+      "url": "https://files.pythonhosted.org/packages/36/00/5bb3a239ccfc3763c4d0fa49b13b1b7010b00182c499ab3c1fecfe6294bc/msgpack-1.2.3-cp313-cp313-musllinux_1_2_x86_64.whl",
+      "sha256": "f9ddd28d3e9bbc602a9dced1591882c7fb9ab776eef8837da2c326fde19e2853",
+      "bytes": 463288,
+      "requires_python": ">=3.10",
+      "executed": false
+    },
+    {
+      "name": "setuptools",
+      "version": "84.2.1",
+      "metadata_url": "https://pypi.org/pypi/setuptools/84.2.1/json",
+      "metadata_sha256": "d75de8ba0d3304a3d74484fb9f340edb87ef02712da4fa02a2ed92e71b0572dd",
+      "filename": "setuptools-84.2.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ef/55/6dc6d6bb953bdfc52519a0059592c52b6e3b8ad51cf8256dffceb55b0610/setuptools-84.2.1-py3-none-any.whl",
+      "sha256": "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2",
+      "bytes": 876263,
+      "requires_python": ">=3.10",
+      "executed": false
+    }
+  ],
+  "python_runner_runtime_locked": [
+    {
+      "name": "certifi",
+      "version": "2026.10.23"
+    },
+    {
+      "name": "sentry-sdk",
+      "version": "2.35.2"
+    },
+    {
+      "name": "task-runner-python",
+      "version": "0.1.0"
+    },
+    {
+      "name": "urllib3",
+      "version": "2.7.0"
+    },
+    {
+      "name": "websockets",
+      "version": "15.0.1"
+    }
+  ],
+  "launcher_source": {
+    "version": "1.5.1",
+    "commit": "871cb76bc35c990f368eaa788f0b4ce7b145e143",
+    "url": "https://codeload.github.com/n8n-io/task-runner-launcher/tar.gz/871cb76bc35c990f368eaa788f0b4ce7b145e143",
+    "sha256": "f858cda1a8b30ffb91d2ed7b7c89ac2e1ac063319872e907085b976192301e05",
+    "bytes": 41992,
+    "files": [
+      {
+        "path": "go.mod",
+        "sha256": "fa59dc695b21450352fc836b3893f33aa98136e99c82c4362b3f181a46646bf2",
+        "bytes": 471,
+        "url": "https://raw.githubusercontent.com/n8n-io/task-runner-launcher/871cb76bc35c990f368eaa788f0b4ce7b145e143/go.mod"
+      },
+      {
+        "path": "go.sum",
+        "sha256": "59aa58cea4c817e8702d0405dedc9f976fc79c0cf8a9e906d68347089cfc58b8",
+        "bytes": 3244,
+        "url": "https://raw.githubusercontent.com/n8n-io/task-runner-launcher/871cb76bc35c990f368eaa788f0b4ce7b145e143/go.sum"
+      },
+      {
+        "path": "Makefile",
+        "sha256": "7d277a92efee9d151fc8d277d4d1251c5b4cb26e03ad80c183afe0e5449d970c",
+        "bytes": 719,
+        "url": "https://raw.githubusercontent.com/n8n-io/task-runner-launcher/871cb76bc35c990f368eaa788f0b4ce7b145e143/Makefile"
+      },
+      {
+        "path": "cmd/launcher/main.go",
+        "sha256": "d4869e18b44f27d309c19e911dd7a2f3f7cfba81389347a994c1568f7feb6b8f",
+        "bytes": 1682,
+        "url": "https://raw.githubusercontent.com/n8n-io/task-runner-launcher/871cb76bc35c990f368eaa788f0b4ce7b145e143/cmd/launcher/main.go"
+      }
+    ],
+    "update_go_directive": "1.27.3",
+    "update_x_text": "v0.41.0",
+    "x_text_mod_sha256": "d9ed44f15d8656abad2642d0052ce966b8135f00c8f80c469d9e6940b49d5e0c",
+    "x_text_sumdb_response": "59512222\ngolang.org/x/text v0.41.0 h1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\ngolang.org/x/text v0.41.0/go.mod h1:jvf1O8ajNzZqhSrQBPbutR/EB83Cc0CFrezNQIwbb5M=\n\ngo.sum database tree\n70884239\nY1q6UiA/CCn9G6ounJ6alzLqAsEbAVxaqMzpDU5VSqs=\n\n— sum.golang.org Az3grmVygfYNz/jSABkDCiAJzkwa4ZNG1mI2+Y7OFIdgXKbzVbz/Gakcovo42aUp4NiOWKb226xSX714AEaCQiOe0wQ=\n",
+    "sdk": {
+      "filename": "go1.27.3.linux-amd64.tar.gz",
+      "url": "https://go.dev/dl/go1.27.3.linux-amd64.tar.gz",
+      "sha256": "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40",
+      "bytes": 70588678
+    },
+    "buildvcs": false,
+    "GOVCS": "*:off",
+    "GOTOOLCHAIN": "local",
+    "GOPROXY": "off",
+    "module_vendor_pending": true
+  },
+  "alpine_candidates": [
+    {
+      "name": "brotli-libs",
+      "version": "1.2.1-r0",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/brotli-libs-1.2.1-r0.apk",
+      "sha256": "62a7e37e43bbfc1f8525a00ad2125fd5897135dc93b849733884cb78ffd8e26c",
+      "bytes": 429435,
+      "apkindex_checksum": "Q19ILQ4/bsNv1JEDWEcsa0i+Y4hYQ=",
+      "signature_verification_pending": true,
+      "executed": false
+    },
+    {
+      "name": "libcurl",
+      "version": "8.23.0-r0",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libcurl-8.23.0-r0.apk",
+      "sha256": "1f70ca404818805a6465b615bbfe84ef861488a963d7e630108ebd7fbaa51665",
+      "bytes": 364567,
+      "apkindex_checksum": "Q1etqr/7fR+stc096aUitDvGM3O9Q=",
+      "signature_verification_pending": true,
+      "executed": false
+    },
+    {
+      "name": "libexpat",
+      "version": "2.10.0-r0",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libexpat-2.10.0-r0.apk",
+      "sha256": "e7e7408ea787ed06d00159b0ff1f9b65a63cf634f36d9e0fa7512ce2c489a503",
+      "bytes": 63634,
+      "apkindex_checksum": "Q1sJ3mbRK300qoX/3bSQgNsvVLmDY=",
+      "signature_verification_pending": true,
+      "executed": false
+    }
+  ],
+  "alpine_index_derived": {
+    "path": ".tools/cache/phase4-sources/alpine3.24-package-records.json",
+    "sha256": "40375ac07b6edd05a0367d12528949ab52dd3250b7d68d5bc4f2c2e47921651b",
+    "upstream_index": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/APKINDEX.tar.gz"
+  },
+  "compatibility_tests_executed": false,
+  "required_acceptance": [
+    "lock_pnpm_regenerado_y_congelado_con_integridad",
+    "lock_uv_y_ruedas_musl_regenerados_y_fijados",
+    "API_Microsoft_Agents_y_Teams_con_transporte_simulado",
+    "configuraciones_Snowflake_TOML_tipicas_y_limites_enteros",
+    "UI_recompilada_Markdown_plugins_i18n_y_pruebas_browser",
+    "launcher_con_broker_falso_ciclo_de_vida_y_cierre_de_hijos",
+    "auditoria_procesos_indirectos_sin_Git",
+    "SCA_grafos_build_y_runtime_separados_y_ficheros_imagen_completa",
+    "Trivy_HIGH_CRITICAL_cero_sin_ignorar_hallazgos",
+    "fuentes_y_artefactos_SHA_respaldados_antes_de_uso"
+  ],
+  "license": {
+    "use": "orquestación interna propia",
+    "public_n8n_saas_allowed": false,
+    "preserve_notices": true,
+    "modified_notice_required": true,
+    "source": "https://raw.githubusercontent.com/n8n-io/n8n/bb72d756104542adb549b6966a57e21459bd52a2/LICENSE.md"
+  },
+  "inventory_validation": {
+    "report_rows_exact": 54,
+    "source_file_hashes_verified": 25,
+    "npm_archives_integrity_verified": 21,
+    "positive_case": true,
+    "negative_cases_rejected": [
+      "fila_ausente",
+      "fila_duplicada",
+      "origen_modificado",
+      "version_sin_artefacto",
+      "SHA_fuente_alterado",
+      "build_indebidamente_habilitado"
+    ],
+    "runtime_compatibility_executed": false,
+    "build_executed": false
+  }
+}

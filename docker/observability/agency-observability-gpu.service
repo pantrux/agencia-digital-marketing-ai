@@ -1,0 +1,30 @@
+[Unit]
+Description=Colector de métricas del puente GPU de la agencia
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+ExecStartPre=/usr/local/lib/agency-observability-gpu/otelcol validate --config=/usr/local/lib/agency-observability-gpu/collector.yml
+ExecStart=/usr/local/lib/agency-observability-gpu/otelcol --config=/usr/local/lib/agency-observability-gpu/collector.yml
+LoadCredential=gpu-token:/opt/media-platform/observability-gpu-v1/gpu-token
+LoadCredential=nas-ca:/opt/media-platform/observability-nas-v1/collector-tls/server-ca.pem
+LoadCredential=nas-client:/opt/media-platform/observability-nas-v1/collector-tls/client.pem
+LoadCredential=nas-key:/opt/media-platform/observability-nas-v1/collector-tls/client.key
+Restart=on-failure
+RestartSec=10s
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=any
+IPAddressAllow=192.168.0.6/32 192.168.0.8/32
+MemoryMax=128M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

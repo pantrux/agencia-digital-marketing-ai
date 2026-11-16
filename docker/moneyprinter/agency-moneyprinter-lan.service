@@ -1,0 +1,24 @@
+[Unit]
+Description=MoneyPrinterTurbo de la agencia en la LAN
+Wants=network-online.target
+Requires=docker.service
+After=network-online.target docker.service nftables.service netfilter-persistent.service agency-observability-nas.service
+PartOf=docker.service
+RequiresMountsFor=/mnt/producciones
+StartLimitIntervalSec=180
+StartLimitBurst=3
+
+[Service]
+Type=exec
+Environment=DOCKER_HOST=unix:///var/run/docker.sock
+Environment=DOCKER_CONFIG=/opt/media-platform/moneyprinter-lan-v1/docker-client
+ExecStartPre=/usr/bin/python3 -I -S -B /opt/media-platform/moneyprinter-lan-v1/lan_guard.py
+ExecStart=/usr/bin/docker compose --ansi never --env-file /opt/media-platform/moneyprinter-lan-v1/compose.env --file /opt/media-platform/moneyprinter-lan-v1/compose.yml up --no-recreate --no-build --pull never --abort-on-container-exit api ui
+ExecStop=/usr/bin/docker compose --ansi never --env-file /opt/media-platform/moneyprinter-lan-v1/compose.env --file /opt/media-platform/moneyprinter-lan-v1/compose.yml stop --timeout 15 api ui
+Restart=always
+RestartSec=5s
+TimeoutStartSec=60s
+TimeoutStopSec=40s
+
+[Install]
+WantedBy=multi-user.target

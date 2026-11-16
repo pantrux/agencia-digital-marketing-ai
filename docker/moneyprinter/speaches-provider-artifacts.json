@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "owner": "agencia-digital-marketing-ai:moneyprinter-speaches-overlay:v1",
+  "repository": "harry0703/MoneyPrinterTurbo",
+  "commit": "6992380c5e82f07f3e1fc46b90927b6f1c655407",
+  "upstream": {
+    "app/services/subtitle.py": {
+      "cache_path": ".tools/evidence/moneyprinter-upstream-subtitle-699.py",
+      "sha256": "6567613fb3fe5f360861f9a2505e894980b8026014d2e5c07142abc6ddeb709b",
+      "blob": "5bb48b67b959b3f25a899629b67b29f651b18ec9",
+      "url": "https://github.com/harry0703/MoneyPrinterTurbo/blob/6992380c5e82f07f3e1fc46b90927b6f1c655407/app/services/subtitle.py"
+    },
+    "config.example.toml": {
+      "cache_path": ".tools/evidence/moneyprinter-upstream-config-699.toml",
+      "sha256": "aa46dc6d77edce071977fe0d9802171e78089acd99994106d565a7335bd3faf6",
+      "blob": "925a00d3b4f345884e953be37047bd8a486c88af",
+      "url": "https://github.com/harry0703/MoneyPrinterTurbo/blob/6992380c5e82f07f3e1fc46b90927b6f1c655407/config.example.toml"
+    },
+    "requirements.txt": {
+      "cache_path": ".tools/evidence/moneyprinter-upstream-requirements-699.txt",
+      "sha256": "bd838cac4ec8f442327ea2db8af6927edc0753306a72d952cd5054b47973a15a",
+      "blob": "ae2175da15d3aa6689bd6ecfdf040cf412cc3f4a",
+      "url": "https://github.com/harry0703/MoneyPrinterTurbo/blob/6992380c5e82f07f3e1fc46b90927b6f1c655407/requirements.txt"
+    },
+    "LICENSE": {
+      "cache_path": ".tools/evidence/moneyprinter-upstream-license-699.txt",
+      "sha256": "87dd19b6a0779e14a91c1b06423ef251df37e89666160c031130a26bae68c229",
+      "blob": "3b409c921f64304a971ca0a0e595c5bb459ac903",
+      "url": "https://github.com/harry0703/MoneyPrinterTurbo/blob/6992380c5e82f07f3e1fc46b90927b6f1c655407/LICENSE"
+    },
+    "app/services/task.py": {
+      "cache_path": ".tools/evidence/moneyprinter-upstream-task-699.py",
+      "sha256": "daa859e689e41dd3098842e1d4161b07cb018d765395ec637a991dafa512387c",
+      "blob": "aa6a775403a27dd528007d95b124f146b860938d",
+      "url": "https://github.com/harry0703/MoneyPrinterTurbo/blob/6992380c5e82f07f3e1fc46b90927b6f1c655407/app/services/task.py"
+    },
+    "app/utils/subtitle_writer.py": {
+      "cache_path": ".tools/evidence/moneyprinter-upstream-subtitle-writer-699.py",
+      "sha256": "b5c845ac19ed7d284a757b0c211bfe2a588fdc2f6a5f7d23e8bb19144b87b82f",
+      "blob": "4f158bd3f0cdb3b11fbc9071ab140376d783eddd",
+      "url": "https://github.com/harry0703/MoneyPrinterTurbo/blob/6992380c5e82f07f3e1fc46b90927b6f1c655407/app/utils/subtitle_writer.py"
+    },
+    "app/models/const.py": {
+      "cache_path": ".tools/evidence/moneyprinter-upstream-const-699.py",
+      "sha256": "0d084175f7554ab65df5355b893d2da915b4af3fbbb9c05ab7f95418bf4a4ca2",
+      "blob": "cbeaa9d4d45470d1dc17b56a299e1ecf9766fdae",
+      "url": "https://github.com/harry0703/MoneyPrinterTurbo/blob/6992380c5e82f07f3e1fc46b90927b6f1c655407/app/models/const.py"
+    },
+    "webui/Main.py": {
+      "cache_path": ".tools/evidence/moneyprinter-upstream-ui-699.py",
+      "sha256": "5a01addd8c0d9b753d34bf4dd1c0cacc91d67b8be038731ac04ecda1b252888b",
+      "blob": "c61c44aff8b1bc0931a4f3f1ebd40a80a2656a31",
+      "url": "https://github.com/harry0703/MoneyPrinterTurbo/blob/6992380c5e82f07f3e1fc46b90927b6f1c655407/webui/Main.py"
+    }
+  },
+  "shared_mit": {
+    "speaches_client.py": {
+      "path": "docker/supoclip/speaches_client.py",
+      "sha256": "f5421409c749c65768b3f8364ee41896a803f9f36b21e5dc793809b3dc5295c5"
+    },
+    "speaches_contract.py": {
+      "path": "docker/supoclip/speaches_contract.py",
+      "sha256": "f3c6aaee4efbac0fbf65f983ae64cb0f8f4a86415d94bfde5e690c0a79dc7e02"
+    }
+  },
+  "provider_sha256": "4053c26cf06765d0262cec4f51cd61645629c28af4c13a38214e31154b37c3d7",
+  "root_proof_sha256": "1f55d947e4a76eaddf60a49a7e7b467bfb83d3ab27dff0406fb174e0ecff2289",
+  "license": {
+    "upstream": "MIT",
+    "copyright": "Copyright (c) 2024 Harry",
+    "upstream_license_sha256": "87dd19b6a0779e14a91c1b06423ef251df37e89666160c031130a26bae68c229",
+    "new_adapter": "MIT",
+    "shared_modules": "MIT propios; sin fixtures AGPL"
+  },
+  "transport": {
+    "host": "192.168.0.6",
+    "port": 8000,
+    "path": "/v1/audio/transcriptions",
+    "model": "Systran/faster-whisper-small",
+    "audio_limit_bytes": 25165824,
+    "multipart_limit_bytes": 26214400,
+    "response_limit_bytes": 2097152,
+    "total_seconds": 300,
+    "idle_seconds": 15,
+    "first_byte_seconds": 45,
+    "secret_config_key": "app.subtitle_speaches_token_file",
+    "secret_value_included": false,
+    "proxy_redirect_retry_or_fallback": false
+  },
+  "behavior": {
+    "providers": [
+      "speaches",
+      "edge"
+    ],
+    "unknown_provider": "fail",
+    "silence": "sentinel silence sin publicar SRT",
+    "word_text": "conservado; no subtitle.correct",
+    "local_model_imports_removed": true,
+    "ui_labels": [
+      "Transcribir el audio",
+      "Usar tiempos de la voz generada"
+    ]
+  },
+  "scope": {
+    "overlay_applied": false,
+    "sdk_executed": false,
+    "application_executed": false,
+    "python_cpu_graph_complete": false,
+    "runtime_verified": false,
+    "chunking_or_90_minutes_supported": false
+  },
+  "permission_verifier_sha256": "ae1c6d5e2fbd4550c78d7ea5857b4b4b203a92e2739f9334c831730a1b8cec3b"
+}

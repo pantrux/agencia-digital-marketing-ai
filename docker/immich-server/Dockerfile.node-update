@@ -1,0 +1,10 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+ENV NODE_VERSION=24.22.3
+USER 0:0
+RUN --network=none \
+    --mount=type=bind,source=payload,target=/immich-node,ro \
+    ["/bin/bash", "/immich-node/install.sh"]
+
+USER 1000:1000

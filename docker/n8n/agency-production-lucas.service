@@ -1,0 +1,22 @@
+[Unit]
+Description=Render de Lucas en el puente GPU para el piloto
+After=agency-production-valeria.service
+RequiresMountsFor=/mnt/producciones
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-lucas
+StateDirectoryMode=0700
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+LoadCredential=gpu:/etc/agency-production-handoff/gpu-render-token
+LoadCredential=dispatch:/etc/agency-production-handoff/dispatch-token
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_lucas.py %d/profile %d/gpu /var/lib/agency-production-lucas --dispatch %d/dispatch
+TimeoutStartSec=42min
+ProtectSystem=full
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

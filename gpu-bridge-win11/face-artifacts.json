@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "model_id": "agency_yunet_auraface_v1",
+  "cache_relative": "face/agency_yunet_auraface_v1",
+  "embedding_dimensions": 512,
+  "models": {
+    "detection": {
+      "name": "YuNet2023mar",
+      "publisher": "OpenCV",
+      "revision": "d4938dfc9d4ec5d098bfa33e98b3f3345a236586",
+      "license": "MIT",
+      "weight_path": "detection.onnx",
+      "input_name": "input",
+      "input_shape": [
+        1,
+        3,
+        640,
+        640
+      ],
+      "layout": "NCHW BGR float32",
+      "normalization": "0..255; sin normalización externa",
+      "output_names": [
+        "cls_8",
+        "cls_16",
+        "cls_32",
+        "obj_8",
+        "obj_16",
+        "obj_32",
+        "bbox_8",
+        "bbox_16",
+        "bbox_32",
+        "kps_8",
+        "kps_16",
+        "kps_32"
+      ],
+      "primary_license": "https://github.com/opencv/opencv_zoo/blob/main/models/face_detection_yunet/LICENSE",
+      "license_scope": "El README primario declara MIT para todos los archivos del directorio, incluidos pesos."
+    },
+    "recognition": {
+      "name": "AuraFace-v1 glintr100",
+      "publisher": "fal",
+      "revision": "af6d057c9b0ec4071d4c49c80e3539258798b609",
+      "license": "Apache-2.0",
+      "weight_path": "recognition.onnx",
+      "input_name": "data",
+      "input_shape": [
+        "None",
+        3,
+        112,
+        112
+      ],
+      "output_name": "1333",
+      "output_shape": [
+        1,
+        512
+      ],
+      "layout": "NCHW RGB float32",
+      "normalization": "(pixel-127.5)/127.5 tras alineación ArcFace de cinco puntos; L2 del embedding en CPU",
+      "primary_license": "https://huggingface.co/fal/AuraFace-v1/blob/af6d057c9b0ec4071d4c49c80e3539258798b609/LICENSE.md",
+      "license_scope": "Licencia Apache-2.0 publicada para AuraFace; la tarjeta declara entrenamiento apto comercial. Sólo se acepta glintr100.onnx, no el resto del paquete."
+    }
+  },
+  "artifacts": [
+    {
+      "path": "detection.onnx",
+      "role": "weights",
+      "model": "detection",
+      "url": "https://huggingface.co/opencv/opencv_zoo/resolve/d4938dfc9d4ec5d098bfa33e98b3f3345a236586/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+      "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+      "size": 232589
+    },
+    {
+      "path": "recognition.onnx",
+      "role": "weights",
+      "model": "recognition",
+      "url": "https://huggingface.co/fal/AuraFace-v1/resolve/af6d057c9b0ec4071d4c49c80e3539258798b609/glintr100.onnx",
+      "sha256": "a7933ea5330113b01c9b60351d8f4c33003f145d8470ac5f0e52ee2effe25c60",
+      "size": 260694151
+    },
+    {
+      "path": "LICENSE.YuNet.txt",
+      "role": "license",
+      "model": "detection",
+      "url": "https://huggingface.co/opencv/opencv_zoo/resolve/d4938dfc9d4ec5d098bfa33e98b3f3345a236586/models/face_detection_yunet/LICENSE",
+      "sha256": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958",
+      "size": 1085
+    },
+    {
+      "path": "NOTICE.YuNet.md",
+      "role": "model_card",
+      "model": "detection",
+      "url": "https://huggingface.co/opencv/opencv_zoo/resolve/d4938dfc9d4ec5d098bfa33e98b3f3345a236586/models/face_detection_yunet/README.md",
+      "sha256": "a45578c40b04f9aaa1e154bca1d0179ffad6dab840458ac8f7cb0a9362413b72",
+      "size": 2745
+    },
+    {
+      "path": "LICENSE.AuraFace.md",
+      "role": "license",
+      "model": "recognition",
+      "url": "https://huggingface.co/fal/AuraFace-v1/resolve/af6d057c9b0ec4071d4c49c80e3539258798b609/LICENSE.md",
+      "sha256": "609e2cb599f84aaa41d8ef29d8fdb04d164fab22e8d9292ca34a599d0f56a338",
+      "size": 12624
+    },
+    {
+      "path": "NOTICE.AuraFace.md",
+      "role": "model_card",
+      "model": "recognition",
+      "url": "https://huggingface.co/fal/AuraFace-v1/resolve/af6d057c9b0ec4071d4c49c80e3539258798b609/README.md",
+      "sha256": "106272348689716d3c159ff16ec42e5f36aafebca591b3678b375f8aa2d12cde",
+      "size": 3959
+    }
+  ],
+  "runtime": {
+    "provider": "CUDAExecutionProvider",
+    "device_id": 0,
+    "batch_size": 1,
+    "cpu_postprocessing_allowed": true,
+    "shared_profiler": "immich_portability.strict_cuda_session",
+    "profile_labels": [
+      "facial-recognition/detection",
+      "facial-recognition/recognition"
+    ],
+    "minimum_score_default": 0.7,
+    "nms_iou": 0.3,
+    "gpu_memory_limit_per_session_bytes": 1073741824,
+    "allocator_limit_is_global_hard_cap": false
+  },
+  "migration": {
+    "replace_existing_model_automatically": false,
+    "reuse_buffalo_embeddings": false,
+    "required": "Registrar el nombre propio, volver a generar embeddings y validar umbrales antes de datos de clientes. Mismo ancho512 no implica mismo espacio semántico."
+  },
+  "licensing_notes": [
+    "Conservar los cuatro archivos de licencia/tarjeta enumerados junto a los pesos.",
+    "La selección se basa en MIT/Apache-2.0 publicadas; no presupone certeza sobre todos los datos de entrenamiento ni derechos sobre fotografías de terceros.",
+    "No se descargan pesos ni se inicia inferencia desde una petición; el instalador debe verificar los seis artefactos completos antes de usarlos."
+  ],
+  "verification": {
+    "full_weights_downloaded_for_this_increment": false,
+    "cuda_inference_performed": false,
+    "metadata_inspection": "Formas y primeros nodos examinados por rangos HTTPS/protobuf de artefactos oficiales; los SHA de pesos provienen de LFS oficial."
+  }
+}

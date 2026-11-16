@@ -1,0 +1,10 @@
+[Unit]
+Description=Comprueba periódicamente si hay una entrega sintética verificada
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

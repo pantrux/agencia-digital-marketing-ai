@@ -1,0 +1,109 @@
+{
+  "annex_versions": {
+    "mimalloc": "2.2.4",
+    "pgvector": "0.8.5",
+    "postgresql": "16.15",
+    "sqlite": "3.54.1",
+    "vectorchord": "1.1.1"
+  },
+  "approved": false,
+  "bounds": {
+    "capture_bytes": 33554432,
+    "memory_bytes": 2147483648,
+    "native_job_seconds": 180,
+    "processes": 8,
+    "report_bytes": 33554432,
+    "supplement_bytes": 33554432
+  },
+  "db": {
+    "database_sha256": "7520aa80bfb8db4a230514baa510ec6b1d7de9099b74f7879be65450407a6f1f",
+    "metadata_sha256": "475ea2061a7f343953b880fd0eb2ce56253cca495d48f12661f3bd3e5e95c125",
+    "root": ".tools/trivy-cache-current-20261106"
+  },
+  "owner": "agencia-digital-marketing-ai:postgres-immich-final-sca:v1",
+  "refs": {
+    "access": {
+      "path": "sre/backup_tools_access.py",
+      "sha256": "ae1c6d5e2fbd4550c78d7ea5857b4b4b203a92e2739f9334c831730a1b8cec3b",
+      "size": 4133
+    },
+    "cargo_lock": {
+      "path": ".tools/postgres-immich-security-inputs-v1/derived-v1/Cargo.lock",
+      "sha256": "ea3a6ad6a7af3af25136693c4265a05788a2dd1f7bec7b0b32b4ad947bf16dad",
+      "size": 59636
+    },
+    "derived_receipt": {
+      "path": ".tools/postgres-immich-security-inputs-v1/derived-v1/receipt.json",
+      "sha256": "a47255902ebf0c0d92dfb730a1fea864dda12a257cbe58c698d0d9bb346e7c43",
+      "size": 625
+    },
+    "fetch_receipt": {
+      "path": ".tools/backup-source-build/postgres-security-final-sca-v1/fetch-receipt.json",
+      "sha256": "c7332e50f6540990eb6c5b5684ee17e66b1f30379c35bf06024a6bc4937ba22f",
+      "size": 1348
+    },
+    "gates": {
+      "path": ".tools/evidence/phase4-postgres-runtime-v7-actual-gates-v1.json",
+      "sha256": "8470db04532891209cd6214ffef21fd0484f0d0944a38da838d45a2096470166",
+      "size": 34452
+    },
+    "graph": {
+      "path": ".tools/postgres-immich-security-inputs-v1/security-rebuild-v7.graph.d6e53d552a32415b905c6fef5b0dc26b.json",
+      "sha256": "01a4031912813a3c9dc3f5813efed1dd68d78e42204d13c5bcf4cd25b9407ad2",
+      "size": 3604
+    },
+    "native_job": {
+      "path": "sre/windows_build_job.py",
+      "sha256": "dfe20e53ce750a00358dca0edfdf34851aa902c5e7b345452a33542b914a7c44",
+      "size": 19066
+    },
+    "oci_reader": {
+      "path": "docker/postgres-immich/final_image_remote.py",
+      "sha256": "9e0a282940bd7585b6953b43dbc3f02df9bf01bb9f775e5a7a4eb1172ed4fa49",
+      "size": 58437
+    },
+    "runtime_build": {
+      "path": ".tools/postgres-immich-security-inputs-v1/security-runtime-v3.build.f22671b0e0c14d108dc3a148b7480b2e.json",
+      "sha256": "f0f8fab22ffedfa804091ff42936657174c21b7aefc62d497bd30e25373b3d58",
+      "size": 12741
+    },
+    "runtime_prepare": {
+      "path": ".tools/postgres-immich-security-inputs-v1/security-runtime-v3.prepare.2991994f50484581ae7fe13e895786ad.json",
+      "sha256": "a8ffd5244af037a40dfb5be2b924ab9c2ece75b7722cb7fe4cb9272e5e89f3fc",
+      "size": 26615
+    },
+    "runtime_profile": {
+      "path": ".tools/postgres-immich-security-inputs-v1/security-runtime-v3.profile.json",
+      "sha256": "e79daf8ebf96151a24dddfd3bd4d727c9e1c0a67ee3dc8238ce6bbd9f6a6da0e",
+      "size": 3111
+    },
+    "sdk_history": {
+      "path": ".tools/postgres-immich-build/compile-v3-profile.json",
+      "sha256": "bffefb81179fd767d640faf106965ba7d465e90c3a789b4e7800b988a0152153",
+      "size": 66814
+    },
+    "vendor_lock": {
+      "path": ".tools/postgres-immich-security-inputs-v1/derived-v1/vendor-lock.json",
+      "sha256": "bbbbaf22919ab5b3dac537368611533a5798bbaa3033b51d9000ffc0283fd427",
+      "size": 1762116
+    }
+  },
+  "run_root": ".tools/evidence/phase4-postgres-immich-final-sca-v1",
+  "schema_version": 1,
+  "sdk_executed": false,
+  "subject": {
+    "archive": {
+      "path": ".tools/backup-source-build/postgres-security-final-sca-v1/runtime-image.tar",
+      "sha256": "02c4948966cc261ef086f181930980dc2be9f6ad7a9a821ec9580b4e9d894bd2",
+      "size": 119867904
+    },
+    "config_digest": "sha256:60331f9322af6e5449db67a68975e7ce57f58562af19843bc4de47ffd46f709f",
+    "image_id": "sha256:a00b7ac5ed30069abde2702a2b2b3d8321ea0f22d2ba64cc9f836c86b4c47601",
+    "runtime_owner": "agencia-digital-marketing-ai:postgres-immich-security-runtime:v3"
+  },
+  "tool": {
+    "path": ".tools/bin/trivy.exe",
+    "sha256": "dd07adf881a72b54d1a922191d62fa939938df2155be85a727da93b67b24e617",
+    "version": "0.76.2"
+  }
+}

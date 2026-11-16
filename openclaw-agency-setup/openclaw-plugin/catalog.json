@@ -1,0 +1,591 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "mcp_immich_broll__buscar_broll",
+      "tool": "buscar_broll",
+      "server": "mcp-immich-broll",
+      "description": "Busca B-roll mediante CLIP y devuelve identificadores de la biblioteca aprobada.",
+      "schema": {
+        "properties": {
+          "consulta": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Consulta",
+            "type": "string"
+          },
+          "cantidad": {
+            "default": 8,
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Cantidad",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "consulta"
+        ],
+        "title": "buscar_brollArguments",
+        "type": "object"
+      },
+      "agents": [
+        "agency-strategist",
+        "agency-director"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "mcp_media_inspector__inspeccionar_medio",
+      "tool": "inspeccionar_medio",
+      "server": "mcp-media-inspector",
+      "description": "Inspecciona un vídeo del proyecto y publica una tira con escala de 0 a 1920.",
+      "schema": {
+        "properties": {
+          "proyecto": {
+            "title": "Proyecto",
+            "type": "string"
+          },
+          "trabajo": {
+            "title": "Trabajo",
+            "type": "string"
+          },
+          "ruta": {
+            "title": "Ruta",
+            "type": "string"
+          },
+          "muestras": {
+            "default": 6,
+            "maximum": 12,
+            "minimum": 1,
+            "title": "Muestras",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "proyecto",
+          "trabajo",
+          "ruta"
+        ],
+        "title": "inspeccionar_medioArguments",
+        "type": "object"
+      },
+      "agents": [
+        "agency-account",
+        "agency-director"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "mcp_media_inspector__transcribir_audio",
+      "tool": "transcribir_audio",
+      "server": "mcp-media-inspector",
+      "description": "Transcribe el WAV o MP3 del proyecto con tiempos por palabra.",
+      "schema": {
+        "properties": {
+          "proyecto": {
+            "title": "Proyecto",
+            "type": "string"
+          },
+          "ruta": {
+            "title": "Ruta",
+            "type": "string"
+          },
+          "idioma": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Idioma"
+          }
+        },
+        "required": [
+          "proyecto",
+          "ruta"
+        ],
+        "title": "transcribir_audioArguments",
+        "type": "object"
+      },
+      "agents": [
+        "agency-account",
+        "agency-director"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "mcp_remotion_gpu__generar_stills",
+      "tool": "generar_stills",
+      "server": "mcp-remotion-gpu",
+      "description": "Genera los PNG de revisión en el trabajo y devuelve sus huellas.",
+      "schema": {
+        "$defs": {
+          "RenderProps": {
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "duration_seconds": {
+                "maximum": 600,
+                "minimum": 0.1,
+                "title": "Duration Seconds",
+                "type": "number"
+              },
+              "subtitle": {
+                "default": "",
+                "maxLength": 240,
+                "title": "Subtitle",
+                "type": "string"
+              },
+              "background": {
+                "default": "#102032",
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "title": "Background",
+                "type": "string"
+              },
+              "accent": {
+                "default": "#8fe3c5",
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "title": "Accent",
+                "type": "string"
+              },
+              "video_path": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Video Path"
+              },
+              "audio_path": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Path"
+              }
+            },
+            "required": [
+              "title",
+              "duration_seconds"
+            ],
+            "title": "RenderProps",
+            "type": "object"
+          },
+          "StillsRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "project_id": {
+                "title": "Project Id",
+                "type": "string"
+              },
+              "job_id": {
+                "title": "Job Id",
+                "type": "string"
+              },
+              "plan": {
+                "enum": [
+                  "Free",
+                  "Pro",
+                  "Ultra",
+                  "Ilimitado"
+                ],
+                "title": "Plan",
+                "type": "string"
+              },
+              "props": {
+                "$ref": "#/$defs/RenderProps"
+              },
+              "composition": {
+                "const": "AgencyVertical",
+                "default": "AgencyVertical",
+                "title": "Composition",
+                "type": "string"
+              },
+              "format": {
+                "default": "mp4",
+                "enum": [
+                  "mp4",
+                  "prores4444"
+                ],
+                "title": "Format",
+                "type": "string"
+              },
+              "resolution": {
+                "default": "1080p",
+                "enum": [
+                  "1080p",
+                  "4k"
+                ],
+                "title": "Resolution",
+                "type": "string"
+              },
+              "frames": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "maxItems": 8,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Frames"
+              }
+            },
+            "required": [
+              "project_id",
+              "job_id",
+              "plan",
+              "props"
+            ],
+            "title": "StillsRequest",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "solicitud": {
+            "$ref": "#/$defs/StillsRequest"
+          }
+        },
+        "required": [
+          "solicitud"
+        ],
+        "title": "generar_stillsArguments",
+        "type": "object"
+      },
+      "agents": [
+        "agency-editor",
+        "agency-critic"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "mcp_remotion_gpu__renderizar_master",
+      "tool": "renderizar_master",
+      "server": "mcp-remotion-gpu",
+      "description": "Rinde el maestro en GPU y verifica sus formatos, audio y huella.",
+      "schema": {
+        "$defs": {
+          "RenderProps": {
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "maxLength": 120,
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "duration_seconds": {
+                "maximum": 600,
+                "minimum": 0.1,
+                "title": "Duration Seconds",
+                "type": "number"
+              },
+              "subtitle": {
+                "default": "",
+                "maxLength": 240,
+                "title": "Subtitle",
+                "type": "string"
+              },
+              "background": {
+                "default": "#102032",
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "title": "Background",
+                "type": "string"
+              },
+              "accent": {
+                "default": "#8fe3c5",
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "title": "Accent",
+                "type": "string"
+              },
+              "video_path": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Video Path"
+              },
+              "audio_path": {
+                "anyOf": [
+                  {
+                    "maxLength": 500,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Audio Path"
+              }
+            },
+            "required": [
+              "title",
+              "duration_seconds"
+            ],
+            "title": "RenderProps",
+            "type": "object"
+          },
+          "RenderRequest": {
+            "additionalProperties": false,
+            "properties": {
+              "project_id": {
+                "title": "Project Id",
+                "type": "string"
+              },
+              "job_id": {
+                "title": "Job Id",
+                "type": "string"
+              },
+              "plan": {
+                "enum": [
+                  "Free",
+                  "Pro",
+                  "Ultra",
+                  "Ilimitado"
+                ],
+                "title": "Plan",
+                "type": "string"
+              },
+              "props": {
+                "$ref": "#/$defs/RenderProps"
+              },
+              "composition": {
+                "const": "AgencyVertical",
+                "default": "AgencyVertical",
+                "title": "Composition",
+                "type": "string"
+              },
+              "format": {
+                "default": "mp4",
+                "enum": [
+                  "mp4",
+                  "prores4444"
+                ],
+                "title": "Format",
+                "type": "string"
+              },
+              "resolution": {
+                "default": "1080p",
+                "enum": [
+                  "1080p",
+                  "4k"
+                ],
+                "title": "Resolution",
+                "type": "string"
+              }
+            },
+            "required": [
+              "project_id",
+              "job_id",
+              "plan",
+              "props"
+            ],
+            "title": "RenderRequest",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "solicitud": {
+            "$ref": "#/$defs/RenderRequest"
+          }
+        },
+        "required": [
+          "solicitud"
+        ],
+        "title": "renderizar_masterArguments",
+        "type": "object"
+      },
+      "agents": [
+        "agency-editor"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "mcp_kitsu_review__consultar_revision",
+      "tool": "consultar_revision",
+      "server": "mcp-kitsu-review",
+      "description": "Consulta el estado y las anotaciones por fotograma de una revisión propia.",
+      "schema": {
+        "properties": {
+          "proyecto": {
+            "title": "Proyecto",
+            "type": "string"
+          },
+          "tarea": {
+            "title": "Tarea",
+            "type": "string"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          }
+        },
+        "required": [
+          "proyecto",
+          "tarea"
+        ],
+        "title": "consultar_revisionArguments",
+        "type": "object"
+      },
+      "agents": [
+        "agency-account",
+        "agency-editor",
+        "agency-critic"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "mcp_kitsu_review__crear_entregable",
+      "tool": "crear_entregable",
+      "server": "mcp-kitsu-review",
+      "description": "Crea o recupera el entregable y la tarea del proyecto habilitado.",
+      "schema": {
+        "properties": {
+          "proyecto": {
+            "title": "Proyecto",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proyecto",
+          "nombre"
+        ],
+        "title": "crear_entregableArguments",
+        "type": "object"
+      },
+      "agents": [
+        "agency-account"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "mcp_kitsu_review__preparar_revision",
+      "tool": "preparar_revision",
+      "server": "mcp-kitsu-review",
+      "description": "Prepara la revisión solicitada de una tarea del proyecto.",
+      "schema": {
+        "properties": {
+          "proyecto": {
+            "title": "Proyecto",
+            "type": "string"
+          },
+          "tarea": {
+            "title": "Tarea",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "proyecto",
+          "tarea",
+          "revision"
+        ],
+        "title": "preparar_revisionArguments",
+        "type": "object"
+      },
+      "agents": [
+        "agency-editor"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "mcp_kitsu_review__adjuntar_revision",
+      "tool": "adjuntar_revision",
+      "server": "mcp-kitsu-review",
+      "description": "Adjunta a la revisión un MP4 verificado del proyecto.",
+      "schema": {
+        "properties": {
+          "proyecto": {
+            "title": "Proyecto",
+            "type": "string"
+          },
+          "tarea": {
+            "title": "Tarea",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "ruta": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Ruta",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proyecto",
+          "tarea",
+          "revision",
+          "ruta",
+          "sha256"
+        ],
+        "title": "adjuntar_revisionArguments",
+        "type": "object"
+      },
+      "agents": [
+        "agency-editor"
+      ],
+      "read_only": false
+    }
+  ]
+}

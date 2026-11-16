@@ -1,0 +1,8 @@
+[Unit]
+Description=Activa a Sofía cuando se registra una ingesta
+
+[Path]
+PathChanged=/var/lib/agency-production-intake
+
+[Install]
+WantedBy=paths.target

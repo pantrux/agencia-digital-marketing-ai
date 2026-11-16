@@ -1,0 +1,9 @@
+# Enlazar wolfi al OCI local amd64 acreditado. El SDK se usa en un CID temporal.
+FROM wolfi
+USER 0:0
+COPY --chown=0:0 --chmod=0555 build-ffmpeg-ass.sh /usr/local/bin/build-ffmpeg-ass
+RUN --network=none --mount=type=bind,source=.,target=/inputs,ro --mount=type=tmpfs,target=/tmp ["/bin/sh", "/usr/local/bin/build-ffmpeg-ass", "prepare"]
+COPY --chown=0:0 --chmod=0444 ffmpeg-7.1.5.tar.xz /opt/ffmpeg-input/ffmpeg-7.1.5.tar.xz
+USER 1000:1000
+ENTRYPOINT ["/usr/bin/bash", "/usr/local/bin/build-ffmpeg-ass"]
+CMD ["build"]

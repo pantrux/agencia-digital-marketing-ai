@@ -1,0 +1,43 @@
+# Plantilla histórica del gateway dedicado. El piloto OAuth vigente no usa esta unidad.
+[Unit]
+Description=Instancia aislada de OpenClaw para Sofía
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=agency-sofia-gateway
+Group=agency-sofia-gateway
+StateDirectory=agency-sofia-gateway
+StateDirectoryMode=0700
+UMask=0077
+WorkingDirectory=/var/lib/agency-sofia-gateway/workspace
+Environment=HOME=/var/lib/agency-sofia-gateway/home
+Environment=XDG_CONFIG_HOME=/var/lib/agency-sofia-gateway/home/.config
+Environment=XDG_CACHE_HOME=/var/lib/agency-sofia-gateway/home/.cache
+Environment=XDG_DATA_HOME=/var/lib/agency-sofia-gateway/home/.local/share
+Environment=OPENCLAW_CONFIG_PATH=/etc/agency-sofia/openclaw.json
+Environment=OPENCLAW_STATE_DIR=/var/lib/agency-sofia-gateway/state
+Environment=PATH=/opt/agency-sofia/runtime/bin:/usr/bin:/bin
+UnsetEnvironment=CODEX_HOME OPENAI_API_KEY CODEX_API_KEY CODEX_ACCESS_TOKEN OPENCLAW_GATEWAY_TOKEN OPENCLAW_GATEWAY_PASSWORD OPENCLAW_CODEX_APP_SERVER_BIN SSH_AUTH_SOCK
+ExecStart=/opt/agency-sofia/runtime/bin/openclaw gateway run --bind loopback --port 3108
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=45s
+ProtectHome=yes
+ProtectSystem=strict
+ProtectProc=invisible
+InaccessiblePaths=-/mnt -/media -/srv -/opt/media-platform
+InaccessiblePaths=-/run/dbus -/run/docker.sock -/run/containerd -/run/systemd/private -/run/user
+PrivateNetwork=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+IPAddressDeny=any
+IPAddressAllow=localhost

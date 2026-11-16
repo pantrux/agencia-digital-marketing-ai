@@ -1,0 +1,245 @@
+# Base funcional incremental; no construye, descarga ni inicializa Zou automáticamente.
+name: ${MEDIA_COMPOSE_PROJECT_NAME:?Falta MEDIA_COMPOSE_PROJECT_NAME}
+
+services:
+  postgres-apps:
+    image: ${MEDIA_POSTGRES_APPS_IMAGE_ID:?Falta MEDIA_POSTGRES_APPS_IMAGE_ID}
+    pull_policy: never
+    platform: linux/amd64
+    user: "70:70"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    cpus: "1.0"
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 128
+    shm_size: 128m
+    stop_grace_period: 30s
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_USER: ${MEDIA_POSTGRES_APPS_ADMIN_USER:?Falta MEDIA_POSTGRES_APPS_ADMIN_USER}
+      POSTGRES_DB: ${MEDIA_POSTGRES_APPS_ADMIN_DATABASE:?Falta MEDIA_POSTGRES_APPS_ADMIN_DATABASE}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256 --auth-local=scram-sha-256
+      PGPASSFILE: /run/secrets/postgres_pgpass
+    secrets: [postgres_password, postgres_pgpass]
+    volumes:
+      - type: bind
+        source: ${MEDIA_POSTGRES_APPS_DATA_PATH:?Falta MEDIA_POSTGRES_APPS_DATA_PATH}
+        target: /var/lib/postgresql/data
+        read_only: false
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m,uid=70,gid=70,mode=0775
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, 'exec psql -X -q -A -t -w -h 127.0.0.1 -p 5432 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" --set=ON_ERROR_STOP=1 -c "SELECT 1"']
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 60s
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "2"}
+
+  valkey:
+    image: ${MEDIA_VALKEY_OCI_CAPTURE_V2_MANIFEST_DIGEST:?Falta MEDIA_VALKEY_OCI_CAPTURE_V2_MANIFEST_DIGEST}
+    pull_policy: never
+    platform: linux/amd64
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    cpus: "0.5"
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    stop_grace_period: 30s
+    command: [valkey-server, /etc/valkey/valkey.conf]
+    secrets: [valkey_password]
+    volumes:
+      - type: bind
+        source: ${MEDIA_VALKEY_DATA_PATH:?Falta MEDIA_VALKEY_DATA_PATH}
+        target: /data
+        read_only: false
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEDIA_VALKEY_CONFIG_FILE:?Falta MEDIA_VALKEY_CONFIG_FILE}
+        target: /etc/valkey/valkey.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m,mode=1777
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, 'export REDISCLI_AUTH; IFS= read -r REDISCLI_AUTH < /run/secrets/valkey_password; exec valkey-cli --no-auth-warning -e -h 127.0.0.1 -p 6379 ping']
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "2"}
+
+  zou-api:
+    image: ${MEDIA_ZOU_APPLICATION_IMAGE_MANIFEST:?Falta MEDIA_ZOU_APPLICATION_IMAGE_MANIFEST}
+    pull_policy: never
+    platform: linux/amd64
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+    cpus: "1.0"
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 64
+    stop_grace_period: 30s
+    command: [/usr/bin/python3.12, -I, -S, -B, /opt/zou/launch_zou.py, api]
+    environment:
+      DB_HOST: postgres-apps
+      DB_PORT: "5432"
+      DB_USERNAME: ${MEDIA_ZOU_DATABASE_USER:?Falta MEDIA_ZOU_DATABASE_USER}
+      DB_DATABASE: ${MEDIA_ZOU_DATABASE_NAME:?Falta MEDIA_ZOU_DATABASE_NAME}
+      KV_HOST: valkey
+      KV_PORT: "6379"
+      DOMAIN_NAME: ${MEDIA_ZOU_DOMAIN_NAME:?Falta MEDIA_ZOU_DOMAIN_NAME}
+      DOMAIN_PROTOCOL: ${MEDIA_ZOU_DOMAIN_PROTOCOL:?Falta MEDIA_ZOU_DOMAIN_PROTOCOL}
+    secrets: [zou_db_password, zou_kv_password, zou_secret_key]
+    volumes:
+      - type: bind
+        source: ${MEDIA_ZOU_STATE_PATH:?Falta MEDIA_ZOU_STATE_PATH}
+        target: /var/lib/zou
+        read_only: false
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEDIA_ZOU_PREVIEWS_PATH:?Falta MEDIA_ZOU_PREVIEWS_PATH}
+        target: /var/lib/zou/previews
+        read_only: false
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+    networks: [data, app]
+    ports: ["127.0.0.1:5000:5000"]
+    depends_on:
+      postgres-apps: {condition: service_healthy}
+      valkey: {condition: service_healthy}
+    healthcheck:
+      # GET / original es público y no consulta ni modifica la base.
+      test:
+        - CMD
+        - /usr/bin/python3.12
+        - -I
+        - -S
+        - -B
+        - -c
+        - >-
+          import json,urllib.request;
+          r=urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:5000/',timeout=2);
+          b=r.read(4097);r.close();d=json.loads(b);
+          assert r.status==200 and len(b)<=4096 and isinstance(d,dict) and isinstance(d.get('api'),str) and bool(d['api']) and isinstance(d.get('version'),str) and bool(d['version'])
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 40s
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "2"}
+
+  zou-events:
+    image: ${MEDIA_ZOU_APPLICATION_IMAGE_MANIFEST:?Falta MEDIA_ZOU_APPLICATION_IMAGE_MANIFEST}
+    pull_policy: never
+    platform: linux/amd64
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+    cpus: "0.5"
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    stop_grace_period: 30s
+    command: [/usr/bin/python3.12, -I, -S, -B, /opt/zou/launch_zou.py, events]
+    environment:
+      DB_HOST: postgres-apps
+      DB_PORT: "5432"
+      DB_USERNAME: ${MEDIA_ZOU_DATABASE_USER:?Falta MEDIA_ZOU_DATABASE_USER}
+      DB_DATABASE: ${MEDIA_ZOU_DATABASE_NAME:?Falta MEDIA_ZOU_DATABASE_NAME}
+      KV_HOST: valkey
+      KV_PORT: "6379"
+      DOMAIN_NAME: ${MEDIA_ZOU_DOMAIN_NAME:?Falta MEDIA_ZOU_DOMAIN_NAME}
+      DOMAIN_PROTOCOL: ${MEDIA_ZOU_DOMAIN_PROTOCOL:?Falta MEDIA_ZOU_DOMAIN_PROTOCOL}
+    secrets: [zou_db_password, zou_kv_password, zou_secret_key]
+    volumes:
+      - type: bind
+        source: ${MEDIA_ZOU_STATE_PATH:?Falta MEDIA_ZOU_STATE_PATH}
+        target: /var/lib/zou
+        read_only: false
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEDIA_ZOU_PREVIEWS_PATH:?Falta MEDIA_ZOU_PREVIEWS_PATH}
+        target: /var/lib/zou/previews
+        read_only: false
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m,mode=1777
+    networks: [data, app]
+    depends_on:
+      postgres-apps: {condition: service_healthy}
+      valkey: {condition: service_healthy}
+    healthcheck:
+      # create_app registra también IndexResource; ambas identidades son originales.
+      test:
+        - CMD
+        - /usr/bin/python3.12
+        - -I
+        - -S
+        - -B
+        - -c
+        - >-
+          import json,urllib.request;
+          r=urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:5001/',timeout=2);
+          b=r.read(4097);r.close();d=json.loads(b);
+          assert r.status==200 and len(b)<=4096 and isinstance(d,dict) and ((isinstance(d.get('api'),str) and bool(d['api']) and isinstance(d.get('version'),str) and bool(d['version'])) or (isinstance(d.get('name'),str) and d['name'].endswith(' Event stream')))
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 40s
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "2"}
+
+networks:
+  data:
+    external: true
+    name: ${MEDIA_PLATFORM_DATA_NETWORK_NAME:?Falta MEDIA_PLATFORM_DATA_NETWORK_NAME}
+  app:
+    external: true
+    name: ${MEDIA_PLATFORM_APP_NETWORK_NAME:?Falta MEDIA_PLATFORM_APP_NETWORK_NAME}
+
+secrets:
+  postgres_password:
+    file: ${MEDIA_POSTGRES_APPS_PASSWORD_FILE:?Falta MEDIA_POSTGRES_APPS_PASSWORD_FILE}
+  postgres_pgpass:
+    file: ${MEDIA_POSTGRES_APPS_PGPASS_FILE:?Falta MEDIA_POSTGRES_APPS_PGPASS_FILE}
+  valkey_password:
+    file: ${MEDIA_VALKEY_PASSWORD_FILE:?Falta MEDIA_VALKEY_PASSWORD_FILE}
+  zou_db_password:
+    file: ${MEDIA_ZOU_DB_PASSWORD_FILE:?Falta MEDIA_ZOU_DB_PASSWORD_FILE}
+  zou_kv_password:
+    file: ${MEDIA_ZOU_KV_PASSWORD_FILE:?Falta MEDIA_ZOU_KV_PASSWORD_FILE}
+  zou_secret_key:
+    file: ${MEDIA_ZOU_SECRET_KEY_FILE:?Falta MEDIA_ZOU_SECRET_KEY_FILE}

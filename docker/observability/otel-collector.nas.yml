@@ -1,0 +1,64 @@
+receivers:
+  prometheus:
+    config:
+      global:
+        scrape_interval: 15s
+        scrape_timeout: 5s
+        body_size_limit: 2MB
+        sample_limit: 2000
+        label_limit: 20
+      scrape_configs:
+        - job_name: agency-node
+          static_configs:
+            - targets: ["node-exporter:9100"]
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              regex: "node_cpu_seconds_total|node_memory_MemAvailable_bytes|node_memory_MemTotal_bytes|node_load1"
+              action: keep
+        - job_name: agency-cgroups
+          static_configs:
+            - targets: ["cadvisor:8080"]
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              regex: "container_cpu_usage_seconds_total|container_memory_usage_bytes"
+              action: keep
+            - source_labels: [id]
+              regex: "/system[.]slice/docker-[a-f0-9]{64}[.]scope"
+              action: keep
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 144
+    spike_limit_mib: 32
+
+exporters:
+  otlp_http/nas:
+    metrics_endpoint: https://192.168.0.8:9090/api/v1/otlp/v1/metrics
+    encoding: proto
+    compression: gzip
+    timeout: 5s
+    tls:
+      ca_file: /run/agency-otel-tls/server-ca.pem
+      cert_file: /run/agency-otel-tls/client.pem
+      key_file: /run/agency-otel-tls/client.key
+      min_version: "1.3"
+    sending_queue:
+      enabled: true
+      num_consumers: 1
+      queue_size: 16
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 5s
+      max_elapsed_time: 20s
+
+service:
+  telemetry:
+    metrics:
+      level: none
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      processors: [memory_limiter]
+      exporters: [otlp_http/nas]

@@ -1,0 +1,5 @@
+ARG ZOU_BASE
+FROM ${ZOU_BASE}
+
+COPY --chown=0:0 --chmod=0555 launch_zou.py /opt/zou/launch_zou.py
+USER 1000:1000

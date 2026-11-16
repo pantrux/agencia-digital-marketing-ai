@@ -1,0 +1,21 @@
+[Unit]
+Description=Auditoría de Elena sobre el máster del piloto
+After=agency-production-lucas.service
+RequiresMountsFor=/mnt/producciones
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-elena
+StateDirectoryMode=0700
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+LoadCredential=dispatch:/etc/agency-production-handoff/dispatch-token
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_elena.py %d/profile %d/dispatch /var/lib/agency-production-elena --pending
+TimeoutStartSec=5min
+ProtectSystem=full
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

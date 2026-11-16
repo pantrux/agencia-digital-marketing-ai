@@ -1,0 +1,11 @@
+[Unit]
+Description=Directorio Unix privado del piloto de Sofía
+Before=openclaw-gateway.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+RuntimeDirectory=agency-sofia-owner
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+ExecStart=/usr/bin/true

@@ -1,0 +1,420 @@
+{
+  "bounds": {
+    "nvd_spacing_seconds": 6.2,
+    "pages_per_query": 4,
+    "request_seconds": 15,
+    "response_bytes": 2097152,
+    "responses": 40,
+    "total_response_bytes": 33554432,
+    "total_seconds": 300
+  },
+  "components": [
+    {
+      "commit_declared": "29173b67508b2de4c0f0ed551f3b47cf19fc3ca8",
+      "id": "valkey",
+      "modified_upstream": false,
+      "name": "Valkey",
+      "nvd_keyword": "Valkey",
+      "nvd_version": "9.1.3",
+      "paths": [
+        "src/"
+      ],
+      "reference_prefixes": [
+        "https://github.com/valkey-io/valkey",
+        "https://valkey.io/"
+      ],
+      "repository": "https://github.com/valkey-io/valkey",
+      "scope": "runtime",
+      "supplier_cpe": "cpe:2.3:a:lfprojects:valkey:9.1.3:*:*:*:*:*:*:*",
+      "supplier_link_candidates": [
+        "valkey-server",
+        "valkey-cli",
+        "valkey-benchmark"
+      ],
+      "version_declared": "9.1.3",
+      "version_witnesses": [
+        {
+          "needle": "#define VALKEY_VERSION \"9.1.3\"",
+          "path": "src/version.h"
+        }
+      ]
+    },
+    {
+      "commit_declared": null,
+      "id": "jemalloc",
+      "modified_upstream": true,
+      "name": "jemalloc",
+      "nvd_keyword": "jemalloc",
+      "nvd_version": "5.3.0",
+      "paths": [
+        "deps/jemalloc/"
+      ],
+      "reference_prefixes": [
+        "https://github.com/jemalloc/jemalloc"
+      ],
+      "repository": "https://github.com/jemalloc/jemalloc",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server",
+        "valkey-cli",
+        "valkey-benchmark"
+      ],
+      "version_declared": "5.3.0",
+      "version_witnesses": [
+        {
+          "needle": "5.3.0-0-g0",
+          "path": "deps/jemalloc/VERSION"
+        }
+      ]
+    },
+    {
+      "commit_declared": null,
+      "id": "lua",
+      "modified_upstream": true,
+      "name": "Lua",
+      "nvd_keyword": "Lua",
+      "nvd_version": "5.1.5",
+      "paths": [
+        "deps/lua/"
+      ],
+      "reference_prefixes": [
+        "https://www.lua.org/",
+        "https://www.lua.org/"
+      ],
+      "repository": "https://www.lua.org/",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server"
+      ],
+      "version_declared": "5.1.5",
+      "version_witnesses": [
+        {
+          "needle": "\"Lua 5.1.5\"",
+          "path": "deps/lua/src/lua.h"
+        }
+      ]
+    },
+    {
+      "commit_declared": null,
+      "id": "libvalkey",
+      "modified_upstream": true,
+      "name": "libvalkey",
+      "nvd_keyword": "libvalkey",
+      "nvd_version": "0.4.0",
+      "paths": [
+        "deps/libvalkey/"
+      ],
+      "reference_prefixes": [
+        "https://github.com/valkey-io/libvalkey"
+      ],
+      "repository": "https://github.com/valkey-io/libvalkey",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server",
+        "valkey-cli",
+        "valkey-benchmark"
+      ],
+      "version_declared": "0.4.0",
+      "version_witnesses": [
+        {
+          "needle": "#define LIBVALKEY_VERSION_MAJOR 0",
+          "path": "deps/libvalkey/include/valkey/valkey.h"
+        },
+        {
+          "needle": "#define LIBVALKEY_VERSION_MINOR 4",
+          "path": "deps/libvalkey/include/valkey/valkey.h"
+        },
+        {
+          "needle": "#define LIBVALKEY_VERSION_PATCH 0",
+          "path": "deps/libvalkey/include/valkey/valkey.h"
+        }
+      ]
+    },
+    {
+      "commit_declared": null,
+      "id": "linenoise",
+      "modified_upstream": false,
+      "name": "linenoise",
+      "nvd_keyword": "linenoise",
+      "nvd_version": "1.0",
+      "paths": [
+        "deps/linenoise/"
+      ],
+      "reference_prefixes": [
+        "https://github.com/antirez/linenoise"
+      ],
+      "repository": "https://github.com/antirez/linenoise",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-cli"
+      ],
+      "version_declared": "1.0",
+      "version_witnesses": [
+        {
+          "needle": "VERSION 1.0",
+          "path": "deps/linenoise/linenoise.h"
+        }
+      ]
+    },
+    {
+      "commit_declared": "e4448cf6d1cd08fff519812d3b1e58bd5a94ac42",
+      "id": "hdr-histogram",
+      "modified_upstream": true,
+      "name": "HdrHistogram",
+      "nvd_keyword": "HdrHistogram",
+      "nvd_version": null,
+      "paths": [
+        "deps/hdr_histogram/"
+      ],
+      "reference_prefixes": [
+        "https://github.com/HdrHistogram/HdrHistogram_c"
+      ],
+      "repository": "https://github.com/HdrHistogram/HdrHistogram_c",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server",
+        "valkey-benchmark"
+      ],
+      "version_declared": null,
+      "version_witnesses": []
+    },
+    {
+      "commit_declared": null,
+      "id": "ffc",
+      "modified_upstream": false,
+      "name": "ffc.h",
+      "nvd_keyword": "ffc.h",
+      "nvd_version": null,
+      "paths": [
+        "deps/fast_float/"
+      ],
+      "reference_prefixes": [
+        "https://github.com/kolemannix/ffc.h"
+      ],
+      "repository": "https://github.com/kolemannix/ffc.h",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server",
+        "valkey-cli",
+        "valkey-benchmark"
+      ],
+      "version_declared": "26.03.02",
+      "version_witnesses": [
+        {
+          "needle": "#define FFC_VERSION_YEAR  26",
+          "path": "deps/fast_float/ffc.h"
+        },
+        {
+          "needle": "#define FFC_VERSION_MONTH 03",
+          "path": "deps/fast_float/ffc.h"
+        },
+        {
+          "needle": "#define FFC_VERSION_BUILD 02",
+          "path": "deps/fast_float/ffc.h"
+        }
+      ]
+    },
+    {
+      "commit_declared": null,
+      "id": "fpconv",
+      "modified_upstream": false,
+      "name": "fpconv",
+      "nvd_keyword": "fpconv",
+      "nvd_version": null,
+      "paths": [
+        "deps/fpconv/"
+      ],
+      "reference_prefixes": [
+        "https://github.com/night-shift/fpconv"
+      ],
+      "repository": "https://github.com/night-shift/fpconv",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server",
+        "valkey-cli",
+        "valkey-benchmark"
+      ],
+      "version_declared": null,
+      "version_witnesses": []
+    },
+    {
+      "commit_declared": null,
+      "id": "lua-cjson",
+      "modified_upstream": true,
+      "name": "lua-cjson",
+      "nvd_keyword": "lua-cjson",
+      "nvd_version": "2.1.0",
+      "paths": [
+        "deps/lua/src/lua_cjson.c"
+      ],
+      "reference_prefixes": [
+        "https://www.kyne.com.au/~mark/software/lua-cjson.php",
+        "https://www.kyne.com.au/~mark/software/lua-cjson"
+      ],
+      "repository": "https://www.kyne.com.au/~mark/software/lua-cjson.php",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server"
+      ],
+      "version_declared": "2.1.0",
+      "version_witnesses": [
+        {
+          "needle": "\"2.1.0\"",
+          "path": "deps/lua/src/lua_cjson.c"
+        }
+      ]
+    },
+    {
+      "commit_declared": null,
+      "id": "lua-cmsgpack",
+      "modified_upstream": true,
+      "name": "lua-cmsgpack",
+      "nvd_keyword": "lua-cmsgpack",
+      "nvd_version": "0.4.0",
+      "paths": [
+        "deps/lua/src/lua_cmsgpack.c"
+      ],
+      "reference_prefixes": [
+        "https://github.com/antirez/lua-cmsgpack"
+      ],
+      "repository": "https://github.com/antirez/lua-cmsgpack",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server"
+      ],
+      "version_declared": "0.4.0",
+      "version_witnesses": [
+        {
+          "needle": "lua-cmsgpack 0.4.0",
+          "path": "deps/lua/src/lua_cmsgpack.c"
+        }
+      ]
+    },
+    {
+      "commit_declared": null,
+      "id": "luabitop",
+      "modified_upstream": false,
+      "name": "LuaBitOp",
+      "nvd_keyword": "LuaBitOp",
+      "nvd_version": "1.0.2",
+      "paths": [
+        "deps/lua/src/lua_bit.c"
+      ],
+      "reference_prefixes": [
+        "https://bitop.luajit.org/",
+        "https://bitop.luajit.org/"
+      ],
+      "repository": "https://bitop.luajit.org/",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server"
+      ],
+      "version_declared": "1.0.2",
+      "version_witnesses": [
+        {
+          "needle": "\"1.0.2\"",
+          "path": "deps/lua/src/lua_bit.c"
+        }
+      ]
+    },
+    {
+      "commit_declared": null,
+      "id": "lua-struct",
+      "modified_upstream": true,
+      "name": "lua_struct",
+      "nvd_keyword": "Lua struct",
+      "nvd_version": null,
+      "paths": [
+        "deps/lua/src/lua_struct.c"
+      ],
+      "reference_prefixes": [
+        "https://www.lua.org/",
+        "https://www.lua.org/"
+      ],
+      "repository": "https://www.lua.org/",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server"
+      ],
+      "version_declared": null,
+      "version_witnesses": []
+    },
+    {
+      "commit_declared": "96664e69b1ecdb76e824be1d9e8f475b76dd08cf",
+      "id": "libbacktrace",
+      "modified_upstream": false,
+      "name": "libbacktrace",
+      "nvd_keyword": "libbacktrace",
+      "nvd_version": null,
+      "paths": [],
+      "reference_prefixes": [
+        "https://github.com/ianlancetaylor/libbacktrace"
+      ],
+      "repository": "https://github.com/ianlancetaylor/libbacktrace",
+      "scope": "runtime",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [
+        "valkey-server",
+        "valkey-cli",
+        "valkey-benchmark"
+      ],
+      "version_declared": null,
+      "version_witnesses": []
+    },
+    {
+      "commit_declared": null,
+      "id": "gtest-parallel",
+      "modified_upstream": false,
+      "name": "gtest-parallel",
+      "nvd_keyword": "gtest-parallel",
+      "nvd_version": null,
+      "paths": [
+        "deps/gtest-parallel/"
+      ],
+      "reference_prefixes": [
+        "https://github.com/google/gtest-parallel"
+      ],
+      "repository": "https://github.com/google/gtest-parallel",
+      "scope": "build-test-only",
+      "supplier_cpe": null,
+      "supplier_link_candidates": [],
+      "version_declared": null,
+      "version_witnesses": []
+    }
+  ],
+  "exceptions": [],
+  "os_scope": {
+    "receipt_path": ".tools/evidence/phase4-valkey-os-sca-v1/receipt.json",
+    "receipt_sha256": "b24e765de94369944f11aa48b02b38c00606e329678d91ce7db9a0e1bdc3304b",
+    "report_path": ".tools/evidence/phase4-valkey-os-sca-v1/os-packages.trivy.json",
+    "report_sha256": "37ee66d9fe4b73f5f389ea05f6d3a67cb1046ed9555ae98a079108576932d9b1"
+  },
+  "owner": "agencia-digital-marketing-ai:valkey-binary-sca:v1",
+  "provenance": {
+    "path": ".tools/evidence/phase4-valkey-source-provenance-v1.json",
+    "sha256": "3338a16479d25c905c02f8a0fd84429f8b39b6950c064ff0738d01e421a255ac"
+  },
+  "publication": {
+    "inventory_sha256": "7ebf54457de5fa7c6413d6d5f7c64fed94517f81894cd3e5da5596efc911ccfd",
+    "path": ".tools/evidence/phase4-valkey-inventory-v2"
+  },
+  "schema_version": 1,
+  "source_archive": {
+    "bytes": 4440532,
+    "commit_declared": "29173b67508b2de4c0f0ed551f3b47cf19fc3ca8",
+    "path": ".tools/cache/phase4-sources/valkey-9.1.3.tar.gz",
+    "root": "valkey-9.1.3",
+    "sha256": "184e34ed2d9b51879b682b5b15205e2b9d677c60280e3cb453be8f520d04e293"
+  }
+}

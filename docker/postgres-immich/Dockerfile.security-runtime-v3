@@ -1,0 +1,7 @@
+# Fuente local autenticada: sin frontend remoto, RUN ni descargas.
+FROM pgbase
+LABEL org.opencontainers.image.title="PostgreSQL Immich de la agencia" \
+      org.opencontainers.image.version="16.15-vchord1.1.1-vector0.8.5-sqlite3.54.1-agencia.security-v7-v3" \
+      cl.e-scale.agencia.owner="agencia-digital-marketing-ai:postgres-immich-security-runtime:v3"
+COPY --chown=0:0 runtime-root/ /
+USER 70:70

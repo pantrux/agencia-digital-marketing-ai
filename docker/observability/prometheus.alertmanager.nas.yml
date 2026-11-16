@@ -1,0 +1,13 @@
+alerting:
+  alertmanagers:
+    - api_version: v2
+      scheme: https
+      timeout: 5s
+      tls_config:
+        ca_file: /run/prometheus-tls/alertmanager-ca.pem
+        cert_file: /run/prometheus-tls/alertmanager-client.pem
+        key_file: /run/prometheus-tls/alertmanager-client.key
+        server_name: agency-alertmanager.nas.invalid
+        min_version: TLS13
+      static_configs:
+        - targets: ["172.31.254.10:9093"]

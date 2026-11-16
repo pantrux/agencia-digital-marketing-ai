@@ -1,0 +1,19 @@
+{
+  "name": "studio-portal-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": { "build": "next build", "dev": "next dev" },
+  "dependencies": {
+    "@uppy/core": "6.3.1",
+    "hash-wasm": "4.13.0",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "typescript": "6.0.3"
+  }
+}

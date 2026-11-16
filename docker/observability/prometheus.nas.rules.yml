@@ -1,0 +1,232 @@
+groups:
+  - name: agencia-disco-vm-media
+    interval: 15s
+    rules:
+      - alert: AgenciaDiscoMediaEspacioBajo
+        expr: min by (job, mountpoint) (system_filesystem_usage_bytes{job="agency-media-host",mountpoint="/",type="ext4",state="free"}) < 3 * 1024 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Menos de 3 GiB disponibles en el disco raíz de vm-media-01"
+      - alert: AgenciaDiscoMediaSinMuestras
+        expr: sum by (job, mountpoint) (absent_over_time(system_filesystem_usage_bytes{job="agency-media-host",mountpoint="/",type="ext4",state="free"}[3m]))
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus dejó de recibir muestras del disco raíz de vm-media-01"
+  - name: agencia-coleccion-vm-media
+    interval: 15s
+    rules:
+      - alert: AgenciaNodeExporterSinMuestras
+        expr: max by (job) (max_over_time(up{job="agency-node"}[2m])) == 0 or absent_over_time(up{job="agency-node"}[2m])
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus no recibe métricas saludables de node-exporter"
+      - alert: AgenciaCAdvisorSinMuestras
+        expr: max by (job) (max_over_time(up{job="agency-cgroups"}[2m])) == 0 or absent_over_time(up{job="agency-cgroups"}[2m])
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus no recibe métricas saludables de cAdvisor"
+  - name: agencia-puente-gpu
+    interval: 15s
+    rules:
+      - alert: AgenciaPuenteGPUSinMuestras
+        expr: max by (job) (max_over_time(up{job="agency-gpu-bridge"}[2m])) == 0 or absent_over_time(up{job="agency-gpu-bridge"}[2m])
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus no recibe métricas saludables del puente GPU"
+      - alert: AgenciaServicioGPUDegradado
+        expr: gpu_bridge_service_healthy{job="agency-gpu-bridge",service=~"immich|whisper|render"} == 0 and on (job, instance) (up{job="agency-gpu-bridge"} == 1)
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Servicio GPU degradado en {{ $labels.service }}"
+  - name: agencia-calidad-audiovisual
+    interval: 1m
+    rules:
+      - alert: AgenciaWhisperLatenciaFueraObjetivo
+        expr: |
+          histogram_quantile(0.95, sum by (job, le) (
+            rate(agency_whisper_inference_seconds_per_minute_bucket{job="agency-whisper"}[30d])
+          )) >= 8
+          and on (job) sum by (job) (increase(agency_whisper_inference_seconds_per_minute_count{job="agency-whisper"}[30d])) > 0
+          and on (job) max by (job) (up{job="agency-whisper"}) == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "El p95 observado de Whisper alcanza ocho segundos por minuto de audio"
+      - alert: AgenciaStudioAudioFueraObjetivo
+        expr: |
+          (
+            last_over_time(studio_render_audio_30d_compliant{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_produccion"}[15m])
+            / last_over_time(studio_render_audio_30d_samples{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_produccion"}[15m])
+          ) < 0.995
+          and last_over_time(studio_render_audio_30d_samples{job="agency-studio-render-audio",instance="vm-media-01",codec="nvenc",cohorte="portal_produccion"}[15m]) > 0
+          and on (job, instance) (
+            time() - last_over_time(studio_render_audio_report_unixtime_seconds{job="agency-studio-render-audio",instance="vm-media-01"}[15m]) <= 720
+          )
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "La conformidad de audio NVENC de producción cayó bajo el 99,5 %"
+      - alert: AgenciaStudioMedicionAudioDesactualizada
+        expr: |
+          time() - last_over_time(studio_render_audio_report_unixtime_seconds{job="agency-studio-render-audio",instance="vm-media-01"}[15m]) > 720
+          or absent_over_time(studio_render_audio_report_unixtime_seconds{job="agency-studio-render-audio",instance="vm-media-01"}[15m])
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus dejó de recibir informes recientes de audio de Studio"
+  - name: agencia-reversion-studio
+    interval: 15s
+    rules:
+      - alert: AgenciaReversionStudio
+        expr: |
+          (
+            time() - agency_studio_rollback_timestamp_seconds{
+              job="agency-studio-sre",instance="vm-media-01",entrega=~"[a-f0-9]{12}",
+              modo=~"ensayo|operacion",resultado=~"restaurado|pendiente",
+              sondas=~"[a-z_,]{1,120}",componentes=~"[a-z_,]{1,40}",duracion_segundos=~"[0-9.]{1,10}"
+            }
+          ) < 180 and agency_studio_rollback_timestamp_seconds{job="agency-studio-sre"} <= time()
+        labels:
+          severity: critical
+        annotations:
+          summary: "Reversión de Studio ({{ $labels.modo }}). Resultado {{ $labels.resultado }}"
+          description: "Entrega {{ $labels.entrega }}. Sondas fallidas: {{ $labels.sondas }}. Componentes pendientes: {{ $labels.componentes }}. Tiempo de recuperación: {{ $labels.duracion_segundos }} s."
+  - name: agencia-entregas-studio
+    interval: 1m
+    rules:
+      - alert: AgenciaStudioMedicionEntregasDesactualizada
+        expr: |
+          time() - last_over_time(studio_delivery_report_unixtime_seconds{job="agency-studio-delivery",instance="vm-media-01"}[15m]) > 720
+          or absent_over_time(studio_delivery_report_unixtime_seconds{job="agency-studio-delivery",instance="vm-media-01"}[15m])
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus dejó de recibir informes recientes de entregas de Studio"
+      - alert: AgenciaStudioEntregasConDemora
+        expr: |
+          last_over_time(studio_delivery_30d_pending_overdue{job="agency-studio-delivery",instance="vm-media-01",cohorte=~"portal_produccion|portal_sandbox"}[8m]) > 0
+          and on (job, instance)
+            (last_over_time(studio_delivery_report_unixtime_seconds{job="agency-studio-delivery",instance="vm-media-01"}[8m]) > time() - 480)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hay pedidos de Studio con al menos seis minutos desde el brief"
+      - alert: AgenciaStudioLatenciaFueraObjetivo
+        expr: |
+          last_over_time(studio_delivery_30d_brief_p95_seconds{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion"}[8m]) >= 360
+          and on (job, instance, cohorte)
+            (last_over_time(studio_delivery_30d_reel_samples{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion"}[8m]) > 0)
+          and on (job, instance)
+            (last_over_time(studio_delivery_report_unixtime_seconds{job="agency-studio-delivery",instance="vm-media-01"}[8m]) > time() - 480)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "El p95 de entrega de reels de 60 s alcanza o supera seis minutos"
+  - name: agencia-ingesta-studio
+    interval: 1m
+    rules:
+      - alert: AgenciaStudioR2ServidorDegradado
+        expr: |
+          last_over_time(studio_edge_r2_15m_server_errors{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}[8m]) > 0
+          and on (job, instance, bucket) (
+            last_over_time(studio_edge_r2_query_ok{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}[8m]) == 1
+          )
+          and on (job, instance, bucket) (
+            time() - last_over_time(studio_edge_r2_report_unixtime_seconds{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}[8m]) <= 720
+          )
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "R2 registró errores de servidor en las cargas multipart de Studio"
+      - alert: AgenciaStudioR2AnaliticaInaccesible
+        expr: |
+          max_over_time(studio_edge_r2_query_ok{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}[12m]) == 0
+          or absent_over_time(studio_edge_r2_query_ok{job="agency-studio-edge",instance="vm-media-01",bucket="studio-media-bucket"}[12m])
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus dejó de recibir consultas válidas de la analítica de R2"
+      - alert: AgenciaStudioIntegridadIngestaFueraObjetivo
+        expr: |
+          (
+            sum by (job, instance, cohorte) (
+              last_over_time(studio_upload_30d_sessions{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion",resultado=~"sha256_distinto|metadatos_distintos"}[8m])
+            )
+            / sum by (job, instance, cohorte) (
+              last_over_time(studio_upload_30d_sessions{job="agency-studio-delivery",instance="vm-media-01",cohorte="portal_produccion",resultado=~"verificada|completa_sin_despacho|sha256_distinto|metadatos_distintos"}[8m])
+            )
+          ) > 0.001
+          and on (job, instance) (
+            time() - last_over_time(studio_delivery_report_unixtime_seconds{job="agency-studio-delivery",instance="vm-media-01"}[15m]) <= 720
+          )
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Los fallos confirmados de integridad en cargas de producción superan el 0,1 %"
+  - name: agencia-ingreso-sofia
+    interval: 1m
+    rules:
+      - alert: AgenciaStudioSofiaIngresoDegradado
+        expr: |
+          max_over_time(studio_edge_sofia_ingress_healthy{job="agency-studio-edge",instance="vm-media-01"}[8m]) == 0
+          and on (job, instance)
+            (count_over_time(studio_edge_sofia_ingress_healthy{job="agency-studio-edge",instance="vm-media-01"}[8m]) >= 2)
+          and on (job, instance)
+            (last_over_time(studio_edge_sofia_probe_unixtime_seconds{job="agency-studio-edge",instance="vm-media-01"}[8m]) > time() - 480)
+        labels:
+          severity: warning
+        annotations:
+          summary: "El ingreso público de Sofía falló en dos comprobaciones consecutivas"
+      - alert: AgenciaStudioSofiaSondaDesactualizada
+        expr: |
+          time() - last_over_time(studio_edge_sofia_probe_unixtime_seconds{job="agency-studio-edge",instance="vm-media-01"}[15m]) > 720
+          or absent_over_time(studio_edge_sofia_probe_unixtime_seconds{job="agency-studio-edge",instance="vm-media-01"}[15m])
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus dejó de recibir comprobaciones recientes del ingreso de Sofía"
+  - name: agencia-copias-d1
+    interval: 1m
+    rules:
+      - alert: AgenciaD1CopiaDiariaSinConfirmar
+        expr: |
+          last_over_time(studio_d1_backup_expected_day_confirmed{job="agency-studio-d1-backup",instance="vm-media-01"}[8m]) == 0
+          and on (job, instance) (
+            time() - last_over_time(studio_d1_backup_report_unixtime_seconds{job="agency-studio-d1-backup",instance="vm-media-01"}[8m]) <= 480
+          )
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Faltan los dos recibos válidos de la copia diaria de D1"
+      - alert: AgenciaD1MonitorCopiaSinMuestras
+        expr: |
+          time() - last_over_time(studio_d1_backup_report_unixtime_seconds{job="agency-studio-d1-backup",instance="vm-media-01"}[15m]) > 720
+          or absent_over_time(studio_d1_backup_report_unixtime_seconds{job="agency-studio-d1-backup",instance="vm-media-01"}[15m])
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus dejó de recibir informes del respaldo diario de D1"

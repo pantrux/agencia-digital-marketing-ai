@@ -1,0 +1,181 @@
+{
+  "schema": 1,
+  "external": {
+    "edicion-de-video": {
+      "references/skeleton/build-captions.py": {
+        "size": 1979,
+        "sha256": "26f33d3849fd41c8c19b8a8b820fa217909d42cb3bd290c504ccbf86d8943f08"
+      },
+      "references/skeleton/mix-audio.py": {
+        "size": 7620,
+        "sha256": "bb27b09ae134766341c9fbb1fba61c9102f7261655814212f2fca54486e87902"
+      },
+      "references/skeleton/package.json": {
+        "size": 726,
+        "sha256": "ba628ee4eac7ba11a334fe129f3d1273ddb76be094b8ee1c3ebe276a2f22922f"
+      },
+      "references/skeleton/public/captions.json": {
+        "size": 424,
+        "sha256": "7a32be3fab6048d8b17eaf5f604063637695062d61cce24b1764980ebeab521e"
+      },
+      "references/skeleton/public/logos/claude.svg": {
+        "size": 347,
+        "sha256": "51635844d2ae983077bb8c81f46b10d142542da4c23a06e9c2faf9154cc20af4"
+      },
+      "references/skeleton/public/logos/instagram.svg": {
+        "size": 7047,
+        "sha256": "821d3a84a192e97a1744a140afd871e8a81d8f7b81fdc33cbf54e74f09ee6143"
+      },
+      "references/skeleton/public/logos/openai.svg": {
+        "size": 1690,
+        "sha256": "a4b4dae5e28790a0fb3dc7b5d8bb199b0dd6938a002e52a8b6355394c321718e"
+      },
+      "references/skeleton/README.md": {
+        "size": 1357,
+        "sha256": "34ab2af7838a78829de1f3219640cd9d3ee0890c06e6cf1fdef48946f1af89c9"
+      },
+      "references/skeleton/remotion.config.ts": {
+        "size": 221,
+        "sha256": "7049b167bb988fbe1421e73d186449a5e039c7b78c41762c28109beffdff8ced"
+      },
+      "references/skeleton/src/index.ts": {
+        "size": 109,
+        "sha256": "957e481dd33a29b4a55ae0e95dbf763b7e48c37c427ca4bd1275faf34bc07a74"
+      },
+      "references/skeleton/src/reel/brand.tsx": {
+        "size": 1152,
+        "sha256": "39c223009e76243ef4adcfbd713d8069ed61291a154cc8beee8921f5c30a7935"
+      },
+      "references/skeleton/src/reel/Captions.tsx": {
+        "size": 7356,
+        "sha256": "01aeaf22eec18f12726a6c441cc0321fdad4ca57781c56c2e0a7c6c35bb0fb9a"
+      },
+      "references/skeleton/src/reel/chapters.tsx": {
+        "size": 3625,
+        "sha256": "d86c7a2e0238e899eb79954740315c5d89b7cf2c9603b93f2204ca058b00defb"
+      },
+      "references/skeleton/src/reel/dm.tsx": {
+        "size": 8899,
+        "sha256": "a2a95ce4c9189925d0ba5b316a1b30b278248f1d760b80b492c2334bf5323e4f"
+      },
+      "references/skeleton/src/reel/motion.tsx": {
+        "size": 4002,
+        "sha256": "842e0d532d96d16fff8ff1d4d4bc88f90333acd82e21d42846e71da3534b85dc"
+      },
+      "references/skeleton/src/reel/overlays.tsx": {
+        "size": 2129,
+        "sha256": "7ec52f568eb2f7006d209bec2d66610c245d3d4a9871abd417b3453517f290ed"
+      },
+      "references/skeleton/src/reel/panels.tsx": {
+        "size": 16445,
+        "sha256": "a17dcefcf4aa1eb0f4ebfd97f729946a988ee8c4b7aed0df80a2bdd8b8c10a66"
+      },
+      "references/skeleton/src/reel/privacy.tsx": {
+        "size": 5569,
+        "sha256": "7054c28fa5482fe337a84ad3208de74ee450fcd44841c39793dde07d5f4f00ee"
+      },
+      "references/skeleton/src/reel/Reel.tsx": {
+        "size": 11230,
+        "sha256": "238b15968bc7729610b29317be32bc4895532ea3d6bdcd5e4d9419daaec58be5"
+      },
+      "references/skeleton/src/reel/seam.tsx": {
+        "size": 14280,
+        "sha256": "b05dcd2776bfb538a5ee0b205fbb215a828a46dbcf785fdba79a3adff0b34427"
+      },
+      "references/skeleton/src/reel/tokens.ts": {
+        "size": 3826,
+        "sha256": "873953bd098889b6d69e1fa871d7a7cfc9bced7690dd0e5c4532eba137f4a9e9"
+      },
+      "references/skeleton/src/Root.tsx": {
+        "size": 388,
+        "sha256": "7b937e637b968b90325df56e650819c1e14ae51cd714271db089867756bb4aff"
+      },
+      "references/skeleton/tsconfig.json": {
+        "size": 421,
+        "sha256": "d4864bf211baca2df1cd38da020fa172d1aeb77f19d4c5613b2f586027918014"
+      },
+      "scripts/medir.ps1": {
+        "size": 3021,
+        "sha256": "111d0b3466ca6cdd04b3206c759dbf0ec7f9bfc0d62d7646cc88c5c260f1cfd1"
+      },
+      "scripts/medir.sh": {
+        "size": 2397,
+        "sha256": "09cb69b96985df12a6e766082bdbc244392087c91189e0e178b728cb6d80164a"
+      },
+      "scripts/prep.ps1": {
+        "size": 4328,
+        "sha256": "457b0bcf074a63021527f1ca3e4b8ccc75e45fa89f9b9d2ae5bb0cfbdcce5a60"
+      },
+      "scripts/prep.sh": {
+        "size": 4690,
+        "sha256": "0fef2b6bb61b529b7ad1ea7fa1451ac8418375b914974bf86be8b1f2137c79f2"
+      },
+      "scripts/transcribir.ps1": {
+        "size": 1868,
+        "sha256": "3f5ac4cf506c686aa40ab2b01d5a2d652548c831912ae726135af39067a94e08"
+      },
+      "scripts/transcribir.sh": {
+        "size": 2052,
+        "sha256": "cf03a54c5394ef56e3b9ef1708a56696e426c3b8c6b797ea2d648f6f8cb0c275"
+      },
+      "SKILL.md": {
+        "size": 9655,
+        "sha256": "e8296aef2f9261e5b0b58a14ec780fce53bdab7ef6baf05ab38706f24e31dd40"
+      }
+    },
+    "remotion-dev": {
+      "references/AnimatedCaptions.tsx": {
+        "size": 5526,
+        "sha256": "19e2393ed9b1399585db02986ccc2e28d5aea1b5f05a9a6cdf1a9e6d2bd33e01"
+      },
+      "references/AnimatedEmojis.tsx": {
+        "size": 2100,
+        "sha256": "631d171192709db07118c3f36f9db441050bff7088ea23efbd4d30a2aacf3d15"
+      },
+      "references/AudiogramWaveform.tsx": {
+        "size": 2109,
+        "sha256": "91054ec0d9bf20fa5afa55811433c99f3f69c95f6a5bddbcb2fc1340aeb19dee"
+      },
+      "references/GlTransitions.tsx": {
+        "size": 1840,
+        "sha256": "88e022290122caad0227f69f32c1b5e241ac075a635a816dae27dae80458a949"
+      },
+      "references/HybridOverlay.tsx": {
+        "size": 1335,
+        "sha256": "ad229385346e1cca0d8e8d89e44a4e78929c7b704342ed8ba5c1bb11f23ef422"
+      },
+      "references/JumpCutsVideo.tsx": {
+        "size": 1969,
+        "sha256": "39ceb375703362f82bdaf2a35b753a841c4e2fae99dda0fd8dd1250066c62bca"
+      },
+      "references/remotion-agent-guidelines.md": {
+        "size": 3567,
+        "sha256": "055d8af2c2b03c353bb2154f8a2bbf91b7ad537bb3fbd69fe64c84d36d58d821"
+      },
+      "SKILL.md": {
+        "size": 6674,
+        "sha256": "44ac0b84e02613e3bf41992fd359081189076617783cd4c0e2bc660c7454743c"
+      }
+    }
+  },
+  "internal": {
+    "operacion-worker-remotion-gpu": {
+      "SKILL.md": {
+        "size": 3058,
+        "sha256": "890b4f32ddca1058c1d920f2b849c8f04dbe478cdf879cd7f17f066bc5cb53cc"
+      }
+    },
+    "protocolo-agencia-audiovisual": {
+      "SKILL.md": {
+        "size": 3333,
+        "sha256": "06083af3caaae0e046771f3dc98e64681d1692e0a90b1d42bea7505345cb7c17"
+      }
+    },
+    "rubrica-qa-audiovisual": {
+      "SKILL.md": {
+        "size": 2982,
+        "sha256": "8dab50f188b2f08f91f4a449f9cb0fb591fee2aa50d0985905834a3662e9312d"
+      }
+    }
+  }
+}

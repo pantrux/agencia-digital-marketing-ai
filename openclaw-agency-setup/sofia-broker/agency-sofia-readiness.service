@@ -1,0 +1,13 @@
+[Unit]
+Description=Preparación autenticada del socket de Sofía
+After=openclaw-gateway.service
+Requires=openclaw-gateway.service
+PartOf=openclaw-gateway.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+UMask=0077
+TimeoutStartSec=35s
+NoNewPrivileges=yes
+ExecStart=/usr/bin/python3 -I -S -B %h/.local/share/agency-sofia-owner-pilot-20261114-v6/sofia_startup_probe.py %h/.local/share/agency-sofia-owner-pilot-20261114-v6/profile.json %h/.local/share/agency-sofia-owner-pilot-20261114-v6/startup-ids.json

@@ -1,0 +1,24 @@
+[Unit]
+Description=Exportación D1 solicitada por Cloudflare Worker Cron
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/opt/media-platform/backup-d1-clock-v1 /var/lib/media-platform /mnt/producciones
+ConditionHost=vm-media-01
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/media-platform/backup-d1-clock-v1
+ExecStart=/usr/bin/python3 -I -B /opt/media-platform/backup-d1-clock-v1/backup_321_d1_clock.py
+Environment=LC_ALL=C.UTF-8
+UMask=0077
+TimeoutStartSec=13min
+TimeoutStopSec=30s
+KillMode=control-group
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/run /var/lib/media-platform/backup-d1-clock-v1 /var/lib/media-platform/.agency-backup-321.lock /mnt/producciones
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,10 @@
+[Unit]
+Description=Recepción de la orden D1 a las 03:00 de Santiago
+
+[Timer]
+OnCalendar=*-*-* 03:00..12:00 America/Santiago
+AccuracySec=1s
+Unit=agency-backup-d1-clock.service
+
+[Install]
+WantedBy=timers.target

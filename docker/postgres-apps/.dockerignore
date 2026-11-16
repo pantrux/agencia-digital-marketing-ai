@@ -1,0 +1,3 @@
+# El contexto sólo necesita la receta; no se envía configuración privada.
+**
+!Dockerfile

@@ -1,0 +1,103 @@
+name: agency-observability-trial-v1
+
+x-restricted: &restricted
+  platform: linux/amd64
+  pull_policy: never
+  restart: "no"
+  user: "65534:65534"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 64
+  networks: [metrics]
+  logging:
+    driver: local
+    options:
+      max-size: "1m"
+      max-file: "2"
+
+services:
+  otel-collector:
+    <<: *restricted
+    image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib@sha256:ac0bb9cdc844b55d2fd2655d03e596243787d6a8c52dd408b1dc96dd1bd372ee
+    command: ["--config=/etc/agency-otel.yaml"]
+    cpus: 0.50
+    mem_limit: 192m
+    memswap_limit: 192m
+    volumes:
+      - type: bind
+        source: ./otel-collector.trial.yml
+        target: /etc/agency-otel.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+
+  node-exporter:
+    <<: *restricted
+    image: quay.io/prometheus/node-exporter@sha256:da83fae85603c4e47e6c68369a7d746e2dda683dc35ea2e234b4f171e0d92798
+    command:
+      - --path.procfs=/host-proc
+      - --path.sysfs=/host-sys
+      - --collector.disable-defaults
+      - --collector.cpu
+      - --collector.meminfo
+      - --collector.loadavg
+    cpus: 0.25
+    mem_limit: 64m
+    memswap_limit: 64m
+    volumes:
+      - type: bind
+        source: /proc/stat
+        target: /host-proc/stat
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /proc/meminfo
+        target: /host-proc/meminfo
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /proc/loadavg
+        target: /host-proc/loadavg
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /sys/devices/system/cpu
+        target: /host-sys/devices/system/cpu
+        read_only: true
+        bind:
+          create_host_path: false
+
+  cadvisor:
+    <<: *restricted
+    image: ghcr.io/google/cadvisor@sha256:bd7c00644d65e6c9fc2c151cab70d2e86d7fe3e0182cfb9863120ec2e017cf01
+    command:
+      - --docker_only=true
+      - --raw_cgroup_prefix_whitelist=/system.slice/docker-
+      - --disable_root_cgroup_stats=true
+      - --store_container_labels=false
+      - --enable_metrics=cpu,memory
+      - --housekeeping_interval=15s
+      - --global_housekeeping_interval=15s
+      - --max_procs=1
+      - --profiling=false
+    # Lee las rutas reales del driver systemd. No entrega la API Docker al contenedor.
+    cgroup: host
+    cpus: 0.25
+    mem_limit: 128m
+    memswap_limit: 128m
+    volumes:
+      - type: bind
+        source: /sys/fs/cgroup
+        target: /sys/fs/cgroup
+        read_only: true
+        bind:
+          create_host_path: false
+
+networks:
+  metrics:
+    driver: bridge
+    internal: true

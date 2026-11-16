@@ -1,0 +1,28 @@
+[Unit]
+Description=Copias 3-2-1 de la plataforma audiovisual
+Wants=network-online.target
+After=network-online.target docker.service agency-immich-lan.service
+Requisite=docker.service
+RequiresMountsFor=/opt/media-platform/backup-321-runtime-v3b /var/lib/media-platform /mnt/producciones
+ConditionHost=vm-media-01
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/media-platform/backup-321-runtime-v3b
+ExecStart=/usr/bin/python3 -I -B /opt/media-platform/backup-321-runtime-v3b/backup_321_daily.py --retention apply
+Environment=LC_ALL=C.UTF-8
+UMask=0077
+TimeoutStartSec=5h
+TimeoutStopSec=30s
+KillMode=control-group
+Restart=no
+RemainAfterExit=no
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/run /var/lib/media-platform /mnt/producciones
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agency-backup-321-daily

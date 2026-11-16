@@ -1,0 +1,44 @@
+# Contexto zoubase fijado al OCI local de la aplicación Zou.
+FROM zoubase
+
+COPY --chown=0:0 --chmod=0555 media/bin/ffmpeg media/bin/ffprobe /opt/zou-media-v1/bin/
+COPY --chown=0:0 --chmod=0444 \
+    media/lib/libavcodec.so.63 \
+    media/lib/libavdevice.so.63 \
+    media/lib/libavfilter.so.12 \
+    media/lib/libavformat.so.63 \
+    media/lib/libavutil.so.61 \
+    media/lib/libdav1d.so.7 \
+    media/lib/libfontconfig.so.1 \
+    media/lib/libfreetype.so.6 \
+    media/lib/libfribidi.so.0 \
+    media/lib/libglib-2.0.so.0 \
+    media/lib/libgraphite2.so.3 \
+    media/lib/libharfbuzz.so.0 \
+    media/lib/libmp3lame.so.0 \
+    media/lib/libpcre2-8.so.0 \
+    media/lib/libpng16.so.16 \
+    media/lib/libswresample.so.7 \
+    media/lib/libswscale.so.10 \
+    media/lib/libx264.so.165 \
+    /opt/zou-media-v1/lib/
+
+# OpenCV se carga en el proceso Python de Zou.
+COPY --chown=0:0 --chmod=0444 \
+    opencv/libIex-3_5.so.34 \
+    opencv/libIlmThread-3_5.so.34 \
+    opencv/libImath-3_2.so.30 \
+    opencv/libOpenEXR-3_5.so.34 \
+    opencv/libOpenEXRCore-3_5.so.34 \
+    opencv/libdeflate.so.0 \
+    opencv/libopenjph.so.0.32 \
+    opencv/libpng16.so.16 \
+    /usr/lib/
+
+COPY --chown=0:0 --chmod=0555 ffmpeg-zou.sh /usr/bin/ffmpeg
+COPY --chown=0:0 --chmod=0555 ffprobe-zou.sh /usr/bin/ffprobe
+
+# COPY aplica 0444 también al directorio nuevo. Restaurar sólo su bit de paso.
+USER 0:0
+RUN --network=none ["/bin/chmod", "0555", "/opt/zou-media-v1/lib"]
+USER 1000:1000

@@ -1,0 +1,20 @@
+[Unit]
+Description=Traspaso firmado de las producciones verificadas por n8n
+After=agency-production-inbox.service
+RequiresMountsFor=/mnt/producciones
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_handoff.py %d/profile
+TimeoutStartSec=40
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ReadWritePaths=/mnt/producciones/.agency-production-handoff
+RestrictAddressFamilies=AF_UNIX

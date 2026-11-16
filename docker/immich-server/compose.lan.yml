@@ -1,0 +1,223 @@
+name: agency-media-immich-lan
+
+x-service: &service
+  platform: linux/amd64
+  pull_policy: never
+  privileged: false
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: "no"
+  dns: ["127.0.0.1"]
+  stop_grace_period: 60s
+  logging:
+    driver: local
+    options: {max-size: "10m", max-file: "2"}
+
+services:
+  postgres-immich:
+    <<: *service
+    image: sha256:4e2f960dcbc4c5fecf8c8b8a07231700c2f8920350539220ef6e8c6053c78dae
+    labels:
+      agency.owner: agencia-digital-marketing-ai:postgres-immich-lan:v1
+    user: "70:70"
+    cpus: "1.0"
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 128
+    shm_size: 128m
+    stop_signal: SIGINT
+    command: [postgres, -c, shared_preload_libraries=vchord.so]
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_USER: postgres
+      POSTGRES_DB: immich
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256 --auth-local=scram-sha-256
+      PGPASSFILE: /run/secrets/postgres_pgpass
+    secrets: [postgres_password, postgres_pgpass]
+    volumes:
+      - type: bind
+        source: /var/lib/media-platform/immich-lan-v1/postgres
+        target: /var/lib/postgresql/data
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m,uid=70,gid=70,mode=0775
+    networks: [data]
+    healthcheck:
+      test: [CMD, /usr/local/bin/psql, -X, -q, -A, -t, -w, -h, 127.0.0.1, -p, "5432", -U, postgres, -d, immich, --set=ON_ERROR_STOP=1, -c, SELECT 1]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 60s
+
+  immich-valkey:
+    <<: *service
+    image: sha256:de6fbe9626fea9f6f297b6867d2c8cf8f0394ee5ed171613166fc093cb49d0a6
+    labels:
+      agency.owner: agencia-digital-marketing-ai:immich-lan:v1
+    user: "1000:1000"
+    cpus: "0.5"
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    command:
+      - valkey-server
+      - --bind
+      - 0.0.0.0
+      - --protected-mode
+      - "yes"
+      - --port
+      - "6379"
+      - --aclfile
+      - /run/secrets/immich_redis_acl
+      - --save
+      - ""
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --dir
+      - /data
+      - --maxmemory
+      - 96mb
+      - --maxmemory-policy
+      - noeviction
+    secrets: [immich_redis_acl, immich_redis_password]
+    volumes:
+      - type: bind
+        source: /var/lib/media-platform/immich-lan-v1/valkey
+        target: /data
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
+    networks: [data]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          REDISCLI_AUTH=$$(cat /run/secrets/immich_redis_password) &&
+          test -n "$$REDISCLI_AUTH" && export REDISCLI_AUTH &&
+          test "$$(valkey-cli --no-auth-warning -e -h 127.0.0.1 -p 6379 --user immich ping)" = PONG
+      interval: 10s
+      timeout: 4s
+      retries: 3
+
+  immich-ml-auth:
+    <<: *service
+    image: sha256:077a815fb7f45eedee7fdb799d52519de21266884eb0bcdd6b38d0b78ca0f723
+    labels:
+      agency.owner: agencia-digital-marketing-ai:immich-lan:v1
+    user: "65532:65532"
+    init: true
+    stop_signal: SIGINT
+    stop_grace_period: 135s
+    cpus: "0.5"
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 64
+    secrets: [gpu_bridge_bearer]
+    networks:
+      ml: {}
+      ml_egress:
+        gw_priority: 1
+    healthcheck:
+      test: [CMD, python, -I, /app/proxy.py, --healthcheck]
+      interval: 30s
+      timeout: 7s
+      start_period: 10s
+      retries: 3
+
+  immich-server:
+    <<: *service
+    image: sha256:9379466497dbddf101825a04ffb90e06ff5a2ebb49250a0c3810944c6b67392c
+    labels:
+      agency.owner: agencia-digital-marketing-ai:immich-lan:v1
+    user: "1000:1000"
+    cpus: "2.0"
+    mem_limit: 2g
+    memswap_limit: 2g
+    pids_limit: 128
+    depends_on:
+      postgres-immich: {condition: service_healthy}
+      immich-valkey: {condition: service_healthy}
+      immich-ml-auth: {condition: service_healthy}
+    environment:
+      IMMICH_CONFIG_FILE: /run/immich/lan.json
+      IMMICH_MEDIA_LOCATION: /data
+      IMMICH_HOST: 0.0.0.0
+      IMMICH_PORT: "2283"
+      IMMICH_LOG_LEVEL: log
+      CPU_CORES: ${MEDIA_IMMICH_LAN_CPU_CORES:-2}
+      DB_HOSTNAME: postgres-immich
+      DB_PORT: "5432"
+      DB_DATABASE_NAME: immich
+      DB_USERNAME: immich
+      DB_PASSWORD_FILE: /run/secrets/immich_db_password
+      DB_VECTOR_EXTENSION: vectorchord
+      REDIS_HOSTNAME: immich-valkey
+      REDIS_PORT: "6379"
+      REDIS_USERNAME: immich
+      REDIS_PASSWORD_FILE: /run/secrets/immich_redis_password
+    ports: ["192.168.0.85:2283:2283/tcp"]
+    secrets: [immich_db_password, immich_redis_password]
+    volumes:
+      - type: bind
+        source: ${MEDIA_IMMICH_LAN_DATA_PATH:-/var/lib/media-platform/immich-lan-v1/data}
+        target: /data
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${MEDIA_IMMICH_LAN_LIBRARY_PATH:?Falta la ruta acreditada de la biblioteca NFS}
+        target: /external/producciones
+        read_only: true
+        bind:
+          create_host_path: false
+          propagation: rprivate
+      - type: bind
+        source: ${MEDIA_IMMICH_LAN_CONFIG_FILE:?Falta la configuración privada acreditada}
+        target: /run/immich/lan.json
+        read_only: true
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777
+    networks:
+      data: {}
+      ml: {}
+      lan:
+        gw_priority: 1
+    healthcheck:
+      test: [CMD, /usr/src/app/server/bin/immich-healthcheck]
+      interval: 10s
+      timeout: 4s
+      start_period: 180s
+      retries: 3
+
+networks:
+  data:
+    external: true
+    name: agency-immich-lan-data-v1
+  ml:
+    external: true
+    name: agency-immich-lan-ml-v1
+  ml_egress:
+    external: true
+    name: agency-immich-lan-ml-egress-v1
+  lan:
+    external: true
+    name: agency-immich-lan-ingress-v1
+
+secrets:
+  postgres_password:
+    file: ${MEDIA_IMMICH_LAN_PG_PASSWORD_FILE:?Falta archivo de contraseña de postgres}
+  postgres_pgpass:
+    file: ${MEDIA_IMMICH_LAN_PGPASS_FILE:?Falta archivo pgpass}
+  immich_db_password:
+    file: ${MEDIA_IMMICH_LAN_DB_PASSWORD_FILE:?Falta archivo de contraseña del rol Immich}
+  immich_redis_password:
+    file: ${MEDIA_IMMICH_LAN_VALKEY_PASSWORD_FILE:?Falta archivo de contraseña Valkey}
+  immich_redis_acl:
+    file: ${MEDIA_IMMICH_LAN_VALKEY_ACL_FILE:?Falta ACL Valkey}
+  gpu_bridge_bearer:
+    file: ${MEDIA_IMMICH_LAN_GPU_BEARER_FILE:?Falta archivo Bearer GPU}

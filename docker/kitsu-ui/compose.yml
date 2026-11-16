@@ -1,0 +1,47 @@
+name: agency-media-ui
+
+services:
+  kitsu-ui:
+    image: ${MEDIA_KITSU_UI_IMAGE_MANIFEST:?Falta MEDIA_KITSU_UI_IMAGE_MANIFEST}
+    pull_policy: never
+    platform: linux/amd64
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    cpus: "0.5"
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 32
+    volumes:
+      - type: bind
+        source: /opt/media-platform/kitsu-ui-refresh-v1/dns-recovery-v1/nginx.conf
+        target: /etc/nginx/kitsu.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,uid=1000,gid=1000,mode=0700
+    networks: [app]
+    ports:
+      - "${MEDIA_VM_IP:?Falta MEDIA_VM_IP}:8081:8081"
+    healthcheck:
+      # Valida la configuración de Nginx y su socket IPv4 de escucha.
+      test:
+        - CMD-SHELL
+        - >-
+          /usr/bin/nginx -e stderr -t -q -c /etc/nginx/kitsu.conf &&
+          /bin/busybox awk '$$2 == "00000000:1F91" && $$4 == "0A" {ready=1} END {exit !ready}' /proc/net/tcp
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "2"}
+
+networks:
+  app:
+    external: true
+    name: ${MEDIA_PLATFORM_APP_NETWORK_NAME:?Falta MEDIA_PLATFORM_APP_NETWORK_NAME}

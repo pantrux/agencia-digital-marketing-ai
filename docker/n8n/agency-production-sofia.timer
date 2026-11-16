@@ -1,0 +1,10 @@
+[Unit]
+Description=Despacho periódico de ingestas acreditadas hacia Sofía
+
+[Timer]
+OnBootSec=75s
+OnUnitInactiveSec=40s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

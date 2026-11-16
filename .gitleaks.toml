@@ -1,0 +1,55 @@
+title = "Detección de secretos de la plataforma audiovisual"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Bóveda local y artefactos descargados; la plantilla sí se inspecciona"
+paths = [
+  '''(^|/)\.env$''',
+  # RE2 no admite negaciones anticipadas: se enumeran los prefijos distintos de example.
+  '''(^|/)\.env\.(?:[^e/][^/]*|e[^x/][^/]*|ex[^a/][^/]*|exa[^m/][^/]*|exam[^p/][^/]*|examp[^l/][^/]*|exampl[^e/][^/]*|example[^/]+|e|ex|exa|exam|examp|exampl)$''',
+  '''(^|/)(?:\.git|\.tools|node_modules|coverage|\.ruff_cache|\.pytest_cache|__pycache__)(?:/|$)''',
+]
+
+# Anclas exactas para huellas verificadas y datos de pruebas.
+
+[[allowlists]]
+description = "Huella exacta del catálogo de paquetes de n8n."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^docker/n8n/replay_server_linux_baseline\.py$''', '''^docker/n8n/replay_server_linux_baseline_v2\.py$''']
+regexes = ['''^6c9131b3dd533604432ea361b49cae43385216e16812adb0d1d3c8d3719c3123$''']
+
+[[allowlists]]
+description = "Huella exacta del archivo de clave que verifica el operador NAS."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^docker/observability/nas_operator\.py$''']
+regexes = ['''^ac16c2639d41e79e26498902b3c453426501c174f8107cb2df9aa0b258ff2ec1$''']
+
+[[allowlists]]
+description = "Huella exacta de la clave pública que verifica el índice Alpine."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^docker/postgres-apps/prepare_alpine_update\.py$''']
+regexes = ['''^207e4696d3c05f7cb05966aee557307151f1f00217af4143c1bcaf33b8df733f$''']
+
+[[allowlists]]
+description = "Nombre literal de una variable del catálogo de la bóveda."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^scripts/ci/document_vault\.py$''']
+regexes = ['''^AGENCY_N8N_TLS_CA_KEY_B64$''']
+
+[[allowlists]]
+description = "Contraseña fija que sólo usa el simulador HTTP de la prueba."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^tests/face_manifest_accept_probe\.test\.cjs$''']
+regexes = ['''^temporary-secret-0123$''']

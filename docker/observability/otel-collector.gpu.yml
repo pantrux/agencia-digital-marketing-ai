@@ -1,0 +1,90 @@
+receivers:
+  hostmetrics/media:
+    collection_interval: 15s
+    scrapers:
+      filesystem:
+        include_mount_points:
+          mount_points: ["/"]
+          match_type: strict
+        include_fs_types:
+          fs_types: [ext4]
+          match_type: strict
+        metrics:
+          system.filesystem.inodes.usage:
+            enabled: false
+  prometheus:
+    config:
+      global:
+        scrape_interval: 15s
+        scrape_timeout: 5s
+        body_size_limit: 64KB
+        sample_limit: 64
+        label_limit: 10
+      scrape_configs:
+        - job_name: agency-gpu-bridge
+          metrics_path: /metrics
+          follow_redirects: false
+          authorization:
+            type: Bearer
+            credentials_file: ${env:CREDENTIALS_DIRECTORY}/gpu-token
+          static_configs:
+            - targets: ["192.168.0.6:9835"]
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              regex: "gpu_bridge_service_(alive|healthy|restarts_total)|gpu_(memory_(total|used)_mib|temperature_celsius|utilization_percent|encoder_sessions(_available)?)"
+              action: keep
+        - job_name: agency-whisper
+          metrics_path: /metrics
+          follow_redirects: false
+          authorization:
+            type: Bearer
+            credentials_file: ${env:CREDENTIALS_DIRECTORY}/gpu-token
+          static_configs:
+            - targets: ["192.168.0.6:8000"]
+          metric_relabel_configs:
+            - source_labels: [__name__]
+              regex: "agency_whisper_inference_seconds_per_minute_(bucket|sum|count)"
+              action: keep
+
+processors:
+  resource/media:
+    attributes:
+      - key: service.name
+        action: upsert
+        value: agency-media-host
+      - key: service.instance.id
+        action: upsert
+        value: vm-media-01
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 96
+    spike_limit_mib: 24
+
+exporters:
+  otlp_http/nas:
+    metrics_endpoint: https://192.168.0.8:9090/api/v1/otlp/v1/metrics
+    compression: gzip
+    timeout: 5s
+    tls:
+      ca_file: ${env:CREDENTIALS_DIRECTORY}/nas-ca
+      cert_file: ${env:CREDENTIALS_DIRECTORY}/nas-client
+      key_file: ${env:CREDENTIALS_DIRECTORY}/nas-key
+      min_version: "1.3"
+    sending_queue:
+      enabled: false
+    retry_on_failure:
+      enabled: false
+
+service:
+  telemetry:
+    metrics:
+      level: none
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      processors: [memory_limiter]
+      exporters: [otlp_http/nas]
+    metrics/media:
+      receivers: [hostmetrics/media]
+      processors: [memory_limiter, resource/media]
+      exporters: [otlp_http/nas]

@@ -1,0 +1,425 @@
+{
+  "external_archives": [
+    {
+      "archive": {
+        "bytes": 291397,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/imath-3.2.3-r2.apk",
+        "sha256": "db4a417a28a4718171e567d5d15f1c792b65aa03964d91aca226324d741aae5c"
+      },
+      "authentication_receipt": {
+        "bytes": 2164,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/imath-3.2.3-r2.json",
+        "sha256": "366e4d09136460a652fafbd68de139c321da98e6ad440cadfcc9a72989b38fbe"
+      },
+      "name": "imath",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1mYg5u5P4u8UIUgVG/tdc5L5vUVI=",
+        "D": "so:libc.so.6 so:libm.so.6 so:libstdc++.so.6",
+        "I": "381574",
+        "L": "BSD-3-Clause",
+        "P": "imath",
+        "S": "291397",
+        "T": "C++ and python library of 2D and 3D vector, matrix, and math operations for computer graphics",
+        "V": "3.2.3-r2",
+        "c": "4cd41f2320a048e26dd6981e8014b6214d63700c",
+        "m": "wolfi",
+        "o": "imath",
+        "p": "so-ver:libImath-3_2.so.30=3.2.3-r2 so:libImath-3_2.so.30=30",
+        "t": "1791601205"
+      },
+      "version": "3.2.3-r2"
+    },
+    {
+      "archive": {
+        "bytes": 57769,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/libdeflate-libs-1.19-r10.apk",
+        "sha256": "ab38b6c710aaca3d06b9ccb2f30d16c462ad1fb650db48d50e5eb7c0c0d3ce29"
+      },
+      "authentication_receipt": {
+        "bytes": 1950,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/libdeflate-libs-1.19-r10.json",
+        "sha256": "ac518d86dc104a27a3e8b33068922da4372ab036c993cb0f8b4635351ac7cf37"
+      },
+      "name": "libdeflate-libs",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1PSvuGUTvFfxCeGG1LXkLqfvWiDI=",
+        "D": "so:libc.so.6",
+        "I": "123065",
+        "L": "MIT",
+        "P": "libdeflate-libs",
+        "S": "57769",
+        "T": "libdeflate shared libraries",
+        "V": "1.19-r10",
+        "c": "436728c87608f53d0e9132ce4a1bfc014d2bf3cd",
+        "m": "wolfi",
+        "o": "libdeflate",
+        "p": "so-ver:libdeflate.so.0=1.19-r10 so:libdeflate.so.0=0",
+        "t": "1791641378"
+      },
+      "version": "1.19-r10"
+    },
+    {
+      "archive": {
+        "bytes": 268185,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/libopenjph0.32-0.32.0-r0.apk",
+        "sha256": "fa2543424239e1930227852ba3c7b4c3f8887b8727ce13cc2faea75c53ff0c52"
+      },
+      "authentication_receipt": {
+        "bytes": 2175,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/libopenjph0.32-0.32.0-r0.json",
+        "sha256": "d0f1fd29faf7d5e7fd969c8870768442673fdbb8ff7f6e52b4d308903e873436"
+      },
+      "name": "libopenjph0.32",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1a4N4sEWtGI0B50K/E2Tu8oTsm6Y=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6 so:libgcc_s.so.1 so:libm.so.6 so:libstdc++.so.6",
+        "I": "712884",
+        "L": "BSD-2-Clause",
+        "P": "libopenjph0.32",
+        "S": "268185",
+        "T": "${{package.name} libraries",
+        "V": "0.32.0-r0",
+        "c": "87dd9efbe01249cc2ba62d39a8dd691d1a16538d",
+        "m": "wolfi",
+        "o": "openjph",
+        "p": "so-ver:libopenjph.so.0.32=0.32.0-r0 so:libopenjph.so.0.32=0.32",
+        "t": "1789658288"
+      },
+      "version": "0.32.0-r0"
+    },
+    {
+      "archive": {
+        "bytes": 153195,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/libpng16-16-1.6.59-r2.apk",
+        "sha256": "ec6af7e0b784f87743ebe3e481eeb011e7d42c43aa4db76d23fabe96b5afb680"
+      },
+      "authentication_receipt": {
+        "bytes": 2105,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/libpng16-16-1.6.59-r2.json",
+        "sha256": "29c150498bc87a1e0d94ad11a5e4bb936d7f6f7bda9be9674205916da2af76c2"
+      },
+      "name": "libpng16-16",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1GAy6XXVGon6aTiTZSpblWvGsyTA=",
+        "D": "so:libc.so.6 so:libm.so.6 so:libz.so.1",
+        "I": "297871",
+        "L": "libpng-2.0",
+        "P": "libpng16-16",
+        "S": "153195",
+        "T": "Portable Network Graphics library",
+        "V": "1.6.59-r2",
+        "c": "b9898dbb7125f3678bc8c6cd9e7a43d9d9d2c518",
+        "m": "wolfi",
+        "o": "libpng",
+        "p": "so-ver:libpng16.so.16=1.6.59-r2 so:libpng16.so.16=16",
+        "t": "1793905898"
+      },
+      "version": "1.6.59-r2"
+    },
+    {
+      "archive": {
+        "bytes": 1267168,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/libstdc++-16.2.0-r2.apk",
+        "sha256": "91d46dc63af715208b8d1424909f4df7e30cbc2321afaa9dcd412476e0297ebd"
+      },
+      "authentication_receipt": {
+        "bytes": 2349,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/libstdc++-16.2.0-r2.json",
+        "sha256": "0fa73815bbb155714254fbffedc30b2f4a504e1aca768b742a4df4d8fb66e450"
+      },
+      "name": "libstdc++",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1TDYeh0Iq9Fjbp5cPck+zZfmDn14=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6 so:libgcc_s.so.1 so:libm.so.6",
+        "I": "3580046",
+        "L": "GPL-3.0-or-later WITH GCC-exception-3.1",
+        "P": "libstdc++",
+        "S": "1267168",
+        "T": "",
+        "V": "16.2.0-r2",
+        "c": "1a8a06e57ab63d92834a9467dd0eaa5d54ade3b0",
+        "m": "wolfi",
+        "o": "gcc",
+        "p": "libstdc++-16=16.2.0-r2 so-ver:libstdc++.so.6=16.2.0-r2 so:libstdc++.so.6=6",
+        "t": "1793036444"
+      },
+      "version": "16.2.0-r2"
+    },
+    {
+      "archive": {
+        "bytes": 185144,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/openexr-libiex-3.5.3-r0.apk",
+        "sha256": "71000163616cfc26220b2e3601eb4115b3ed0e9fbb59104542b9aee64be25944"
+      },
+      "authentication_receipt": {
+        "bytes": 2117,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/openexr-libiex-3.5.3-r0.json",
+        "sha256": "ad05d0b0bc48513fc7a3f0d82494b8a08a2854b8e2c7128ab6bf7f22e9d958cd"
+      },
+      "name": "openexr-libiex",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1SAnazof6OFYD7Q6okf4eOU+CEkw=",
+        "D": "so:libc.so.6 so:libgcc_s.so.1 so:libstdc++.so.6",
+        "I": "852297",
+        "L": "BSD-3-Clause",
+        "P": "openexr-libiex",
+        "S": "185144",
+        "T": "openexr libiex",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "so-ver:libIex-3_5.so.34=3.5.3-r0 so:libIex-3_5.so.34=34",
+        "t": "1793416744"
+      },
+      "version": "3.5.3-r0"
+    },
+    {
+      "archive": {
+        "bytes": 38162,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/openexr-libilmthread-3.5.3-r0.apk",
+        "sha256": "e19aa82887d780ea3469b9d539553d718584ffd5ee88bd4a2554fbd2591a0343"
+      },
+      "authentication_receipt": {
+        "bytes": 2194,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/openexr-libilmthread-3.5.3-r0.json",
+        "sha256": "122ff00eb1ab54c7bed03d4c7c8a87210302907e34fdc4590eb1591c96c22edf"
+      },
+      "name": "openexr-libilmthread",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1CntS9FWFm77JAJw6RouJDmhPf98=",
+        "D": "so:libIex-3_5.so.34 so:libc.so.6 so:libgcc_s.so.1 so:libstdc++.so.6",
+        "I": "104333",
+        "L": "BSD-3-Clause",
+        "P": "openexr-libilmthread",
+        "S": "38162",
+        "T": "openexr libilmthread",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "so-ver:libIlmThread-3_5.so.34=3.5.3-r0 so:libIlmThread-3_5.so.34=34",
+        "t": "1793416744"
+      },
+      "version": "3.5.3-r0"
+    },
+    {
+      "archive": {
+        "bytes": 680497,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/openexr-libopenexr-3.5.3-r0.apk",
+        "sha256": "868edec4ef266ddd3b41848f189a2cd20e32565a150b83c18d90152249ad933a"
+      },
+      "authentication_receipt": {
+        "bytes": 2268,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/openexr-libopenexr-3.5.3-r0.json",
+        "sha256": "787b1e34b632e6f95fd37ce700c9832e6fa04ea14750c3376598dbb4b75c1370"
+      },
+      "name": "openexr-libopenexr",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1V5p79F7yNI316eEQYYS+tk5irk0=",
+        "D": "so:libIex-3_5.so.34 so:libIlmThread-3_5.so.34 so:libImath-3_2.so.30 so:libOpenEXRCore-3_5.so.34 so:libc.so.6 so:libgcc_s.so.1 so:libm.so.6 so:libstdc++.so.6",
+        "I": "1916409",
+        "L": "BSD-3-Clause",
+        "P": "openexr-libopenexr",
+        "S": "680497",
+        "T": "openexr libopenexr",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "so-ver:libOpenEXR-3_5.so.34=3.5.3-r0 so:libOpenEXR-3_5.so.34=34",
+        "t": "1793416744"
+      },
+      "version": "3.5.3-r0"
+    },
+    {
+      "archive": {
+        "bytes": 667274,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/openexr-libopenexrcore-3.5.3-r0.apk",
+        "sha256": "bb00831805787e8f9d27b2340fd60245125f774d5c78374155e680d74c47e911"
+      },
+      "authentication_receipt": {
+        "bytes": 2277,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/openexr-libopenexrcore-3.5.3-r0.json",
+        "sha256": "bc94ac6defe51034e6046dad8ea6361a879e6e44b225bcd4b8b6afd3dd46276b"
+      },
+      "name": "openexr-libopenexrcore",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1dc3ENq9OadDaIrQYUF8ZJUzVk8E=",
+        "D": "so:ld-linux-x86-64.so.2 so:libc.so.6 so:libdeflate.so.0 so:libgcc_s.so.1 so:libm.so.6 so:libopenjph.so.0.32 so:libstdc++.so.6",
+        "I": "1588649",
+        "L": "BSD-3-Clause",
+        "P": "openexr-libopenexrcore",
+        "S": "667274",
+        "T": "openexr libopenexrcore",
+        "V": "3.5.3-r0",
+        "c": "af19e42ac0ae09a42264b99e852055c091a62a73",
+        "m": "wolfi",
+        "o": "openexr",
+        "p": "so-ver:libOpenEXRCore-3_5.so.34=3.5.3-r0 so:libOpenEXRCore-3_5.so.34=34",
+        "t": "1793416744"
+      },
+      "version": "3.5.3-r0"
+    },
+    {
+      "archive": {
+        "bytes": 12403757,
+        "path": ".tools/kitsu-zou-opencv-sdk-v1/kit-755ea032b52a767f/data/apks/python-3.12-base-3.12.16-r0.apk",
+        "sha256": "0a79422e80e1d164899c8e25737f3ca6b7058f3e8e0dc52ecc75197e2630090d"
+      },
+      "authentication_receipt": {
+        "bytes": 305841,
+        "path": ".tools/zou-native-research-v1/opencv-inputs-v1/receipts/python-3.12-base-3.12.16-r0.json",
+        "sha256": "3d9da7f260c9e5080ed232efd5fb4ffe33927042aa8eb3f23795af9eca19af39"
+      },
+      "name": "python-3.12-base",
+      "record": {
+        "A": "x86_64",
+        "C": "Q1G3V7umduU1h6fR92rTIbRNB60H4=",
+        "D": "py3-pip-wheel so:ld-linux-x86-64.so.2 so:libbz2.so.1 so:libc.so.6 so:libcrypt.so.1 so:libcrypto.so.4 so:libexpat.so.1 so:libffi.so.8 so:libgdbm.so.6 so:libgdbm_compat.so.4 so:liblzma.so.5 so:libm.so.6 so:libmpdec.so.4 so:libncursesw.so.6 so:libpanelw.so.6 so:libreadline.so.8 so:libsqlite3.so.0 so:libssl.so.4 so:libtinfo.so.6 so:libuuid.so.1 so:libz.so.1",
+        "I": "36543792",
+        "L": "PSF-2.0",
+        "P": "python-3.12-base",
+        "S": "12403757",
+        "T": "python-3.12 without /usr/bin/python3",
+        "V": "3.12.16-r0",
+        "c": "22063bc246742742a25cd702202142c433afcf1e",
+        "m": "wolfi",
+        "o": "python-3.12",
+        "p": "cmd:pydoc3.12=3.12.16-r0 cmd:python3.12=3.12.16-r0 so-ver:libpython3.12.so.1.0=3.12.16-r0 so:libpython3.12.so.1.0=1.0",
+        "t": "1792969341"
+      },
+      "version": "3.12.16-r0"
+    }
+  ],
+  "osv_protocol": {
+    "documentation": "https://google.github.io/osv.dev/post-v1-query/",
+    "endpoint": "https://api.osv.dev/v1/query",
+    "method": "POST",
+    "request_next_page_field": "page_token",
+    "require_pagination_exhausted": true,
+    "response_next_page_field": "next_page_token"
+  },
+  "output_relative": ".tools/backup-source-build/opencv-wheel-inventory-v1",
+  "owner": "agencia-digital-marketing-ai:opencv-wheel-inventory:v1",
+  "queries_performed": false,
+  "references": {
+    "manifest": {
+      "bytes": 203011,
+      "path": ".tools/backup-source-build/opencv-relocation-inputs-v1/manifest-approved.json",
+      "sha256": "1207f5840f3d663775ee54fd377688ef00081681a1a50952df61c5d1ee01cd3a"
+    },
+    "packager": {
+      "bytes": 26860,
+      "path": "docker/kitsu-zou/package_opencv_minimal.py",
+      "sha256": "831a28043da1de203bae7845244e90efd548da4cd75f707d1358d33288b2b9d9"
+    },
+    "parser": {
+      "bytes": 58437,
+      "path": "docker/postgres-immich/final_image_remote.py",
+      "sha256": "9e0a282940bd7585b6953b43dbc3f02df9bf01bb9f775e5a7a4eb1172ed4fa49"
+    },
+    "relocation_receipt": {
+      "bytes": 2654,
+      "path": ".tools/backup-source-build/opencv-relocated-wheel-v1/receipt.json",
+      "sha256": "b88343d49decd86328a6d74d4c02b01789c83ed4d12ce7339a81d38eeada3c18"
+    },
+    "relocator": {
+      "bytes": 30407,
+      "path": "docker/kitsu-zou/prepare_opencv_relocated_wheel.py",
+      "sha256": "b7b14e650a0eb900f585591077680fa91a335c0224057ad99cb24e68afd771f6"
+    },
+    "sdk_approval": {
+      "bytes": 3424,
+      "path": ".tools/evidence/phase4-zou-opencv-openexr3-sdk-root-approval-v1.json",
+      "sha256": "666f51e18365eb14a4d1c386fdf8c803e2b01076db75e9e296e4f5898a78ecca"
+    },
+    "sdk_cdx": {
+      "bytes": 74667,
+      "path": ".tools/evidence/phase4-zou-opencv-openexr3-inputs-current-sca-v1.cdx.json",
+      "sha256": "9538e95604d10a89cfe4b40337569e67139dc829088be754603bf3fa464141e6"
+    },
+    "sdk_sca_receipt": {
+      "bytes": 3980,
+      "path": ".tools/evidence/phase4-zou-opencv-openexr3-inputs-current-sca-v1.receipt.json",
+      "sha256": "42b066e199e3b148444dc21f9c40f9b32f3deb9b0bb7ac3ac56142ab56726a52"
+    },
+    "sdk_stage": {
+      "bytes": 2255,
+      "path": ".tools/evidence/phase4-zou-opencv-openexr3-sdk-v1.sdk.b8549de8bb885ffd.json",
+      "sha256": "b8549de8bb885ffd2af593200474816c6875f39cb11a2cd904ce67aaf8a969de"
+    },
+    "source_archive": {
+      "bytes": 95450266,
+      "path": ".tools/zou-native-research-v1/opencv-4.13.0-fe38fc6.tar.gz",
+      "sha256": "6a7508554941c1a698c243b2212b2985ce59a65a3e0348d53c2158607d801e61"
+    },
+    "wheel": {
+      "bytes": 6320026,
+      "path": ".tools/backup-source-build/opencv-relocated-wheel-v1/wheel/opencv_python_headless-4.13.0.92+agency1-cp312-cp312-linux_x86_64.whl",
+      "sha256": "1c03ca69b42b10ca1ff75bdc64113ca2885d7f502edbba369b9779f2da1b51cd"
+    }
+  },
+  "runtime_verified": false,
+  "scan_performed": false,
+  "schema_version": 1,
+  "security_approved": false,
+  "source_identity": {
+    "commit": "fe38fc608f6acb8b68953438a62305d8318f4fcd",
+    "license": "Apache-2.0",
+    "sha256": "6a7508554941c1a698c243b2212b2985ce59a65a3e0348d53c2158607d801e61",
+    "url": "https://codeload.github.com/opencv/opencv/tar.gz/fe38fc608f6acb8b68953438a62305d8318f4fcd",
+    "version": "4.13.0"
+  },
+  "wheel_members": {
+    "cv2.cpython-312-x86_64-linux-gnu.so": {
+      "bytes": 2308952,
+      "sha256": "e91ef1901f5567f385959046a57267a18dfb836dd795605d460bc95b46ae4f10"
+    },
+    "opencv_python_headless-4.13.0.92+agency1.dist-info/AGENCY-BUILD.json": {
+      "bytes": 205,
+      "sha256": "8ed002e0aae33298bb261ba6a7d3e64f4bb19f080e2ffad09c1f8e2389532804"
+    },
+    "opencv_python_headless-4.13.0.92+agency1.dist-info/METADATA": {
+      "bytes": 393,
+      "sha256": "ed6c8788c4ec4640f4e1fdac0b58c811a1c25b7bdee6af215e8d329d30340614"
+    },
+    "opencv_python_headless-4.13.0.92+agency1.dist-info/RECORD": {
+      "bytes": 1096,
+      "sha256": "34d3254908c85163031af1086a46b3a5548b7068775fefc60acb60459707e207"
+    },
+    "opencv_python_headless-4.13.0.92+agency1.dist-info/WHEEL": {
+      "bytes": 109,
+      "sha256": "93f9e5f55b0fdb29451d054f58318f9e834e73c54e99b850823735e9809f5de2"
+    },
+    "opencv_python_headless-4.13.0.92+agency1.dist-info/licenses/LICENSE": {
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "opencv_python_headless-4.13.0.92+agency1.dist-info/licenses/NUMPY-LICENSE": {
+      "bytes": 46794,
+      "sha256": "4860083caa0de2ac3292ca98bd074bd8f45d8b32624e37b1e70a240bff61e488"
+    },
+    "opencv_python_headless.libs/libopencv_core.so.413": {
+      "bytes": 5675096,
+      "sha256": "496c3e2422aae9a07207c2d6c459f7fcee3eaf1447798cef2cffdb0591dea5b3"
+    },
+    "opencv_python_headless.libs/libopencv_imgcodecs.so.413": {
+      "bytes": 443096,
+      "sha256": "cfc465b962b09320835466a3a7c7511b584b1499d3ea488787a58dc4a6bf7e82"
+    },
+    "opencv_python_headless.libs/libopencv_imgproc.so.413": {
+      "bytes": 9183832,
+      "sha256": "ad35a5bcce551574dc9b9ba432087abe621a09d9a54d06a10f4f97741f9128e1"
+    }
+  }
+}

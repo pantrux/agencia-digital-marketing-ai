@@ -1,0 +1,10 @@
+9b27ab69add838665af44c9aa304a0dd910af90f2cd9e191e52e0b585a3ce2fd  apk-repo/x86_64/APKINDEX.tar.gz
+54073b77b86ce384a05f8796c3f4b116a01742703240e9040dffc0e1856a0ef0  apk-repo/x86_64/libpcre2-8-0-10.49-r3.apk
+428331fc00bf89c88e6e54943db74efbc06832548b0a752482e8e9ec3552eb02  apk-repo/x86_64/nginx-mainline-1.31.8-r1.apk
+1900138a83678f6c213693e67df80028f1d55c360085cb78bf63a78a62104123  apk-repo/x86_64/nginx-mainline-config-1.31.8-r1.apk
+4990ed79b392a44bf83bfb38a6563362a7240f153fe438cfc975c65da1db81ab  apk-repo/x86_64/nginx-mainline-fastcgi-params-1.31.8-r1.apk
+8365ee137dd4b2e5438d6a0663e05f79e92c1bb5f1c54bb03d97fb561b5bdf81  apk-repo/x86_64/nginx-mainline-mime-types-1.31.8-r1.apk
+f2e65ff12005350917d7b403733026f13be6444b6d73282cc61cc19489288242  apk-repo/x86_64/nginx-mainline-scgi-params-1.31.8-r1.apk
+cc8f5987f92f25151387f1fa22de80e9bd6738e4879e7b438421777ac124a275  apk-repo/x86_64/nginx-mainline-uwsgi-params-1.31.8-r1.apk
+f0031424cf46f7db780ce63a45f0fd6aa6f85f601e6bb3b7a91fe3d4d5b7d2cc  keys/wolfi-signing.rsa.pub
+556b3ce424fc94625ceb8a7666dcb084a2e442463344d528dde359685b69b658  repositories

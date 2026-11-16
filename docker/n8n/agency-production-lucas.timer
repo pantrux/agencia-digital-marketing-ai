@@ -1,0 +1,10 @@
+[Unit]
+Description=Procesa las escaletas listas para render
+
+[Timer]
+OnBootSec=110s
+OnUnitInactiveSec=55s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

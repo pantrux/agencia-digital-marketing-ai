@@ -1,0 +1,29 @@
+# Dependencias directas y restricciones de seguridad; requiere lock completo auditado.
+# Fuente Speaches oficial separada y verificada por whisper-artifacts.json; sin Git.
+# onnxruntime CPU sólo para VAD/control; Whisper exige CTranslate2 CUDA.
+ctranslate2==4.8.5
+faster-whisper==1.2.1
+av==15.1.0
+aiortc==1.14.0
+onnxruntime==1.22.1
+kokoro-onnx==0.4.9
+numpy==2.3.5
+pydantic-settings==2.15.0
+pydantic==2.13.5
+sounddevice==0.5.3
+soundfile==0.13.1
+openai==1.109.1
+aiostream==0.7.1
+cachetools==6.2.4
+httpx-ws==0.8.2
+httpx==0.28.1
+nvidia-cublas-cu12==12.8.4.1
+fastapi==0.162.0
+starlette==1.10.0
+anyio==4.16.0
+idna==3.20
+requests==2.34.2
+urllib3==2.8.0
+huggingface-hub==2.4.0
+python-multipart==0.0.33
+uvicorn==0.49.0

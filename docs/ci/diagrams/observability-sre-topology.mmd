@@ -1,0 +1,27 @@
+flowchart LR
+    %% Topología objetivo de arquitectura v4.1; su despliegue se verifica en fases posteriores.
+    subgraph EMISORES["Emisores previstos por plano"]
+        EDGE["Cloudflare Edge: autenticación, cuotas, ingestión y pedidos"]
+        MEDIA["vm-media-01 .85: aplicaciones, PostgreSQL, Valkey y consumidor R2"]
+        AGENTES["OpenClaw .7: cinco agentes, cuatro MCPs, duración y rondas"]
+        GPU["Windows .6: VRAM, temperatura, CUDA y sesiones NVENC :9835"]
+        NAS["Synology .8: /volume2/producciones, espacio, inodos y copias"]
+    end
+    subgraph OBS["Synology .8: observabilidad objetivo"]
+        OTEL["Colector OpenTelemetry :4318"]
+        PROM["Prometheus: métricas y reglas"]
+        GRAF["Grafana: indicadores, objetivos y presupuesto de error"]
+        ALERT["Alertmanager: incidentes por componente"]
+    end
+    EDGE -. "Trazas y métricas" .-> OTEL
+    MEDIA -. "Trazas y métricas" .-> OTEL
+    AGENTES -. "Trazas y métricas" .-> OTEL
+    GPU -. "Métricas autenticadas" .-> PROM
+    NAS -. "Métricas" .-> PROM
+    OTEL -. "Métricas" .-> PROM
+    PROM -.-> GRAF
+    PROM -.-> ALERT
+    ALERT -. "Integración futura" .-> GUARDIA["Responsable de plataforma: runbooks rb-01 a rb-05"]
+    GUARDIA --> EVIDENCIA["Registrar causa, versión, duración y recuperación; ocultar secretos"]
+    LOCAL["Fase 0: pruebas y simulación locales; sin alertas externas"]
+    LOCAL --> EVIDENCIA

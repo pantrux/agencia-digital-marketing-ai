@@ -1,0 +1,136 @@
+{
+  "id": null,
+  "uid": "agency-studio-edge-slo",
+  "title": "Studio · Respuestas HTTP y latencia",
+  "schemaVersion": 41,
+  "version": 0,
+  "tags": ["agencia", "studio", "sre"],
+  "timezone": "America/Santiago",
+  "refresh": "5m",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Respuestas HTTP 2xx y 3xx · 30 días",
+      "description": "El denominador incluye todos los estados, también 401 esperados sin sesión. Objetivo del 99,9 % sobre estas rutas.",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_edge_30d_successful_requests{job=\"agency-studio-edge\"}[7m]) / (last_over_time(studio_edge_30d_requests{job=\"agency-studio-edge\"}[7m]) > 0)", "legendFormat": "{{ruta}}", "instant": true, "range": false }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "noValue": "Sin muestras", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 0.999 }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "p95 hasta el primer byte en Cloudflare",
+      "description": "El panel queda sin datos cuando la API no concede acceso al campo de primer byte o aún no hay muestras.",
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_edge_30d_ttfb_p95_milliseconds{job=\"agency-studio-edge\"}[7m]) and on(job) (last_over_time(studio_edge_ttfb_query_allowed{job=\"agency-studio-edge\"}[7m])==1)", "legendFormat": "{{ruta}}", "instant": true, "range": false }],
+      "fieldConfig": { "defaults": { "unit": "ms", "noValue": "Sin datos de Cloudflare", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 150 }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Antigüedad de la medición",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "time()-last_over_time(studio_edge_report_unixtime_seconds{job=\"agency-studio-edge\"}[1h])", "instant": true, "range": false }],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 360 }, { "color": "red", "value": 600 }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Estados HTTP en la ventana móvil de 30 días",
+      "gridPos": { "x": 0, "y": 5, "w": 14, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [
+        { "refId": "A", "expr": "last_over_time(studio_edge_30d_requests{job=\"agency-studio-edge\"}[7m])", "legendFormat": "Total · {{ruta}}" },
+        { "refId": "B", "expr": "last_over_time(studio_edge_30d_successful_requests{job=\"agency-studio-edge\"}[7m])", "legendFormat": "2xx y 3xx · {{ruta}}" },
+        { "refId": "C", "expr": "last_over_time(studio_edge_30d_client_errors{job=\"agency-studio-edge\"}[7m])", "legendFormat": "4xx · {{ruta}}" },
+        { "refId": "D", "expr": "last_over_time(studio_edge_30d_server_errors{job=\"agency-studio-edge\"}[7m])", "legendFormat": "5xx · {{ruta}}" }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 0, "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "p95 de respuesta del origen",
+      "description": "Incluye las solicitudes con duración del origen mayor que cero. La latencia hasta el primer byte se mide por separado.",
+      "gridPos": { "x": 14, "y": 5, "w": 10, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_edge_30d_origin_p95_milliseconds{job=\"agency-studio-edge\"}[7m])", "legendFormat": "{{ruta}}" }],
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Cargas multipart verificadas · 30 días",
+      "description": "Sesiones de D1 con SHA-256 verificado y mensaje de despacho registrado. Los fallos de firma del PUT directo a R2 requieren otra medición.",
+      "gridPos": { "x": 0, "y": 14, "w": 8, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_upload_30d_sessions{job=\"agency-studio-delivery\",resultado=\"verificada\"}[7m])", "legendFormat": "{{cohorte}}", "instant": true, "range": false }],
+      "fieldConfig": { "defaults": { "decimals": 0, "noValue": "Sin medición" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Resultados de las cargas multipart · 30 días",
+      "description": "Clasifica las sesiones creadas en la ventana según su último estado en D1. Muestra sólo los resultados con sesiones observadas.",
+      "gridPos": { "x": 8, "y": 14, "w": 16, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_upload_30d_sessions{job=\"agency-studio-delivery\"}[7m]) > 0", "legendFormat": "{{cohorte}} · {{resultado}}" }],
+      "fieldConfig": { "defaults": { "decimals": 0, "min": 0 }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Sesiones con incidencias en PUT directo · 30 días",
+      "description": "Cuenta una vez cada señal por sesión. Un PUT sin respuesta legible puede deberse a CORS o a un fallo de red. Cero indica ausencia de informes del navegador.",
+      "gridPos": { "x": 0, "y": 23, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_upload_30d_put_observed_sessions{job=\"agency-studio-delivery\"}[7m])", "legendFormat": "{{cohorte}} · {{senal}}" }],
+      "fieldConfig": { "defaults": { "decimals": 0, "min": 0, "noValue": "Sin medición" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "p95 del navegador por ruta · 30 días",
+      "description": "Tiempo hasta el primer byte en respuestas exitosas del portal. Cada percentil pondera las muestras de la ventana. El retorno de Google se mide en el Worker.",
+      "gridPos": { "x": 0, "y": 31, "w": 13, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_edge_30d_browser_p95_milliseconds{job=\"agency-studio-edge\"}[7m]) and on(job,instance,ruta) (last_over_time(studio_edge_30d_browser_samples{job=\"agency-studio-edge\"}[7m])>0) and on(job,instance) (last_over_time(studio_edge_browser_query_ok{job=\"agency-studio-edge\"}[7m])==1)", "legendFormat": "{{ruta}}" }],
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0, "noValue": "Sin muestras", "custom": { "thresholdsStyle": { "mode": "line" } }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 150 }] } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Muestras del navegador · 30 días",
+      "description": "Número de observaciones efectivas por ruta de producción. Cero indica que la consulta fue exitosa y la ruta carece de muestras.",
+      "gridPos": { "x": 13, "y": 31, "w": 7, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_edge_30d_browser_samples{job=\"agency-studio-edge\"}[7m]) and on(job,instance) (last_over_time(studio_edge_browser_query_ok{job=\"agency-studio-edge\"}[7m])==1)", "legendFormat": "{{ruta}}", "instant": true, "range": false }],
+      "fieldConfig": { "defaults": { "decimals": 0, "noValue": "Sin consulta" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Consulta de navegador",
+      "gridPos": { "x": 20, "y": 31, "w": 4, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "${PROMETHEUS_UID}" },
+      "targets": [{ "refId": "A", "expr": "last_over_time(studio_edge_browser_query_ok{job=\"agency-studio-edge\"}[7m])", "instant": true, "range": false }],
+      "fieldConfig": { "defaults": { "noValue": "Sin consulta", "mappings": [{ "type": "value", "options": { "0": { "text": "Fallida", "color": "red" }, "1": { "text": "Operativa", "color": "green" } } }] }, "overrides": [] },
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    }
+  ]
+}
