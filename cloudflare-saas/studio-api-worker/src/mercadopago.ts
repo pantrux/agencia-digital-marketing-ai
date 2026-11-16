@@ -374,6 +374,11 @@ export class MercadoPagoClient {
   }
 
   async createPending(input: MercadoPagoPendingInput): Promise<MercadoPagoSubscription> {
+    const submit = await this.preparePending(input);
+    return submit();
+  }
+
+  async preparePending(input: MercadoPagoPendingInput): Promise<() => Promise<MercadoPagoSubscription>> {
     const { reference: ref, payerEmail, reason, amountClp, frequency, frequencyType: type, backUrl } = input;
     const back = url(backUrl, 'invalid_input');
     requireValue(back.origin === this.#returnOrigin && matches(ref, EXTERNAL_REFERENCE)
@@ -384,16 +389,18 @@ export class MercadoPagoClient {
     requireValue(numericId(seller.id, 'sandbox_unverified') === this.#merchantId
       && seller.site_id === 'MLC' && Array.isArray(seller.tags) && seller.tags.includes('test_user'),
       'sandbox_unverified');
-    const body = await this.#request('/preapproval', {
-      status: 'pending', external_reference: ref, payer_email: payerEmail, reason, back_url: back.href,
-      auto_recurring: { currency_id: 'CLP', transaction_amount: amountClp, frequency, frequency_type: type },
-    }, 'mandate_create');
-    const result = this.#subscription(body);
-    requireValue(result.status === 'pending' && result.checkoutUrl !== null && result.reference === ref
-      && result.amountClp === amountClp && result.frequency === frequency && result.frequencyType === type
-      && body.preapproval_plan_id == null && (body.back_url == null || body.back_url === back.href),
-      'provider_binding');
-    return result;
+    return async () => {
+      const body = await this.#request('/preapproval', {
+        status: 'pending', external_reference: ref, payer_email: payerEmail, reason, back_url: back.href,
+        auto_recurring: { currency_id: 'CLP', transaction_amount: amountClp, frequency, frequency_type: type },
+      }, 'mandate_create');
+      const result = this.#subscription(body);
+      requireValue(result.status === 'pending' && result.checkoutUrl !== null && result.reference === ref
+        && result.amountClp === amountClp && result.frequency === frequency && result.frequencyType === type
+        && body.preapproval_plan_id == null && (body.back_url == null || body.back_url === back.href),
+        'provider_binding');
+      return result;
+    };
   }
 
   async getSubscription(id: string): Promise<MercadoPagoSubscription> {

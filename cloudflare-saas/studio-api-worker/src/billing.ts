@@ -40,6 +40,7 @@ interface Checkout {
   provider_mandate: MercadoPagoSubscription["status"];
   provider_updated_at: number | null;
   provider_version: number | null;
+  idempotency_key: string;
   request_sha256: string;
   payer_email: string;
   amount_clp: number;
@@ -70,7 +71,7 @@ const merchantId = /^[1-9][0-9]{0,23}$/;
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const checkoutSelect = `SELECT b.subscription_id, b.user_id, s.plan_id, s.external_reference,
   s.provider_subscription_id, s.status, s.billing_status, s.current_period_start, s.current_period_end,
-  b.provider_mandate, b.provider_updated_at, b.provider_version, b.request_sha256, b.payer_email,
+  b.provider_mandate, b.provider_updated_at, b.provider_version, b.idempotency_key, b.request_sha256, b.payer_email,
   b.amount_clp, b.frequency, b.frequency_type, b.checkout_url
   FROM billing_checkout b JOIN subscriptions s ON s.id=b.subscription_id AND s.user_id=b.user_id
   WHERE s.provider='mercadopago' AND s.provider_mode=?`;
@@ -228,8 +229,10 @@ async function create(request: Request, env: BillingEnv, user: PortalIdentity): 
   const fingerprint = await sha256Hex(JSON.stringify([
     MODE, plan, terms.amount_clp, terms.frequency, terms.frequency_type, email,
   ]));
-  const existing = () => checkoutBy(env, " AND b.user_id=? AND b.idempotency_key=?", user.id, key);
+  const existing = () => checkoutBy(env, ` AND b.user_id=? AND (b.idempotency_key=? OR b.closed_at IS NULL)
+    ORDER BY (b.idempotency_key=?) DESC LIMIT 1`, user.id, key, key);
   const replay = (row: Checkout) => {
+    if (row.idempotency_key !== key) fail(409, "CHECKOUT_EN_CURSO");
     if (row.request_sha256 !== fingerprint) fail(409, "IDEMPOTENCIA_EN_CONFLICTO");
     return view(row, row.provider_subscription_id ? 200 : 202, env);
   };
@@ -238,6 +241,12 @@ async function create(request: Request, env: BillingEnv, user: PortalIdentity): 
 
   const id = crypto.randomUUID();
   const ref = "studio-sandbox-" + id;
+  // Verificar al vendedor antes de reservar un intento que todavía puede repetirse.
+  const submit = await client.preparePending({
+    reference: ref, payerEmail: email, reason: "E-scale Studio " + plan,
+    amountClp: terms.amount_clp, frequency: terms.frequency, frequencyType: terms.frequency_type,
+    backUrl: new URL("/", env.PUBLIC_ORIGIN).href,
+  });
   const time = now();
   try {
     await env.DB.batch([
@@ -249,19 +258,12 @@ async function create(request: Request, env: BillingEnv, user: PortalIdentity): 
   } catch (error) {
     const winner = await existing();
     if (winner) return replay(winner);
-    if (await checkoutBy(env, " AND b.user_id=? AND b.closed_at IS NULL", user.id)) {
-      fail(409, "CHECKOUT_EN_CURSO");
-    }
     throw error;
   }
   const created = await checkoutBy(env, " AND b.subscription_id=?", id);
   if (!created) fail(503, "PAGO_NO_DISPONIBLE");
   try {
-    const mandate = await client.createPending({
-      reference: ref, payerEmail: email, reason: "E-scale Studio " + plan,
-      amountClp: terms.amount_clp, frequency: terms.frequency, frequencyType: terms.frequency_type,
-      backUrl: new URL("/", env.PUBLIC_ORIGIN).href,
-    });
+    const mandate = await submit();
     await persist(env, created, mandate, null);
   } catch (error) {
     if (!(error instanceof MercadoPagoError)) throw error;

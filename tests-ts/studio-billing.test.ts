@@ -107,6 +107,8 @@ function state() {
 
 function emulate(options: {
   abort?: boolean;
+  sellerFailure?: "http" | "transport";
+  searchMissing?: boolean;
   authorized?: boolean;
   cancelled?: boolean;
   paymentStatus?: string;
@@ -120,7 +122,11 @@ function emulate(options: {
   let reference: string;
   const upstream = vi.fn<typeof fetch>(async (url, init) => {
     const path = new URL(String(url)).pathname;
-    if (path === "/users/me") return Response.json({ id: MERCHANT, site_id: "MLC", tags: ["test_user"] });
+    if (path === "/users/me") {
+      if (options.sellerFailure === "http") return new Response(null, { status: 503 });
+      if (options.sellerFailure === "transport") throw new Error("vendedor temporalmente inaccesible");
+      return Response.json({ id: MERCHANT, site_id: "MLC", tags: ["test_user"] });
+    }
     const subscription = () => ({
       id: options.providerId ?? SUB, collector_id: MERCHANT,
       application_id: options.providerApplication ?? APP, external_reference: reference,
@@ -140,9 +146,10 @@ function emulate(options: {
       return Response.json(subscription(), { status: 201 });
     }
     if (path === "/preapproval/" + (options.providerId ?? SUB)) return Response.json(subscription());
-    if (path === "/preapproval/search") return Response.json({
-      paging: { limit: 20, offset: 0, total: 1 }, results: [subscription()],
-    });
+    if (path === "/preapproval/search") {
+      const results = options.searchMissing ? [] : [subscription()];
+      return Response.json({ paging: { limit: 20, offset: 0, total: results.length }, results });
+    }
     const invoice = {
       id: INVOICE, preapproval_id: SUB, external_reference: reference, status: "processed",
       last_modified: ANCHOR, debit_date: options.invoiceStart ?? ANCHOR, currency_id: "CLP", transaction_amount: 5000,
@@ -178,16 +185,37 @@ function message(topic: string, id: string, reqId = "fixture-message-1", applica
 }
 
 it("reserva checkout en D1 antes del POST y reutiliza la misma respuesta sin otra alta", async () => {
-  const upstream = emulate();
+  const scenario: { sellerFailure?: "http" } = {};
+  const upstream = emulate(scenario);
   const first = await checkout();
   const row = await first.json();
   expect(first.status).toBe(201);
   expect(row).toMatchObject({ plan_id: "pro", status: "pending", checkout_url: expect.stringContaining(SUB) });
+  scenario.sellerFailure = "http";
   expect(await (await checkout()).json()).toEqual(row);
   await expect(checkout("ultra")).rejects.toMatchObject({ status: 409 });
   await expect(checkout("pro", "different-key")).rejects.toMatchObject({ status: 409 });
   expect(upstream).toHaveBeenCalledTimes(2);
 });
+
+it.each(["http", "transport"] as const)(
+  "recupera la misma clave tras un fallo %s al comprobar el vendedor antes del POST", async (sellerFailure) => {
+    const scenario: { sellerFailure?: typeof sellerFailure } = { sellerFailure };
+    const upstream = emulate(scenario);
+    await expect(checkout()).rejects.toMatchObject({ status: 503, code: "PAGO_NO_DISPONIBLE" });
+    expect(database.prepare("SELECT COUNT(*) AS n FROM billing_checkout").get()).toEqual({ n: 0 });
+    expect(database.prepare("SELECT COUNT(*) AS n FROM subscriptions").get()).toEqual({ n: 0 });
+    expect(upstream.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+
+    delete scenario.sellerFailure;
+    const first = await checkout();
+    expect(first.status).toBe(201);
+    const result = await first.json();
+    expect(result).toMatchObject({ plan_id: "pro", status: "pending", checkout_url: expect.stringContaining(SUB) });
+    expect(await (await checkout()).json()).toEqual(result);
+    expect(upstream.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  },
+);
 
 it("pausa las altas y oculta enlaces previos sin impedir consultar el intento", async () => {
   const upstream = emulate();
@@ -217,13 +245,20 @@ it("reserva el checkout de ensayo al titular del piloto", async () => {
 });
 
 it("devuelve un intento pendiente tras timeout, y PUT sólo lee para recuperar el mismo mandato", async () => {
-  const upstream = emulate({ abort: true });
+  const scenario = { abort: true, searchMissing: true };
+  const upstream = emulate(scenario);
   const ambiguous = await checkout();
   const row = await ambiguous.json();
   expect(ambiguous.status).toBe(202);
   expect((await checkout()).status).toBe(202);
-  const recovered = await handleBilling(request("PUT", reconcilePath, { checkout_id: row.checkout_id }),
+  const lookup = () => handleBilling(request("PUT", reconcilePath, { checkout_id: row.checkout_id }),
     env, reconcilePath, SESSION);
+  const stillPending = await lookup();
+  expect(stillPending.status).toBe(202);
+  expect(await stillPending.json()).toEqual(row);
+  await expect(checkout("pro", "different-key")).rejects.toMatchObject({ code: "CHECKOUT_EN_CURSO" });
+  scenario.searchMissing = false;
+  const recovered = await lookup();
   expect((await recovered.json()).checkout_url).toContain(SUB);
   expect(upstream.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
 });
