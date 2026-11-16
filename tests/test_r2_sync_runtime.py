@@ -6,6 +6,7 @@ import hmac
 import importlib
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -686,7 +687,11 @@ class LinuxRuntimeTests(unittest.TestCase):
             release.wait(3)
             return native_watch(*args, **kwargs)
 
-        with patch.object(R, "CODE_DIR", code):
+        # El worker sólo usa la biblioteca estándar. En CI, Python del sistema
+        # cumple los permisos que el supervisor exige al intérprete del worker.
+        system_python = shutil.which("python3", path=os.defpath)
+        worker_python = Path(system_python).resolve() if system_python else R.PYTHON
+        with patch.object(R, "CODE_DIR", code), patch.object(R, "PYTHON", worker_python):
             supervisor = R.WorkerSupervisor(self.runtime)
 
             def run():
