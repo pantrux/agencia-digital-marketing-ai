@@ -15,11 +15,16 @@ mock.method(ScratchSpace.prototype, 'ensureSpace', async (bytes: number) => {
 after(() => mock.restoreAll());
 
 const request = parseRender({project_id: 'sansevieras', job_id: 'prueba', composition: 'AgencyVertical', plan: 'Free', props: {title: 'Prueba sintética', duration_seconds: 3, audio_path: 'proyectos/sansevieras/03_assets/voz.wav'}});
-async function setup(badPeak: boolean, options: {format?: OutputFormat; resolution?: Resolution; badAlpha?: boolean; failProresProbe?: boolean; missingColor?: boolean; duration?: number; badTiming?: boolean; recoverPeak?: boolean} = {}) {
+async function setup(badPeak: boolean, options: {format?: OutputFormat; resolution?: Resolution; badAlpha?: boolean; failProresProbe?: boolean; missingColor?: boolean; duration?: number; badTiming?: boolean; recoverPeak?: boolean; normalizedVideo?: boolean} = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'render-backend-'));
   const nas = path.join(root, 'nas'), cache = path.join(root, 'cache');
   await mkdir(path.join(nas, 'proyectos', 'sansevieras', '03_assets'), {recursive: true}); await mkdir(cache);
   await writeFile(path.join(nas, 'proyectos', 'sansevieras', '03_assets', 'voz.wav'), 'audio sintético controlado');
+  if (options.normalizedVideo) {
+    const raw = path.join(nas, 'proyectos', 'sansevieras', '01_raw');
+    await mkdir(raw);
+    await writeFile(path.join(raw, 'movil.mp4'), 'vídeo de entrada sintético');
+  }
   const config: RuntimeConfig = {token: 'a'.repeat(40), ffmpeg: 'ffmpeg-controlado', ffprobe: 'ffprobe-controlado', browser: 'browser-controlado', cacheRoot: cache, nasRoot: nas};
   const dimensions = outputDimensions(options.resolution ?? '1080p');
   const prores = options.format === 'prores4444';
@@ -27,6 +32,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
   const captures: (number[] | null)[] = [];
   const duration = options.duration ?? 3;
   const count = duration * 30;
+  const sourceCount = Math.floor(duration * 30000 / 1001);
   const backend = await RenderBackend.create(config, {
     verifyTools: async () => {}, verifyMapping: async () => {},
     scene: async (options, frames) => {
@@ -38,7 +44,18 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
     run: async (executable, args) => {
       calls.push(args);
       if (executable === config.ffprobe) {
+        const filename = path.basename(args.at(-1)!);
+        if (options.normalizedVideo && filename === 'movil.mp4') {
+          return {stdout: JSON.stringify({format:{duration},streams:[{codec_type:'video',codec_name:'hevc',
+            width:1920,height:1080,pix_fmt:'yuv420p',color_space:'bt709',color_range:'tv',avg_frame_rate:'30000/1001',r_frame_rate:'30/1',
+            start_pts:0,duration_ts:sourceCount*3003,time_base:'1/90000',disposition:{attached_pic:0},
+            side_data_list:[{side_data_type:'Display Matrix',rotation:90,displaymatrix:'00000000: 0 -65536 0\n00000001: 65536 0 0\n00000002: 0 0 1073741824'}]}]}), stderr:''};
+        }
         if (args.includes('-show_entries')) {
+          if (options.normalizedVideo && filename === 'crudo.mp4') {
+            const packets = Array.from({length:sourceCount}, (_, index) => ({pts:index * 3003, duration:3003}));
+            return {stdout:JSON.stringify({streams:[{time_base:'1/90000'}],packets}), stderr:''};
+          }
           const packets = Array.from({length: count}, (_, i) => ({pts: options.badTiming && i === 1 ? 0 : i * 512, duration: 512}));
           return {stdout: JSON.stringify({streams: [{time_base:'1/15360'}], packets}), stderr: ''};
         }
@@ -95,6 +112,26 @@ test('corrige el audio del MP4 conservando el flujo NVENC y vuelve a medir antes
     assert.equal(result.audio.true_peak_dbtp, -1.4);
     assert.equal(path.basename(result.files[0]!.path), 'master-corrected.mp4');
   } finally {await rm(fixture.root, {recursive: true, force: true});}
+});
+
+test('el puente entrega HEVC 4K largo por capas y corrige el audio sin volver a codificar el vídeo', async () => {
+  const duration_seconds = 130;
+  const fixture = await setup(false,{duration:duration_seconds,resolution:'4k',normalizedVideo:true,recoverPeak:true});
+  const long = parseRender({project_id:request.project_id, job_id:'hevc-largo', composition:'AgencyVertical', plan:'Ilimitado', resolution:'4k', props:{...request.props,
+    duration_seconds, video_path:'proyectos/sansevieras/01_raw/movil.mp4'}});
+  try {
+    await fixture.backend.initialize();
+    const result = await fixture.backend.render(long, new AbortController().signal);
+    assert.equal(result.render_pipeline, 'capas_remotion_nvenc');
+    assert.equal(result.media.duration_seconds, duration_seconds);
+    assert.deepEqual(fixture.captures.at(-1), Array.from({length:13}, (_, index) => index));
+    const masters = fixture.calls.filter(args => args.includes('-c:v') && path.basename(args.at(-1)!).startsWith('master'));
+    assert.deepEqual(masters.map(args => args[args.indexOf('-c:v') + 1]), ['h264_nvenc','copy']);
+    assert.ok(masters[1]?.some(value => value.includes('TP=-3.5')));
+    assert.deepEqual(fixture.calls.filter(args => args.includes('-show_entries')).map(args => path.basename(args.at(-1)!)),
+      ['crudo.mp4','master.mp4','master-corrected.mp4']);
+    await access(path.join(fixture.nas, result.files[0]!.path));
+  } finally {await rm(fixture.root, {recursive:true, force:true});}
 });
 
 test('repite el recibo de render sin recodificar y rechaza una solicitud cambiada', async () => {

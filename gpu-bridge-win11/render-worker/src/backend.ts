@@ -168,7 +168,9 @@ export class RenderBackend implements Backend {
       return result;
     } finally {
       // Un temporal ajeno al destino no bloquea el próximo intento si su limpieza falla.
-      await folder?.discard().catch(() => undefined);
+      await folder?.discard().catch(() => {
+        console.warn(JSON.stringify({service: 'remotion', error: 'LIMPIEZA_PUBLICACION_FALLIDA', stage: kind}));
+      });
       this.#inProgress.delete(jobKey);
     }
   }
