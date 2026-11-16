@@ -30,7 +30,7 @@ Ejecuta los comandos desde la raíz del proyecto con Node.js 24, npm, Python 3.1
 
 ## Procedimiento local
 
-1. Persistir cualquier credencial o ID nuevo en `.env` con los tres comentarios obligatorios, actualizar `.env.example` con `CHANGE_ME` y después inyectar en destino.
+1. Persistir cualquier credencial o ID nuevo en `.env` con los tres comentarios obligatorios, actualizar `.env.example` con `CHANGE_ME` y después inyectar en destino. La revisión local de Greptile usa `GREPTILE_API_KEY` desde la bóveda. El registro de variables permite que el aprovisionamiento de Kitsu regenere la plantilla con `CHANGE_ME` para esa clave.
 2. Instalar dependencias reproducibles y ejecutar los controles del código presente:
 
    ```bash
