@@ -139,6 +139,7 @@ export class RenderBackend implements Backend {
     const jobKey = `${request.project_id}/${request.job_id}/${kind}`;
     if (this.#inProgress.has(jobKey)) throw new WorkerError(409, 'TRABAJO_EN_CURSO', 'El puente ya procesa este trabajo.');
     this.#inProgress.add(jobKey);
+    let folder: Awaited<ReturnType<NasPaths['stageOutput']>> | undefined;
     try {
       const inputs = [request.props.video_path, request.props.audio_path];
       const sources: (string | null)[] = [];
@@ -148,7 +149,6 @@ export class RenderBackend implements Backend {
       const identity = createHash('sha256').update(JSON.stringify([kind, request, sources])).digest('hex');
       const existing = await this.nas.existingOutput(request.project_id, request.job_id, kind);
       if (existing) return await this.#replay<T>(existing, identity, signal);
-      let folder: Awaited<ReturnType<NasPaths['output']>> | undefined;
       const result = await execute(async files => {
         for (const [index, relative] of inputs.entries()) {
           if (relative && await sha256File(await this.nas.input(relative, request.project_id), signal) !== sources[index]) {
@@ -156,14 +156,21 @@ export class RenderBackend implements Backend {
           }
         }
         signal.throwIfAborted();
-        folder = await this.nas.output(request.project_id, request.job_id, kind);
+        folder = await this.nas.stageOutput(request.project_id, request.job_id, kind);
         return this.#copyArtifacts(folder, files);
       });
       if (!folder) throw new WorkerError(500, 'RECIBO_NO_DISPONIBLE', 'No se pudo preparar el recibo del puente.');
       const body = JSON.stringify({request_sha256: identity, result});
       await writeFile(path.join(folder.absolute, receiptName), JSON.stringify({body, signature: this.#receiptSignature(body).toString('hex')}), {flag: 'wx', flush: true});
+      signal.throwIfAborted();
+      await folder.commit();
+      folder = undefined;
       return result;
-    } finally {this.#inProgress.delete(jobKey);}
+    } finally {
+      // Un temporal ajeno al destino no bloquea el próximo intento si su limpieza falla.
+      await folder?.discard().catch(() => undefined);
+      this.#inProgress.delete(jobKey);
+    }
   }
 
   async #prepareStaticProres(work: string, framePattern: string, lastFrame: string, count: number, signal: AbortSignal): Promise<string> {
@@ -202,12 +209,17 @@ export class RenderBackend implements Backend {
       const staticProres = request.format === 'prores4444' && !video && request.durationInFrames > TITLE_FADE_FRAMES + 1;
       const videoBytes = video ? (await stat(video.source)).size : 0;
       let sourceVideo: string | undefined;
-      if (video && overlayInputSupported(video.probe, request)) {
+      let normalizeVideo = false;
+      const overlayMode = video && overlayInputSupported(video.probe, request);
+      if (video && overlayMode) {
         await this.scratch.ensureSpace(videoBytes + (TITLE_FADE_FRAMES + 1) * frameBytes + outputs);
         const localVideo = path.join(work, 'crudo.mp4');
         await copyFile(video.source, localVideo, constants.COPYFILE_EXCL);
         const {stdout} = await this.deps.run(this.config.ffprobe, packetProbeArgs(localVideo), {timeoutMs: 30000, signal: bounded});
-        if (overlayPacketTimingSupported(stdout, request.durationInFrames)) sourceVideo = localVideo;
+        if (overlayPacketTimingSupported(stdout, request.durationInFrames, overlayMode === 'normalized')) {
+          sourceVideo = localVideo;
+          normalizeVideo = overlayMode === 'normalized';
+        }
       }
       const layerFrames = sourceVideo || staticProres ? Array.from({length: TITLE_FADE_FRAMES + 1}, (_, index) => index) : null;
       // La gráfica sin crudo solo renderiza el fundido. El margen del MOV se calcula tras codificar sus fragmentos.
@@ -222,25 +234,26 @@ export class RenderBackend implements Backend {
         ? await this.#prepareStaticProres(work, framePattern, scene.files.at(-1)!, request.durationInFrames, bounded)
         : null;
       let output = '', info: MediaInfo | undefined, finalAudio = measured;
-      for (const peak of [-1.5, -2]) {
+      const retryPeak = request.durationInFrames > 1800 && (sourceVideo || proresList) ? -3.5 : -2;
+      for (const peak of [-1.5, retryPeak]) {
         const extension = request.format === 'prores4444' ? 'mov' : 'mp4';
         const previousOutput = output;
-        const correctingMp4 = peak === -2 && request.format === 'mp4';
+        const correctingMp4 = peak === retryPeak && request.format === 'mp4';
         output = path.join(work, `${peak === -1.5 ? 'master' : 'master-corrected'}.${extension}`);
         const encode = correctingMp4
-          ? correctMp4Audio(previousOutput, audio, output, request.durationInFrames, duration, measured)
+          ? correctMp4Audio(previousOutput, audio, output, request.durationInFrames, duration, measured, peak)
           : proresList
           ? muxProresFragments(proresList, audio, output, request.durationInFrames, duration, measured, peak)
-          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo);
+          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo);
         await this.deps.run(this.config.ffmpeg, encode, {timeoutMs: 1200000, signal: bounded});
         const outputProbe = await this.#readProbe(output, bounded);
         if ((sourceVideo || proresList || correctingMp4) && videoFrameCount(outputProbe) !== request.durationInFrames) {
           throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'El máster no conserva todos los fotogramas esperados.');
         }
-        if (proresList) {
+        if (proresList || normalizeVideo) {
           const {stdout} = await this.deps.run(this.config.ffprobe, packetProbeArgs(output), {timeoutMs: 30000, signal: bounded});
           if (!overlayPacketTimingSupported(stdout, request.durationInFrames)) {
-            throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'El MOV no conserva las marcas de tiempo esperadas.');
+            throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'El máster no conserva las marcas de tiempo esperadas.');
           }
         }
         info = parseProbe(outputProbe);

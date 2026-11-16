@@ -52,7 +52,8 @@ test('la composición por capas admite H.264 progresivo de 30 fps con geometría
   assert.equal(overlayInputSupported(probe({width:4320,height:7680}),request),false);
   assert.equal(overlayInputSupported(probe(),{...ultra,format:'prores4444',transparent:true}),false);
   assert.equal(overlayInputSupported(probe({color_primaries:'bt2020'}),ultra),false);
-  assert.equal(overlayInputSupported(probe(),{...ultra,durationInFrames:1801}),false);
+  assert.equal(overlayInputSupported(probe({nb_frames:'6000',duration_ts:3072000}),{...ultra,durationInFrames:6000}),'exact');
+  assert.equal(overlayInputSupported(probe({nb_frames:'18001',duration_ts:9216512}),{...ultra,durationInFrames:18001}),false);
   assert.ok(overlayInputSupported(probe({nb_frames:'120',duration_ts:61440}),{...ultra,durationInFrames:120}));
   assert.equal(overlayInputSupported(probe({nb_frames:'12',duration_ts:6144}),{...ultra,durationInFrames:12}),false);
   assert.equal(overlayInputSupported(probe(),{...request,durationInFrames:1799}),false);
@@ -86,6 +87,39 @@ test('la composición por capas verifica el tiempo de presentación de todos los
   assert.equal(overlayPacketTimingSupported(probe([0,1024,480]),3),false);
   assert.equal(overlayPacketTimingSupported(probe([0,1024,1024]),3),false);
   assert.equal(overlayPacketTimingSupported(probe([0,512]),3),false);
+});
+test('un MP4 HEVC vertical de celular y seis minutos usa capas con cadencia normalizada', () => {
+  const request = parseRender({project_id:'sansevieras',job_id:'capas-largas',composition:'AgencyVertical',plan:'Ilimitado',
+    resolution:'4k',props:{title:'Capas',duration_seconds:367.80225,video_path:'proyectos/sansevieras/01_raw/crudo.mp4',audio_path:'proyectos/sansevieras/03_assets/voz.wav'}});
+  const video = {codec_type:'video',codec_name:'hevc',pix_fmt:'yuv420p',width:1920,height:1080,
+    color_range:'tv',color_space:'bt709',color_primaries:'bt709',color_transfer:'bt709',
+    r_frame_rate:'30/1',avg_frame_rate:'987660000/33088421',start_pts:0,duration_ts:33085494,time_base:'1/90000',
+    nb_frames:'10974',disposition:{attached_pic:0},side_data_list:[{side_data_type:'Display Matrix',rotation:90,
+      displaymatrix:'\n00000000: 0 -65536 0\n00000001: 65536 0 0\n00000002: 0 0 1073741824\n'}]};
+  const probe = (changes: Record<string, unknown> = {}) => JSON.stringify({streams:[{...video,...changes}]});
+  assert.equal(overlayInputSupported(probe(), request), 'normalized');
+  assert.equal(overlayInputSupported(probe({sample_aspect_ratio:'4:3'}), request), false);
+  assert.equal(overlayInputSupported(probe({duration_ts:25200000}), request), false);
+  assert.equal(overlayInputSupported(probe({start_pts:1}), request), false);
+  assert.equal(overlayInputSupported(probe({color_transfer:'smpte2084'}), request), false);
+  assert.equal(overlayInputSupported(probe({side_data_list:[{...video.side_data_list[0],rotation:17}]}), request), false);
+  assert.equal(overlayInputSupported(probe({side_data_list:[{...video.side_data_list[0],displaymatrix:'00000000: 0 65536 0'}]}), request), false);
+});
+
+test('en capas normalizadas acepta la cadencia variable con final cercano y rechaza discontinuidades extensas', () => {
+  const packets = Array.from({length: 115}, (_, index) => ({pts:index * 3060,duration:3060}));
+  const probe = (values = packets) => JSON.stringify({streams:[{time_base:'1/90000'}],packets:values.reverse()});
+  assert.equal(overlayPacketTimingSupported(probe([...packets]),120,true),true);
+  assert.equal(overlayPacketTimingSupported(probe([...packets]),120),false);
+  assert.equal(overlayPacketTimingSupported(probe([packets[0]!, ...packets.slice(72)]),120,true),false);
+  assert.equal(overlayPacketTimingSupported(probe([...packets,packets[0]!]),120,true),false);
+  assert.equal(overlayPacketTimingSupported(probe([...packets]),180,true),false);
+});
+
+test('el render por capas normalizado completa el final con un margen de un segundo', () => {
+  const args = encodeOutput('mp4','4k','still-%d.png','voz.wav','master.mp4',11034,367.8,measured,-1.5,'crudo.mp4',true);
+  assert.match(args[args.indexOf('-filter_complex')+1]!, /fps=fps=30:start_time=0,tpad=stop_mode=clone:stop_duration=1,scale=2160:3840/);
+  assert.equal(args[args.indexOf('-frames:v')+1], '11034');
 });
 test('ffprobe devuelve únicamente metadatos técnicos y rechaza duración desconocida', () => {
   const info = parseProbe(JSON.stringify({format: {duration: '3.0', filename: 'no-publicar'}, streams: [{codec_type:'video', codec_name:'h264', width:1080,height:1920,avg_frame_rate:'30/1'},{codec_type:'audio',codec_name:'aac',sample_rate:'48000'}]}));

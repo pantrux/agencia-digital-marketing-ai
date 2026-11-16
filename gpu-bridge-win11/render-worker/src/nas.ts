@@ -1,4 +1,4 @@
-import {lstat, realpath, mkdir} from 'node:fs/promises';
+import {lstat, realpath, mkdir, mkdtemp, readdir, rename, rmdir, unlink} from 'node:fs/promises';
 import path from 'node:path';
 import {mediaPath, WorkerError} from './contracts.ts';
 
@@ -47,12 +47,49 @@ export class NasPaths {
       throw error;
     }
   }
+  async #outputParent(parts: string[]): Promise<string> {
+    // El proyecto debe existir previamente; no se crean proyectos desde esta API.
+    const projectRoot = await this.#check(parts.slice(0, 2), false);
+    if (!(await lstat(projectRoot)).isDirectory()) throw new WorkerError(422, 'PROYECTO_INVALIDO', 'El proyecto no existe.');
+    return this.#check(parts.slice(0, -1), true);
+  }
+  async stageOutput(project: string, job: string, kind: 'render' | 'stills') {
+    const parts = this.#outputParts(project, job, kind);
+    const parent = await this.#outputParent(parts);
+    const absolute = await mkdtemp(path.join(parent, `.${kind}-`));
+    const destination = path.join(parent, kind);
+    const stagingParts = [...parts.slice(0, -1), path.basename(absolute)];
+    const sameDirectory = async (): Promise<void> => {
+      if (await this.#check(stagingParts, false) !== absolute || !inside(this.root, absolute)
+        || await realpath(absolute) !== absolute || !(await lstat(absolute)).isDirectory()) {
+        throw new WorkerError(500, 'TEMPORAL_INVALIDO', 'No se pudo verificar el directorio temporal de publicación.');
+      }
+    };
+    const collision = () => new WorkerError(409, 'TRABAJO_EXISTENTE', 'El área de salida de este trabajo ya existe.');
+    await sameDirectory();
+
+    return {
+      absolute, relative: parts.join('/'),
+      commit: async () => {
+        await sameDirectory();
+        if (await this.existingOutput(project, job, kind)) throw collision();
+        try {await rename(absolute, destination);}
+        catch (error) {
+          if (await this.existingOutput(project, job, kind)) throw collision();
+          throw error;
+        }
+      },
+      discard: async () => {
+        try {await sameDirectory();}
+        catch (error) {if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error;}
+        for (const name of await readdir(absolute)) await unlink(path.join(absolute, name));
+        await rmdir(absolute);
+      },
+    };
+  }
   async output(project: string, job: string, kind: 'render' | 'stills' | 'inspect'): Promise<{absolute: string; relative: string}> {
     const parts = this.#outputParts(project, job, kind);
-    // El proyecto debe existir previamente; no se crean proyectos desde esta API.
-    const projectRoot = await this.#check(['proyectos', project], false);
-    if (!(await lstat(projectRoot)).isDirectory()) throw new WorkerError(422, 'PROYECTO_INVALIDO', 'El proyecto no existe.');
-    const parent = await this.#check(parts.slice(0, -1), true);
+    const parent = await this.#outputParent(parts);
     const absolute = path.join(parent, kind);
     try {await mkdir(absolute);} catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new WorkerError(409, 'TRABAJO_EXISTENTE', 'El área de salida de este trabajo ya existe.');

@@ -691,8 +691,8 @@ export default function Home() {
       </>}
       {section === "entregas" && <><section className="heading"><div><p className="eyebrow">Estudio audiovisual</p><h1>Entregas</h1></div></section>
         <section className="panel"><h2>Kits de campaña</h2>{kits.length ?
-          <ul>{kits.map((kit) => <li key={kit.id}><span>{kit.title}</span><a href={kit.url} download>Descargar ZIP</a>
-            {kit.prores && <a href={kit.prores.url} download>Descargar ProRes</a>}</li>)}</ul> :
+          <ul>{kits.map((kit) => <li key={kit.id}><span>{kit.title}</span><a href={kit.url} download>Descargar ZIP con MP4</a>
+            {kit.prores && <a href={kit.prores.url} download>Descargar ProRes 4444</a>}</li>)}</ul> :
           <p>Aquí podrás descargar los kits aprobados de tus producciones.</p>}</section></>}
       {section === "plan" && <><section className="heading"><div><p className="eyebrow">Estudio audiovisual</p><h1>Mi plan</h1></div></section>
         <div className="plans">{plans.map((item) => <section key={item.id} className={`panel ${plan?.plan_id === item.id ? "current" : ""}`}>

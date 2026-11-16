@@ -1,4 +1,4 @@
-import {outputDimensions, TITLE_FADE_FRAMES, WorkerError, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
+import {MAX_SEGMENT_SECONDS, outputDimensions, TITLE_FADE_FRAMES, WorkerError, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
 
 export interface Loudness {integrated_lufs: number; true_peak_dbtp: number; range_lu: number; threshold_lufs: number; offset_lu: number}
 export interface MediaInfo {duration_seconds: number; width: number; height: number; fps: number; video_codec: string | null; video_profile: string | null; codec_tag: string | null; audio_codec: string | null; has_audio: boolean; sample_rate: number | null; color_space: string | null; color_transfer: string | null; color_primaries: string | null; pixel_format: string | null}
@@ -28,11 +28,24 @@ export function parseProbe(stdout: string): MediaInfo {
   const field = (name: string): string | null => typeof video?.[name] === 'string' ? video[name] as string : null;
   return {duration_seconds, width: video ? finite(video.width) : 0, height: video ? finite(video.height) : 0, fps: Number.isFinite(fps) ? fps : 0, video_codec: field('codec_name'), video_profile: field('profile'), codec_tag: field('codec_tag_string'), audio_codec: audio && typeof audio.codec_name === 'string' ? audio.codec_name : null, has_audio: Boolean(audio), sample_rate: audio ? finite(audio.sample_rate) : null, color_space: field('color_space'), color_transfer: field('color_transfer'), color_primaries: field('color_primaries'), pixel_format: field('pix_fmt')};
 }
-export function overlayInputSupported(stdout: string, request: RenderRequest): boolean {
+const exactTimeToleranceSeconds = 1;
+
+function simpleDisplayRotation(metadata: unknown[]): boolean {
+  if (!metadata.length) return true;
+  if (metadata.length !== 1) return false;
+  const matrix = metadata[0] as {side_data_type?: string; rotation?: number; displaymatrix?: string} | null;
+  if (matrix?.side_data_type !== 'Display Matrix' || typeof matrix.displaymatrix !== 'string' || typeof matrix.rotation !== 'number') return false;
+  const rotations = new Map([[0, '65536,0,0,65536'], [90, '0,-65536,65536,0'], [-90, '0,65536,-65536,0'], [180, '-65536,0,0,-65536'], [-180, '-65536,0,0,-65536']]);
+  const rows = [...matrix.displaymatrix.matchAll(/^\d{8}:\s*(-?\d+)\s+(-?\d+)\s+(-?\d+)\s*$/gm)].map(row => row.slice(1).map(Number));
+  return rows.length === 3 && rows[0]![2] === 0 && rows[1]![2] === 0 && rows[2]!.join(',') === '0,0,1073741824'
+    && rows.slice(0, 2).flatMap(row => row.slice(0, 2)).join(',') === rotations.get(matrix.rotation);
+}
+
+export function overlayInputSupported(stdout: string, request: RenderRequest): false | 'exact' | 'normalized' {
   const minimumFrames = request.plan === 'Free' ? 900 : TITLE_FADE_FRAMES + 1;
   if (request.format !== 'mp4'
     || !request.props.video_path?.toLowerCase().endsWith('.mp4')
-    || request.durationInFrames < minimumFrames || request.durationInFrames > 1800) return false;
+    || request.durationInFrames < minimumFrames || request.durationInFrames > MAX_SEGMENT_SECONDS * 30) return false;
   const data = JSON.parse(stdout) as {streams?: Record<string, unknown>[]};
   const videos = data.streams?.filter(stream => stream.codec_type === 'video');
   const video = videos?.[0];
@@ -44,16 +57,30 @@ export function overlayInputSupported(stdout: string, request: RenderRequest): b
     && Math.min(width,height) * 16 === Math.max(width,height) * 9;
   const tags = video.tags as {rotate?: unknown} | undefined;
   const disposition = video.disposition as {attached_pic?: number} | undefined;
-  const metadata = video.side_data_list as unknown[] | undefined;
-  return supportedGeometry && video.codec_name === 'h264' && video.pix_fmt === 'yuv420p'
-    && video.field_order === 'progressive' && video.sample_aspect_ratio === '1:1'
+  const metadata = (video.side_data_list ?? []) as unknown[];
+  const hevc = video.codec_name === 'hevc' && (video.field_order === undefined || video.field_order === 'progressive');
+  // Algunos móviles omiten la relación de píxel en HEVC. Un valor explícito debe ser 1:1.
+  const squarePixels = video.sample_aspect_ratio === '1:1' || (hevc && video.sample_aspect_ratio === undefined);
+  const supportedColor = video.pix_fmt === 'yuv420p' && squarePixels
     && video.color_space === 'bt709' && video.color_range === 'tv'
     && (video.color_transfer === undefined || video.color_transfer === 'bt709')
-    && (video.color_primaries === undefined || video.color_primaries === 'bt709')
-    && video.r_frame_rate === '30/1' && video.avg_frame_rate === '30/1'
-    && Number(video.start_pts) === 0 && Number(video.nb_frames) === request.durationInFrames
+    && (video.color_primaries === undefined || video.color_primaries === 'bt709');
+  if (!supportedGeometry || !supportedColor || disposition?.attached_pic !== 0 || tags?.rotate !== undefined
+    || Number(video.start_pts) !== 0 || !Array.isArray(metadata)) return false;
+  if (video.codec_name === 'h264' && video.field_order === 'progressive' && !metadata.length
+    && video.r_frame_rate === '30/1' && video.avg_frame_rate === '30/1' && Number(video.nb_frames) === request.durationInFrames
     && Number(video.duration_ts) === frameTicks(video.time_base) * request.durationInFrames
-    && disposition?.attached_pic === 0 && tags?.rotate === undefined && !metadata?.length;
+  ) return 'exact';
+  // Los HEVC de móvil pueden omitir field_order. Se acota la corrección a fuentes SDR
+  // de cadencia nominal 30 fps con orientación simple y duración cercana al pedido.
+  const longH264 = request.durationInFrames > 1800 && video.codec_name === 'h264' && video.field_order === 'progressive';
+  const [rateNumerator, rateDenominator] = String(video.avg_frame_rate ?? '').split('/').map(Number);
+  const averageRate = (rateNumerator ?? 0) / (rateDenominator ?? 0);
+  const sourceDuration = Number(video.duration_ts) / (frameTicks(video.time_base) * 30);
+  if ((hevc || longH264) && video.r_frame_rate === '30/1' && averageRate >= 24 && averageRate <= 31
+    && sourceDuration > 0 && Math.abs(sourceDuration - request.durationInFrames / 30) <= exactTimeToleranceSeconds
+    && simpleDisplayRotation(metadata)) return 'normalized';
+  return false;
 }
 export function videoFrameCount(stdout: string): number {
   const data = JSON.parse(stdout) as {streams?: Record<string, unknown>[]};
@@ -66,10 +93,25 @@ function frameTicks(timeBase: unknown): number {
 export function packetProbeArgs(input: string): string[] {
   return ['-v','error','-select_streams','v:0','-show_entries','stream=time_base:packet=pts,duration','-of','json',input];
 }
-export function overlayPacketTimingSupported(stdout: string, frameCount: number): boolean {
+export function overlayPacketTimingSupported(stdout: string, frameCount: number, normalize = false): boolean {
   const data = JSON.parse(stdout) as {streams?: {time_base?: string}[]; packets?: {pts?: number; duration?: number}[]};
   const ticks = frameTicks(data.streams?.[0]?.time_base);
-  if (!Number.isSafeInteger(ticks) || ticks <= 0 || data.packets?.length !== frameCount) return false;
+  if (!Number.isSafeInteger(ticks) || ticks <= 0 || !data.packets?.length) return false;
+  if (normalize) {
+    const ticksPerSecond = ticks * 30;
+    const packets = [...data.packets].sort((left, right) => Number(left.pts) - Number(right.pts));
+    if (packets.length > MAX_SEGMENT_SECONDS * 31 + 31 || Number(packets[0]!.pts) !== 0) return false;
+    let previous = -1, end = 0;
+    for (const packet of packets) {
+      const pts = Number(packet.pts), duration = Number(packet.duration);
+      if (!Number.isSafeInteger(pts) || !Number.isSafeInteger(duration) || pts <= previous
+        || pts - previous > 2 * ticksPerSecond || duration <= 0 || duration > 2 * ticksPerSecond) return false;
+      previous = pts;
+      end = Math.max(end, pts + duration);
+    }
+    return Math.abs(end / ticksPerSecond - frameCount / 30) <= exactTimeToleranceSeconds;
+  }
+  if (data.packets.length !== frameCount) return false;
   // El orden de decodificación puede diferir del orden de presentación con fotogramas B.
   const positions = new Set<number>();
   for (const packet of data.packets) {
@@ -96,19 +138,20 @@ function sdrVideoFilter(pixelFormat: 'yuv420p' | 'yuva444p10le', jpeg = false): 
   return `scale=in_range=pc:out_range=tv${sourceMatrix}:out_color_matrix=bt709,format=${pixelFormat},${limitedBt709}`;
 }
 function normalizeAudio(count: number, duration: number, measured: Loudness, peak: number): string {
-  if (!Number.isInteger(count) || count < 1 || ![-1.5,-2].includes(peak)
+  if (!Number.isInteger(count) || count < 1 || ![-1.5,-2,-3.5].includes(peak)
     || Object.values(measured).some(value => !Number.isFinite(value))) return bad();
   const loudnorm = `loudnorm=I=-14:TP=${peak}:LRA=11:measured_I=${measured.integrated_lufs}:measured_TP=${measured.true_peak_dbtp}:measured_LRA=${measured.range_lu}:measured_thresh=${measured.threshold_lufs}:offset=${measured.offset_lu}:linear=true:print_format=json`;
   return `${audioPass(duration)},${loudnorm}`;
 }
 const aacAudio = ['-c:a','aac','-b:a','256k','-ar','48000','-ac','2'];
 
-export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string): string[] {
+export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false): string[] {
   const audioFilter = normalizeAudio(count, duration, measured, peak);
   const {width,height} = outputDimensions(resolution);
   const high = resolution === '4k';
   const images = ['-framerate','30','-start_number','0','-i',frames];
-  const scale = `[0:v]fps=fps=30:start_time=0,scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=bilinear:in_color_matrix=bt709`;
+  const tail = normalize ? `tpad=stop_mode=clone:stop_duration=${exactTimeToleranceSeconds},` : '';
+  const scale = `[0:v]fps=fps=30:start_time=0,${tail}scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=bilinear:in_color_matrix=bt709`;
   const crop = `crop=${width}:${height},setsar=1`;
   const overlay = 'alpha=straight:eof_action=repeat:repeatlast=1';
   // El crudo admitido ya está en YUV BT.709. Solo se convierte la capa RGBA.
@@ -123,8 +166,8 @@ export function encodeNvenc(frames: string, audio: string, output: string, count
   return ['-hide_banner','-nostdin','-nostats','-n',...inputs,'-frames:v',String(count),'-t',String(duration),'-c:v','h264_nvenc','-preset','p5','-profile:v','high','-level:v',high ? '5.1' : '4.2','-b:v',high ? '24M' : '6M','-maxrate',high ? '32M' : '8M','-bufsize',high ? '48M' : '12M','-colorspace','bt709','-color_primaries','bt709','-color_trc','bt709','-color_range','tv','-af',audioFilter,...aacAudio,'-movflags','+faststart',output];
 }
 
-export function correctMp4Audio(video: string, audio: string, output: string, count: number, duration: number, measured: Loudness): string[] {
-  const filter = normalizeAudio(count, duration, measured, -2);
+export function correctMp4Audio(video: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -2): string[] {
+  const filter = normalizeAudio(count, duration, measured, peak);
   return ['-hide_banner','-nostdin','-nostats','-n','-i',video,'-i',audio,'-map','0:v:0','-map','1:a:0',
     '-c:v','copy','-af',filter,...aacAudio,'-movflags','+faststart',output];
 }
@@ -150,8 +193,8 @@ export function muxProresFragments(list: string, audio: string, output: string, 
     '-video_track_timescale',String(proresTimescale),'-af',audioFilter,...pcmAudio,'-f','mov',output];
 }
 
-export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string): string[] {
-  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo);
+export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string, normalize = false): string[] {
+  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo, normalize);
   outputDimensions(resolution);
   if (format !== 'prores4444') return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);

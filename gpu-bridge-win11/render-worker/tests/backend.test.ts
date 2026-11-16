@@ -118,6 +118,30 @@ test('repite el recibo de render sin recodificar y rechaza una solicitud cambiad
   } finally {await rm(fixture.root, {recursive: true, force: true});}
 });
 
+test('un fallo de limpieza antes de confirmar el render permite reintentar la misma revisión', async (t) => {
+  const fixture = await setup(false);
+  try {
+    await fixture.backend.initialize();
+    const scratch = fixture.backend.scratch;
+    const remove = scratch.remove.bind(scratch);
+    let firstCleanup = true;
+    t.mock.method(scratch, 'remove', async (job: string) => {
+      await remove(job);
+      if (firstCleanup) {
+        firstCleanup = false;
+        throw new Error('Fallo temporal de limpieza');
+      }
+    });
+
+    const signal = new AbortController().signal;
+    await assert.rejects(fixture.backend.render(request, signal), /Fallo temporal de limpieza/);
+    const result = await fixture.backend.render(request, signal);
+    await access(path.join(fixture.nas, result.files[0]!.path));
+    assert.deepEqual(await fixture.backend.render(request, signal), result);
+    await assert.rejects(fixture.backend.render({...request, props: {...request.props, title: 'Otro'}}, signal), /solicitud/);
+  } finally {await rm(fixture.root, {recursive: true, force: true});}
+});
+
 const extendedInput = (format: OutputFormat, resolution: Resolution) => ({project_id: 'sansevieras', job_id: 'extendido', composition: 'AgencyVertical', plan: 'Ilimitado', format, resolution, props: {title: 'Prueba de formatos', duration_seconds: 3, audio_path: 'proyectos/sansevieras/03_assets/voz.wav'}});
 const extendedRequest = (format: OutputFormat, resolution: Resolution) => parseRender(extendedInput(format, resolution));
 
