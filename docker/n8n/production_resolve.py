@@ -21,6 +21,7 @@ MUSIC_PATH = f"_biblioteca_global/musica-stock/{AD_MUSIC_ID}.mp3"
 MUSIC_SHA256 = "8433b770a630d9b1594fd484442c677907ece899a4d149954cd2e74fd733e311"
 LIMIT = 131072
 IMAGE_LIMIT = 2 * 1024**3
+TIMELINE_NAME = "Anuncio de Studio"
 PACKAGE_FILES = {
     "imagen-edicion.mov",
     "voz-original.wav",
@@ -130,7 +131,7 @@ def timeline(props, package, source_frames):
             ),
         )
 
-    cut = otio.schema.Timeline(name="Anuncio de Studio")
+    cut = otio.schema.Timeline(name=TIMELINE_NAME)
     picture = otio.schema.Track(name="Imagen", kind="Video")
     voice = otio.schema.Track(name="Voz original", kind="Audio")
     bed = otio.schema.Track(name="Música de catálogo", kind="Audio")
@@ -300,6 +301,10 @@ def verify_package(order, direction, package):
     return cut_sha
 
 
+def project_name(order, revision):
+    return f"Studio {order['order_id']} {revision[:8]}"
+
+
 def open_resolve(intake, direction, media_root, package):
     import DaVinciResolveScript as script
 
@@ -308,7 +313,7 @@ def open_resolve(intake, direction, media_root, package):
     resolve = script.scriptapp("Resolve")
     if not resolve:
         raise RuntimeError("Resolve Studio no está abierto o el scripting local está desactivado")
-    name = f"Studio {order['order_id']} {revision[:8]}"
+    name = project_name(order, revision)
     manager = resolve.GetProjectManager()
     project = manager.CreateProject(name)
     if not project:
@@ -322,7 +327,9 @@ def open_resolve(intake, direction, media_root, package):
     ):
         if not project.SetSetting(key, value):
             raise RuntimeError(f"Resolve rechazó el ajuste {key}")
-    cut = project.GetMediaPool().ImportTimelineFromFile(str(package / "montaje.otio"))
+    cut = project.GetMediaPool().ImportTimelineFromFile(
+        str(package / "montaje.otio"), {"timelineName": TIMELINE_NAME}
+    )
     if not cut or cut.GetTrackCount("video") != 1 or cut.GetTrackCount("audio") != 2:
         raise RuntimeError("Resolve no importó la pista de imagen y las dos pistas de audio")
     if cut.GetEndFrame() - cut.GetStartFrame() != FRAMES:
@@ -334,6 +341,58 @@ def open_resolve(intake, direction, media_root, package):
     ):
         raise RuntimeError("Resolve no pudo guardar y abrir la mezcla en Fairlight")
     return {"proyecto": name, "fotogramas": FRAMES, "pistas_audio": 2}
+
+
+def mix_resolve(intake, direction, media_root, package, voice_db, music_db):
+    import DaVinciResolveScript as script
+
+    order, _, _ = validated_cut(intake, direction)
+    name = project_name(order, verify_package(order, direction, package))
+    if not all(level is not None and -60 <= level <= 12 for level in (voice_db, music_db)):
+        raise ValueError("Indica ambos niveles de Fairlight entre −60 y +12 dB")
+    resolve = script.scriptapp("Resolve")
+    if not resolve:
+        raise RuntimeError("Resolve Studio no está disponible para la mezcla local")
+    manager = resolve.GetProjectManager()
+    project = manager.GetCurrentProject()
+    if not project or project.GetName() != name or project.IsRenderingInProgress():
+        raise RuntimeError("Abre el proyecto del traspaso y espera cualquier exportación en curso")
+    cut = project.GetCurrentTimeline()
+    if (
+        not cut
+        or cut.GetName() not in {TIMELINE_NAME, "montaje"}
+        or cut.GetTrackCount("audio") != 2
+        or cut.GetEndFrame() - cut.GetStartFrame() != FRAMES
+        or [cut.GetTrackName("audio", i) for i in (1, 2)] != ["Voz original", "Música de catálogo"]
+    ):
+        raise RuntimeError("Abre el montaje del traspaso con las dos pistas de audio")
+    tracks = [cut.GetItemListInTrack("audio", i) for i in (1, 2)]
+    if not all(tracks) or not resolve.OpenPage("fairlight"):
+        raise RuntimeError("No se pudo abrir la mezcla en Fairlight")
+    apply_mix(tracks, (voice_db, music_db), manager.SaveProject)
+    return {"proyecto": name, "voz_db": voice_db, "musica_db": music_db}
+
+
+def apply_mix(tracks, levels, save):
+    changed = []
+    try:
+        for clips, level in zip(tracks, levels, strict=True):
+            for clip in clips:
+                previous = (clip.GetProperty("AudioVolumeEnabled"), clip.GetProperty("AudioVolume"))
+                changed.append((clip, *previous))
+                if (
+                    not clip.SetProperty("AudioVolumeEnabled", True)
+                    or not clip.SetProperty("AudioVolume", level)
+                    or abs(clip.GetProperty("AudioVolume") - level) >= 0.1
+                ):
+                    raise RuntimeError("Fairlight rechazó un ajuste de volumen")
+        if not save():
+            raise RuntimeError("No se pudo guardar la mezcla en Resolve")
+    except Exception:
+        for clip, was_enabled, old_level in reversed(changed):
+            clip.SetProperty("AudioVolume", old_level)
+            clip.SetProperty("AudioVolumeEnabled", was_enabled)
+        raise
 
 
 def audit_export(intake, direction, media_root, package):
@@ -384,16 +443,26 @@ def audit_export(intake, direction, media_root, package):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    actions = {"preparar": prepare, "abrir": open_resolve, "revisar": audit_export}
+    actions = {
+        "preparar": prepare,
+        "abrir": open_resolve,
+        "mezclar": mix_resolve,
+        "revisar": audit_export,
+    }
     parser.add_argument("accion", choices=actions)
     for name in ("ingesta", "escaleta", "medios", "destino"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--voz-db", type=float)
+    parser.add_argument("--musica-db", type=float)
     args = parser.parse_args()
     intake, direction = (
         json.loads(read_regular(path, LIMIT)) for path in (args.ingesta, args.escaleta)
     )
     package = args.destino.parent.resolve(strict=True) / args.destino.name
-    result = actions[args.accion](intake, direction, args.medios.resolve(strict=True), package)
+    levels = (args.voz_db, args.musica_db) if args.accion == "mezclar" else ()
+    result = actions[args.accion](
+        intake, direction, args.medios.resolve(strict=True), package, *levels
+    )
     print(json.dumps(result, ensure_ascii=False))
 
 

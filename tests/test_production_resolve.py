@@ -116,3 +116,28 @@ def test_reconoce_musica_desplazada_y_rechaza_otra_pista(cut):
     assert not matching_music_window(array("h", [0] * 4000), reference)
     other = array("h", (generator.randint(-20000, 20000) for _ in range(4000)))
     assert not matching_music_window(other, reference)
+
+
+def test_mezcla_guarda_los_niveles_y_restaura_si_falla(cut):
+    resolve, *_ = cut
+
+    class Clip:
+        def __init__(self):
+            self.properties = {"AudioVolumeEnabled": False, "AudioVolume": 0.0}
+
+        def GetProperty(self, key):
+            return self.properties[key]
+
+        def SetProperty(self, key, value):
+            self.properties[key] = value
+            return True
+
+    voice, music = Clip(), Clip()
+    tracks = ([voice], [music])
+    resolve.apply_mix(tracks, (2, -8), lambda: True)
+    assert voice.properties == {"AudioVolumeEnabled": True, "AudioVolume": 2}
+    assert music.properties == {"AudioVolumeEnabled": True, "AudioVolume": -8}
+    with pytest.raises(RuntimeError, match="guardar la mezcla"):
+        resolve.apply_mix(tracks, (5, -15), lambda: False)
+    assert voice.GetProperty("AudioVolume") == 2
+    assert music.GetProperty("AudioVolume") == -8
