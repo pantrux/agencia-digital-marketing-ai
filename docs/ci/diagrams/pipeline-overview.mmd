@@ -15,6 +15,7 @@ flowchart TB
     %% Las pruebas Node cubren bundle único concurrente, assets UUID y QA normalizada 0..1920 también en 4K.
     %% El manifiesto declara Fase 7 con CD deshabilitado. Los siete controles deben pasar.
     %% La plantilla incluye GREPTILE_API_KEY como CHANGE_ME. La revisión local obtiene el valor de la bóveda.
+    %% Kitsu acepta medios aprobados de hasta 3 GiB. Su proxy reserva un margen para la estructura multipart.
     %% El control 7 coteja los árboles de ambos commits cuando la comparación alcanza su límite.
     %% La evidencia operativa de Fase 4 se registra fuera de CI.
     %% Ruff y formato incluyen docker/.

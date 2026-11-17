@@ -473,6 +473,32 @@ def test_multipart_bounds_include_framing(adapter, monkeypatch):
         module._stage_upload(io.BytesIO(), PurePosixPath(SOURCE), DIGEST)
 
 
+@pytest.mark.parametrize("size, zip_file", [(1_110_957_940, False), (3 * 1024**3, True)])
+def test_multipart_admite_tamanos_de_produccion_sin_leer_el_cuerpo_entero(
+    adapter, monkeypatch, size, zip_file
+):
+    module, _, _ = adapter
+
+    class InicioDeLectura(Exception):
+        pass
+
+    class Medio:
+        def read(self, amount):
+            assert amount == module.CHUNK
+            raise InicioDeLectura
+
+    @contextmanager
+    def media(_):
+        yield Medio(), size
+
+    monkeypatch.setattr(module, "_media_file", media)
+    out = io.BytesIO()
+    with pytest.raises(InicioDeLectura):
+        module._stage_upload(out, PurePosixPath(SOURCE), DIGEST, zip_file=zip_file)
+    kind = b"application/zip" if zip_file else b"video/mp4"
+    assert out.getvalue().endswith(b"Content-Type: " + kind + b"\r\n\r\n")
+
+
 def test_adapta_zip_superior_a_128_mib_por_bloques(adapter, monkeypatch, tmp_path):
     module, _, _ = adapter
     size = 129 * 1024**2
@@ -504,6 +530,27 @@ def test_adapta_zip_superior_a_128_mib_por_bloques(adapter, monkeypatch, tmp_pat
         out, PurePosixPath("ensayo.zip"), digest, zip_file=True
     )
     assert stream is out and size < length == out.count and boundary == digest
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Requiere openat y O_NOFOLLOW nativos")
+def test_native_nas_limita_el_tamano_del_medio_sin_asignar_el_cuerpo(
+    adapter, monkeypatch, tmp_path
+):
+    module, _, _ = adapter
+    monkeypatch.setattr(module, "MEDIA_ROOT", tmp_path)
+    source = tmp_path / "archivo.zip"
+    limit = 3 * 1024**3
+    with source.open("wb") as out:
+        out.truncate(limit)
+    with module._media_file(PurePosixPath("archivo.zip")) as (_, size):
+        assert size == limit
+    with source.open("r+b") as out:
+        out.truncate(limit + 1)
+    with (
+        pytest.raises(ValueError, match="KITSU_MEDIO_INVALIDO"),
+        module._media_file(PurePosixPath("archivo.zip")),
+    ):
+        pytest.fail("Se abrió un archivo sobre el límite de medio")
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Requiere openat y O_NOFOLLOW nativos")
