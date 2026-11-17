@@ -13,7 +13,7 @@ try {
     !["agency-director", "agency-critic"].includes(agentId) ||
     typeof message !== "string" || !message.trim() ||
     typeof idempotencyKey !== "string" ||
-    !Array.isArray(attachments) || attachments.length < 1 || attachments.length > 3
+    !Array.isArray(attachments) || attachments.length < 1 || attachments.length > 8
   ) throw new Error("Solicitud visual inválida");
 
   const sdk = join(homedir(), ".npm-global/lib/node_modules/openclaw/dist/plugin-sdk/gateway-runtime.js");

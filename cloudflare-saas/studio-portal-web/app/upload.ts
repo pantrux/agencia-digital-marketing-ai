@@ -7,6 +7,7 @@ type Api = <T>(path: string, init?: RequestInit) => Promise<T>;
 type Order = { id: string; project_slug: string };
 export type OutputResolution = "1080p" | "4k";
 export type OutputFormat = "mp4" | "prores4444";
+export type OutputEdit = "full" | "reel";
 type Session = { id: string; uploadId: string; key: string; partSize: number; partCount: number; status: string; newlyOpened?: true };
 type Part = { PartNumber: number; ETag: string };
 const files = { mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm" };
@@ -32,14 +33,14 @@ async function sha256(file: File): Promise<string> {
 
 export async function uploadVideo(
   file: File, api: Api, report: (value: number) => void, resolution: OutputResolution, format: OutputFormat,
-  brandId?: string,
+  brandId?: string, edit: OutputEdit = "full",
 ): Promise<Order> {
   const extension = file.name.split(".").pop()?.toLowerCase();
   if (extension !== "mp4" && extension !== "mov" && extension !== "webm") throw new Error("ARCHIVO_INVALIDO");
   if (!file.size || file.size > maximum) throw new Error("ARCHIVO_INVALIDO");
-  await validateVideoDuration(file);
+  await validateVideoDuration(file, edit === "reel" ? 30 : 0);
   const digest = await sha256(file);
-  const retryKey = "studio:upload:" + digest + (brandId ? ":" + brandId : "");
+  const retryKey = "studio:upload:" + digest + (brandId ? ":" + brandId : "") + (edit === "reel" ? ":reel" : "");
   const known = sessionStorage.getItem(retryKey);
   const key = known ?? crypto.randomUUID();
   if (!known) sessionStorage.setItem(retryKey, key);
@@ -47,6 +48,7 @@ export async function uploadVideo(
     kind: "production",
     ...(resolution === "4k" ? { output_resolution: resolution } : {}),
     ...(format === "prores4444" ? { output_format: format } : {}),
+    ...(edit === "reel" ? { output_edit: edit } : {}),
     ...(brandId ? { brand_id: brandId } : {}),
   });
   const order = await api<Order>("/orders", { ...body, headers: { ...body.headers, "Idempotency-Key": key } })

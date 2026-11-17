@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { observeBrowserTimings } from "./browser-timing";
 import { quotaNotice } from "./quota";
-import { uploadVideo, type OutputFormat, type OutputResolution } from "./upload";
+import { uploadVideo, type OutputEdit, type OutputFormat, type OutputResolution } from "./upload";
 
 type Person = { email: string; display_name: string | null };
 type Plan = { plan_id: string; monthly_reels: number | null; used: number; max_resolution: OutputResolution;
@@ -74,6 +74,7 @@ function message(error: unknown): string {
     IDEMPOTENCIA_EN_CONFLICTO: "Ya existe una reserva para este archivo. Usa la misma resolución, formato y marca para retomarla.",
     ARCHIVO_INVALIDO: "Selecciona un vídeo MP4, MOV o WebM de hasta 1 GiB.",
     VIDEO_SUPERA_DURACION: "El vídeo supera los 10 minutos. Recórtalo antes de subirlo.",
+    VIDEO_CORTO_PARA_REEL: "El reel requiere un vídeo de al menos 30 segundos.",
     VIDEO_NO_VERIFICABLE: "Tu navegador no pudo leer el vídeo. Prueba con un MP4 en H.264.",
     SUBIDA_NO_DISPONIBLE: "La carga de vídeos aún está en preparación.",
     PAGO_NO_DISPONIBLE: "La activación de planes pagados todavía está en preparación.",
@@ -336,6 +337,7 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [resolution, setResolution] = useState<OutputResolution>("1080p");
   const [format, setFormat] = useState<OutputFormat>("mp4");
+  const [edit, setEdit] = useState<OutputEdit>("full");
   const [progress, setProgress] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -471,7 +473,7 @@ export default function Home() {
         setProgress(part);
         setStatus(part < 100 ? "Enviando vídeo…" : "Verificando la carga…");
       }, plan.max_resolution === "4k" ? resolution : "1080p", plan.allow_prores4444 === 1 ? format : "mp4",
-      unlimited && brands?.some((brand) => brand.id === selectedBrand) ? selectedBrand : undefined);
+      unlimited && brands?.some((brand) => brand.id === selectedBrand) ? selectedBrand : undefined, edit);
       setSelected(order.id);
       setStatus("Vídeo recibido. Tu producción está en preparación.");
       await refresh();
@@ -629,6 +631,14 @@ export default function Home() {
                   {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.display_name}</option>)}
                 </select>
               </div>}
+              <div className="production-choice">
+                <label htmlFor="output-edit">Montaje</label>
+                <select id="output-edit" value={edit} disabled={busy}
+                  onChange={(event) => setEdit(event.currentTarget.value === "reel" ? "reel" : "full")}>
+                  <option value="full">Vídeo completo</option>
+                  <option value="reel">Reel por escenas · 30–45 segundos</option>
+                </select>
+              </div>
               {plan.max_resolution === "4k" && <div className="production-choice">
                 <label htmlFor="output-resolution">Resolución de entrega</label>
                 <select id="output-resolution" disabled={busy} value={resolution} onChange={(event) => {

@@ -321,6 +321,55 @@ def test_escaleta_de_valeria_exige_fuente_confirmada_y_preserva_el_plan(
         make_edl(receipt, angles, {**answer, "subtitulo_ampliado": "sí"})
 
 
+def test_valeria_convierte_escenas_a_fotogramas_y_acota_los_rotulos(monkeypatch, order):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    from production_valeria import make_edl
+
+    order["output_edit"] = "reel"
+    job = order["media"]
+    root = f"proyectos/{job['project_slug']}"
+    receipt = {
+        "order": order,
+        "raw": f"{root}/01_raw/{job['asset_id']}.mp4",
+        "duration_seconds": 75.0,
+        "audio": {"path": f"{root}/03_assets/intake-source.wav"},
+    }
+    angles = [{"angulo": name} for name in ("A", "B", "C")]
+    answer = {
+        "angulo": 1,
+        "titulo": "Catálogo",
+        "subtitulo": "Pide asesoría",
+        "observacion": "Hay planos de detalle disponibles",
+        "apto_sin_cambios": True,
+        "escenas": [
+            {
+                "desde": 0,
+                "hasta": 12,
+                "rotulo": {"texto": "Catálogo", "desde": 1, "hasta": 4, "posicion": "inferior"},
+            },
+            {"desde": 22, "hasta": 44},
+        ],
+    }
+    props = make_edl(receipt, angles, answer)["render"]["props"]
+    assert props["duration_seconds"] == 34
+    assert props["scenes"] == [
+        {
+            "source_start_frame": 0,
+            "source_end_frame": 360,
+            "label": {
+                "text": "Catálogo",
+                "start_frame": 30,
+                "end_frame": 120,
+                "position": "bottom",
+            },
+        },
+        {"source_start_frame": 660, "source_end_frame": 1320},
+    ]
+    for bad in ({"desde": 11, "hasta": 35}, {"desde": 60, "hasta": 82}, {"desde": 20, "hasta": 22}):
+        with pytest.raises(ValueError):
+            make_edl(receipt, angles, {**answer, "escenas": [answer["escenas"][0], bad]})
+
+
 @pytest.mark.parametrize(
     "first_size,qualities,mutate_original",
     [(100, [4], False), (26_000, [4, 8], False), (100, [4], True)],
@@ -797,6 +846,87 @@ def test_lucas_exige_la_marca_del_plan_en_las_capturas(
     with pytest.raises(ValueError, match="plan"):
         lucas.verify_stills({**data, "height": height - 2}, body, [0])
     assert checked == [(file, {expected})]
+
+
+def test_vista_previa_rechazada_bloquea_el_master(monkeypatch, tmp_path, order):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_lucas as lucas
+
+    order["plan_id"] = "ilimitado"
+    order["output_resolution"] = "4k"
+    order["output_edit"] = "reel"
+    job = order["media"]
+    root = f"proyectos/{job['project_slug']}"
+    raw, audio = f"{root}/01_raw/{job['asset_id']}.mp4", f"{root}/03_assets/intake-source.wav"
+    fingerprint = {key: job[key] for key in ("sha256", "bytes")}
+    receipt = {"order": order, "raw": raw, "audio": {"path": audio, **fingerprint}}
+    payload = {
+        "project_id": job["project_slug"],
+        "job_id": order["order_id"] + "-v1",
+        "plan": "Ilimitado",
+        "composition": "AgencyVertical",
+        "format": "mp4",
+        "resolution": "4k",
+        "props": {
+            "video_path": raw,
+            "audio_path": audio,
+            "duration_seconds": 34,
+            "scenes": [
+                {
+                    "source_start_frame": 0,
+                    "source_end_frame": 360,
+                    "label": {
+                        "text": "Catálogo",
+                        "start_frame": 0,
+                        "end_frame": 90,
+                        "position": "bottom",
+                    },
+                },
+                {"source_start_frame": 660, "source_end_frame": 1320},
+            ],
+        },
+    }
+    direction = {
+        "order_id": order["order_id"],
+        "source_sha256": job["sha256"],
+        "brief_sha256": "a" * 64,
+        "escaleta": {"estado": "lista_para_stills", "render": payload},
+    }
+    preview = {
+        "path": f"{root}/06_renders/{payload['job_id']}-preview/render/master.mp4",
+        **fingerprint,
+    }
+    calls = []
+
+    def render(kind, body, *args, **kwargs):
+        calls.append((kind, body["resolution"], body["job_id"]))
+        assert body["job_id"].endswith("-preview")
+        return {
+            "codec": "h264_nvenc",
+            "hardware_acceleration": True,
+            "watermark": False,
+            "audio_verified": True,
+            "audio": {"integrated_lufs": -14, "true_peak_dbtp": -3},
+            "media": {"width": 1080, "height": 1920, "fps": 30, "duration_seconds": 34},
+            "files": [preview],
+        }
+
+    def review(_order, _edl, _job, item, out):
+        assert item == preview
+        content = {"dictamen": {"decision": "rechazado"}}
+        out.write_text(json.dumps(content), encoding="utf-8")
+        return content
+
+    monkeypatch.setattr(lucas, "fingerprint", lambda _: fingerprint)
+    monkeypatch.setattr(lucas, "verify_file", lambda item, paths: None)
+    monkeypatch.setattr(lucas, "submit_with_receipt", render)
+    monkeypatch.setattr(lucas, "audit_preview", review, raising=False)
+    target = tmp_path / "orden.json"
+    lucas.run(order, receipt, direction, "fixture", 1, target)
+    assert calls == [("render", "1080p", payload["job_id"] + "-preview")]
+    record = json.loads(target.read_bytes())
+    assert record["preview"] == preview
+    assert "master" not in record
 
 
 def test_lucas_serializa_los_textos_como_utf8(monkeypatch):

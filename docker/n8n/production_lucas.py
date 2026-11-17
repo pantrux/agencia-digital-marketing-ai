@@ -7,10 +7,12 @@ import json
 import logging
 import re
 import sqlite3
+import subprocess
 import time
 from contextlib import closing
 from pathlib import Path
 
+from production_elena import audit_preview
 from production_handoff import (
     RENDER_SIZES,
     canonical,
@@ -103,6 +105,24 @@ def verify_stills(data, body, frames):
         verify_file(item, {f"{prefix}/still-{frame}.png"})
 
 
+def verify_mp4(result, body):
+    audio, media = result["audio"], result["media"]
+    if (
+        (result["codec"], result["hardware_acceleration"], result["audio_verified"])
+        != ("h264_nvenc", True, True)
+        or result["watermark"] is not (body["plan"] == "Free")
+        or (media["width"], media["height"], media["fps"])
+        != (*RENDER_SIZES[body["resolution"]], 30)
+        or not -15 <= audio["integrated_lufs"] <= -13
+        or not -120 <= audio["true_peak_dbtp"] <= -1
+    ):
+        raise ValueError("Máster fuera del contrato del plan")
+    [master] = result["files"]
+    prefix = f"proyectos/{body['project_id']}/06_renders/{body['job_id']}/render"
+    verify_file(master, {f"{prefix}/master.mp4", f"{prefix}/master-corrected.mp4"})
+    return master
+
+
 def run(order, receipt, edl, token, revision, target):
     job = order["media"]
     plan = render_plan(order)
@@ -133,6 +153,9 @@ def run(order, receipt, edl, token, revision, target):
         raise ValueError("Escaleta fuera del contrato del plan")
     video, audio = source_paths(receipt)
     props = original["props"]
+    reel = order.get("output_edit") == "reel"
+    if reel != ("scenes" in props):
+        raise ValueError("La escaleta no corresponde al montaje solicitado")
     if props["video_path"] != video or props["audio_path"] != audio:
         raise ValueError("Las pistas no coinciden con la ingesta")
     if fingerprint(MEDIA / video) != {k: job[k] for k in ("sha256", "bytes")} or fingerprint(
@@ -151,6 +174,29 @@ def run(order, receipt, edl, token, revision, target):
         "audio": receipt["audio"]["sha256"],
         "brief": edl["brief_sha256"],
     }
+    record = {
+        "order_id": order["order_id"],
+        "source_sha256": job["sha256"],
+        "brief_sha256": edl["brief_sha256"],
+        "job_id": body["job_id"],
+    }
+    if reel:
+        preview = {**body, "job_id": body["job_id"] + "-preview", "resolution": "1080p"}
+        draft = submit_with_receipt(
+            "render", preview, token, target.with_suffix(".preview.receipt"), source=source
+        )
+        asset = verify_mp4(draft, preview)
+        report = target.with_suffix(".preview-review.receipt")
+        verdict = audit_preview(order, edl, body["job_id"], asset, report)["dictamen"]["decision"]
+        record.update(
+            preview=asset,
+            preview_review_sha256=hashlib.sha256(read_regular(report, LIMIT)).hexdigest(),
+        )
+        if verdict == "rechazado":
+            publish(target, canonical(record) + b"\n")
+            return
+        if verdict != "aprobado":
+            raise ValueError("Estado de revisión previa inválido")
     stills = submit_with_receipt(
         "stills",
         {**body, "frames": frames},
@@ -166,23 +212,7 @@ def run(order, receipt, edl, token, revision, target):
         target.with_name(target.stem + ".render.receipt"),
         source=source,
     )
-    audio_metrics, media = result["audio"], result["media"]
-    if (
-        (
-            result["codec"],
-            result["hardware_acceleration"],
-            result["audio_verified"],
-        )
-        != ("h264_nvenc", True, True)
-        or result["watermark"] is not watermark
-        or (media["width"], media["height"], media["fps"]) != (*RENDER_SIZES[resolution], 30)
-        or not -15 <= audio_metrics["integrated_lufs"] <= -13
-        or not -120 <= audio_metrics["true_peak_dbtp"] <= -1
-    ):
-        raise ValueError("Máster fuera del contrato del plan")
-    [master] = result["files"]
-    prefix = f"proyectos/{body['project_id']}/06_renders/{body['job_id']}/render"
-    verify_file(master, {f"{prefix}/master.mp4", f"{prefix}/master-corrected.mp4"})
+    master = verify_mp4(result, body)
     direction = {}
     if render_format(order) == "prores4444":
         direction["direction_sha256"] = hashlib.sha256(canonical(edl)).hexdigest()
@@ -190,15 +220,12 @@ def run(order, receipt, edl, token, revision, target):
         target,
         canonical(
             {
-                "order_id": order["order_id"],
-                "source_sha256": job["sha256"],
-                "brief_sha256": edl["brief_sha256"],
-                "job_id": body["job_id"],
+                **record,
                 "master": master,
                 "codec": result["codec"],
                 "resolution": resolution,
                 "watermark": watermark,
-                "audio": audio_metrics,
+                "audio": result["audio"],
                 "frames": stills["files"],
                 **direction,
             }
@@ -258,7 +285,7 @@ def run_pending(profile, token, dispatch, output):
                 continue
             try:
                 rendered = render_pending(path, target, version, profile, token, dispatch)
-            except ORDER_ERRORS:
+            except (*ORDER_ERRORS, subprocess.SubprocessError):
                 failures = min(previous[0] + 1, 4) if previous else 1
                 # La primera espera supera los 55 s del temporizador de Lucas.
                 due_at = int(time.time()) + min(60 * 2 ** (failures - 1), 300)
@@ -310,7 +337,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (*ORDER_ERRORS, sqlite3.Error) as error:
+    except (*ORDER_ERRORS, subprocess.SubprocessError, sqlite3.Error) as error:
         if type(error) is ValueError:
             logging.error("Falló el render de Lucas. %s", error)
         else:

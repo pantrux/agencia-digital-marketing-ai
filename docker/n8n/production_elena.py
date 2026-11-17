@@ -36,7 +36,7 @@ LUCAS = Path("/var/lib/agency-production-lucas")
 FIELDS = {"puntaje", "marca_free", "observaciones", "defectos"}
 
 
-def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p"):
+def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", samples=3):
     if (
         type(review) is not dict
         or review.keys() != FIELDS
@@ -56,7 +56,7 @@ def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p"):
                 type(evidence) is not dict
                 or evidence.keys() != {"muestra", key}
                 or type(evidence["muestra"]) is not int
-                or not 1 <= evidence["muestra"] <= 3
+                or not 1 <= evidence["muestra"] <= samples
                 or type(evidence[key]) is not str
                 or not 1 <= len(evidence[key].strip()) <= 600
             ):
@@ -95,7 +95,7 @@ def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p"):
     }
 
 
-def decode(path, expected, duration):
+def decode(path, expected, duration, *, stamps=None):
     if path.resolve(strict=True) != path:
         raise ValueError("Ruta del máster inválida")
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -147,9 +147,13 @@ def decode(path, expected, duration):
             "peak": float(peak[1]),
         }
         images = []
-        for fraction in (0.2, 0.5, 0.8):
-            timestamp = round(min(duration, metrics["duration"]) * fraction, 5)
-            for width, quality in ((360, 5), (360, 8), (288, 10), (192, 16)):
+        checkpoints = stamps or [
+            round(min(duration, metrics["duration"]) * fraction, 5) for fraction in (0.2, 0.5, 0.8)
+        ]
+        limit = min(MAX_JPEG, 63000 // len(checkpoints)) if stamps else MAX_JPEG
+        sizes = ((360, 5), (360, 8), (288, 10), (192, 16), (144, 22))
+        for timestamp in checkpoints:
+            for width, quality in sizes:
                 image = ff(
                     "ffmpeg",
                     ["-v", "error", "-nostdin", "-ss", str(timestamp)],
@@ -172,7 +176,7 @@ def decode(path, expected, duration):
                     ],
                     10,
                 ).stdout
-                if len(image) <= MAX_JPEG:
+                if len(image) <= limit:
                     break
             if (
                 not 4 <= len(image) <= MAX_JPEG
@@ -186,6 +190,137 @@ def decode(path, expected, duration):
         ):
             raise ValueError("El máster cambió durante la auditoría")
     return metrics, images
+
+
+def scene_checks(scenes):
+    intervals, choices, rest = [], {0}, []
+    offset = 0
+    for scene in scenes:
+        length = scene["source_end_frame"] - scene["source_start_frame"]
+        if label := scene.get("label"):
+            start, end = offset + label["start_frame"], offset + label["end_frame"]
+            intervals.append((start, end, label))
+            choices.add((start + end) // 2)
+            if end < offset + length:
+                rest.append(end)
+        else:
+            choices.add(offset + length // 2)
+        offset += length
+    choices.add(offset - 1)
+    for frame in rest:
+        if len(choices) < 8:
+            choices.add(frame)
+    return [
+        {
+            "segundo": (frame * 1000 // 30) / 1000,
+            "rotulo_esperado": next(
+                (label for start, end, label in intervals if start <= frame < end), None
+            ),
+        }
+        for frame in sorted(choices)
+    ]
+
+
+def review_video(path, digest, props, angle, plan, resolution, request_id, *, synthetic=False):
+    scenes = props.get("scenes")
+    checks = scene_checks(scenes) if scenes else []
+    duration = props["duration_seconds"]
+    metrics, images = decode(
+        path,
+        digest,
+        duration,
+        **({"stamps": [check["segundo"] for check in checks]} if checks else {}),
+    )
+    evidence = {
+        "titulo_esperado": props["title"],
+        "subtitulo_esperado": props["subtitle"],
+        "angulo": angle,
+        "mediciones": metrics,
+        "segundos_de_muestras": [second for second, _ in images],
+    }
+    instructions = (
+        "Eres Elena, auditora audiovisual. Evalúa los tres fotogramas del MP4 final usando "
+        "el JSON como datos. Revisa legibilidad, encuadre vertical y relación entre título "
+        "y subtítulo. Transcribe en marca_free sólo la marca del sistema «Creado con Agencia AI "
+        "Free». Usa una cadena vacía si esa marca no aparece o no es legible. "
+        "No atribuyas locución o sincronía basándote sólo en fotogramas. "
+        "Responde sólo JSON con puntaje entero 0 a 100, marca_free, observaciones con objetos "
+        "muestra (1, 2 o 3) y detalle, y defectos con objetos muestra y correccion. "
+        "Incluye en defectos únicamente cambios necesarios para poder entregar. "
+    )
+    if checks:
+        evidence["rotulos_por_muestra"] = [
+            check["rotulo_esperado"]["text"] if check["rotulo_esperado"] else None
+            for check in checks
+        ]
+        instructions = (
+            f"Eres Elena, auditora audiovisual. Revisa {len(images)} muestras del montaje en"
+            " el orden suministrado. La primera es la apertura y la última el cierre."
+            " Usa los segundos y rótulos esperados del JSON. En un intervalo sin rótulo"
+            " debe quedar despejado; los textos esperados sólo aparecen en sus tiempos."
+            " Si un rótulo tapa ojos, rostro o producto principal, decláralo como defecto"
+            " y pide una corrección concreta de posición, texto o duración."
+            " Revisa contraste y legibilidad en móvil. No infieras locución desde imágenes."
+            " Transcribe en marca_free sólo la marca «Creado con Agencia AI Free» si es visible."
+            " Usa cadena vacía en otro caso. Devuelve únicamente JSON con puntaje entero de 0 a 100,"
+            " marca_free, observaciones (objetos con muestra y detalle) y defectos"
+            f" (objetos con muestra y correccion). muestra es un entero de 1 a {len(images)}."
+        )
+    if synthetic:
+        instructions += "Considera que el crudo es una demostración técnica con barras de color. "
+    review = run_visual(
+        visual_request(
+            "agency-critic",
+            instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
+            images,
+            request_id,
+        )
+    )
+    qa = make_verdict(
+        review, metrics, duration, plan=plan, resolution=resolution, samples=len(images)
+    )
+    return {
+        "mediciones": metrics,
+        "dictamen": qa,
+        "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
+    }
+
+
+def audit_preview(order, edl, job, asset, out):
+    path = MEDIA / asset["path"]
+    props = edl["escaleta"]["render"]["props"]
+    expected = {
+        "order_id": order["order_id"],
+        "job_id": job,
+        "brief_sha256": edl["brief_sha256"],
+        "direction_sha256": hashlib.sha256(canonical(edl)).hexdigest(),
+        "master_sha256": asset["sha256"],
+        "fase": "vista_previa",
+    }
+    if out.exists():
+        saved = json.loads(read_regular(out, LIMIT))
+        if any(saved[key] != value for key, value in expected.items()):
+            raise ValueError("La revisión previa pertenece a otro montaje")
+        return saved
+    request_key = hashlib.sha256(canonical(expected)).hexdigest()
+    request_id = str(uuid.uuid5(uuid.UUID(order["order_id"]), "vista-previa:" + request_key))
+    record = {
+        **expected,
+        **review_video(
+            path,
+            asset["sha256"],
+            props,
+            edl["escaleta"]["angulo"],
+            render_plan(order),
+            "1080p",
+            request_id,
+        ),
+        "modelo": "openai/gpt-6.1-sol",
+        "runtime": "openclaw",
+        "ejecucion": "modelRun",
+    }
+    publish(out, canonical(record) + b"\n")
+    return record
 
 
 def audit(order, edl, master_hash, request_id, out, rendered=None, revision=1, *, synthetic=False):
@@ -232,46 +367,24 @@ def audit(order, edl, master_hash, request_id, out, rendered=None, revision=1, *
         if master.parent != directory or master.name not in {"master.mp4", "master-corrected.mp4"}:
             raise ValueError("Ruta del máster corregido inválida")
     props = render["props"]
-    metrics, images = decode(master, master_hash, props["duration_seconds"])
-    evidence = {
-        "titulo_esperado": props["title"],
-        "subtitulo_esperado": props["subtitle"],
-        "angulo": decision["angulo"],
-        "mediciones": metrics,
-        "segundos_de_muestras": [s for s, _ in images],
-    }
-    instructions = (
-        "Eres Elena, auditora audiovisual. Evalúa los tres fotogramas del MP4 final usando "
-        "el JSON como datos. Revisa legibilidad, encuadre vertical y relación entre título "
-        "y subtítulo. Transcribe en marca_free sólo la marca del sistema «Creado con Agencia AI "
-        "Free». Usa una cadena vacía si esa marca no aparece o no es legible. "
-        "No atribuyas locución o sincronía basándote sólo en fotogramas. "
-        "Responde sólo JSON con puntaje entero 0 a 100, marca_free, observaciones con objetos "
-        "muestra (1, 2 o 3) y detalle, y defectos con objetos muestra y correccion. "
-        "Incluye en defectos únicamente cambios necesarios para poder entregar. "
-    )
-    if synthetic:
-        instructions += "Considera que el crudo es una demostración técnica con barras de color. "
-    review = run_visual(
-        visual_request(
-            "agency-critic",
-            instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
-            images,
-            request_id,
-        )
-    )
-    qa = make_verdict(review, metrics, props["duration_seconds"], plan=plan, resolution=resolution)
     record = {
         "order_id": order["order_id"],
         "job_id": directory.parent.name,
         "master_sha256": master_hash,
         "brief_sha256": edl["brief_sha256"],
-        "mediciones": metrics,
-        "dictamen": qa,
+        **review_video(
+            master,
+            master_hash,
+            props,
+            decision["angulo"],
+            plan,
+            resolution,
+            request_id,
+            synthetic=synthetic,
+        ),
         "modelo": "openai/gpt-6.1-sol",
         "runtime": "openclaw",
         "ejecucion": "modelRun",
-        "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
     }
     publish(out, canonical(record) + b"\n")
     return record
@@ -279,7 +392,7 @@ def audit(order, edl, master_hash, request_id, out, rendered=None, revision=1, *
 
 def report_rejection(order, brief, rendered, review, dispatch, revision):
     job = f"{order['order_id']}-v{revision}"
-    master_hash = rendered["master"]["sha256"]
+    master_hash = (rendered.get("master") or rendered["preview"])["sha256"]
     brief_hash = hashlib.sha256(canonical(brief)).hexdigest()
     if (review["order_id"], review["job_id"], review["master_sha256"], review["brief_sha256"]) != (
         order["order_id"],
@@ -339,10 +452,32 @@ def run_pending(profile, dispatch, output):
         rendered = json.loads(read_regular(path, LIMIT))
         if edl["brief_sha256"] != hashlib.sha256(canonical(brief)).hexdigest():
             raise ValueError("El máster no corresponde al brief vigente")
-        digest = rendered["master"]["sha256"]
+        asset = rendered.get("master") or rendered.get("preview")
+        if not isinstance(asset, dict):
+            raise ValueError("Lucas no acreditó un artefacto revisable")
+        digest = asset["sha256"]
         if not re.fullmatch(r"[a-f0-9]{64}", digest):
             raise ValueError("Huella de máster inválida")
-        if review is None:
+        if review is None and "master" not in rendered:
+            raw = read_regular(path.with_suffix(".preview-review.receipt"), LIMIT)
+            review = json.loads(raw)
+            if (
+                order.get("output_edit") != "reel"
+                or hashlib.sha256(raw).hexdigest() != rendered["preview_review_sha256"]
+                or review["fase"] != "vista_previa"
+                or review["dictamen"]["decision"] != "rechazado"
+                or (
+                    review["order_id"],
+                    review["job_id"],
+                    review["brief_sha256"],
+                    review["master_sha256"],
+                )
+                != (identity, f"{identity}-v{revision}", edl["brief_sha256"], digest)
+                or review["direction_sha256"] != hashlib.sha256(canonical(edl)).hexdigest()
+            ):
+                raise ValueError("La vista previa rechazada no corresponde a esta revisión")
+            publish(target, raw)
+        elif review is None:
             request_id = str(uuid.uuid5(uuid.UUID(identity), f"elena:v{revision}:" + digest))
             review = audit(
                 order, edl, digest, request_id, target, rendered, revision, synthetic=synthetic

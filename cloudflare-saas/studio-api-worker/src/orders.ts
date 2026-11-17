@@ -3,7 +3,7 @@ import { brandIdPattern, findBrand } from "./brands.js";
 import { HttpError, ownerId, prepareOwnedStatement, readJson, response, type SqlDatabase, type SqlOwner, type SqlSession } from "./platform.js";
 
 const maxIdempotency = 128;
-const orderColumns = "o.id,o.plan_id,o.project_slug,o.kind,o.status,o.queue_priority,o.created_at,o.updated_at,o.output_resolution,o.output_format";
+const orderColumns = "o.id,o.plan_id,o.project_slug,o.kind,o.status,o.queue_priority,o.created_at,o.updated_at,o.output_resolution,o.output_format,o.output_edit";
 const brandColumns = "m.brand_id,m.display_name AS brand_name";
 const brandJoin = "LEFT JOIN order_brand_profiles m ON m.order_id=o.id AND m.user_id=o.user_id AND m.provider_mode=o.provider_mode";
 const quotaColumns = "plan_id,monthly_reels,queue_priority,max_resolution,watermark,max_output_seconds,allow_prores4444";
@@ -13,6 +13,7 @@ const activePlan = (owner = "?") => `COALESCE((SELECT plan_id FROM subscriptions
 export type PlanId = "free" | "pro" | "ultra" | "ilimitado";
 export type OutputResolution = "1080p" | "4k";
 export type OutputFormat = "mp4" | "prores4444";
+export type OutputEdit = "full" | "reel";
 
 interface Order {
   id: string;
@@ -23,6 +24,7 @@ interface Order {
   queue_priority: number;
   output_resolution: OutputResolution;
   output_format: OutputFormat;
+  output_edit: OutputEdit;
   request_sha256: string;
   created_at: number;
   updated_at: number;
@@ -102,7 +104,7 @@ export function publicOrder<T extends Pick<Order, "id"> & Partial<Pick<Order, In
 
 export function prepareOrders(db: SqlSession, owner: SqlOwner | string, env: OrderEnv) {
   return prepareOwnedStatement(db, owner, `SELECT o.id,o.plan_id,o.project_slug,o.kind,
-    o.status,o.queue_priority,o.created_at,o.updated_at,o.output_resolution,o.output_format,${brandColumns},
+    o.status,o.queue_priority,o.created_at,o.updated_at,o.output_resolution,o.output_format,o.output_edit,${brandColumns},
     d.received_at,b.confirmed_at AS brief_confirmed_at,
     CASE WHEN o.qa_rejected_master_sha256 IS NOT NULL THEN 'qa_rechazado'
       WHEN o.status='processing' AND r.order_id IS NOT NULL THEN 'requiere_revision' END AS production_issue
@@ -129,16 +131,19 @@ export async function reserveOrder(request: Request, userId: string, env: OrderE
   const input = await readJson(request);
   const resolution = input.output_resolution === undefined ? "1080p" : input.output_resolution;
   const format = input.output_format === undefined ? "mp4" : input.output_format;
+  const edit = input.output_edit === undefined ? "full" : input.output_edit;
   const brandId = input.brand_id;
-  if (Object.keys(input).some((field) => !["kind", "output_resolution", "output_format", "brand_id"].includes(field))
+  if (Object.keys(input).some((field) => !["kind", "output_resolution", "output_format", "output_edit", "brand_id"].includes(field))
     || input.kind !== "production" || (resolution !== "1080p" && resolution !== "4k")
     || (format !== "mp4" && format !== "prores4444")
+    || (edit !== "full" && edit !== "reel")
     || (brandId !== undefined && (typeof brandId !== "string" || brandId.length !== 36 || !brandIdPattern.test(brandId)))) {
     throw new HttpError(422, "ORDEN_INVALIDA");
   }
   const fingerprint = await sha256Hex(JSON.stringify({ kind: "production", mode: env.BILLING_MODE,
     ...(resolution === "4k" ? { output_resolution: resolution } : {}),
     ...(format === "prores4444" ? { output_format: format } : {}),
+    ...(edit === "reel" ? { output_edit: edit } : {}),
     ...(brandId ? { brand_id: brandId } : {}) }));
   const recent = () => env.DB.withSession("first-primary").prepare(`SELECT ${orderColumns},o.request_sha256,${brandColumns}
     FROM orders o ${brandJoin} WHERE o.user_id=? AND o.idempotency_key=?`).bind(userId, key).first<Order>();
@@ -162,10 +167,10 @@ export async function reserveOrder(request: Request, userId: string, env: OrderE
   try {
     await env.DB.batch([
       env.DB.prepare(`INSERT INTO orders(id,user_id,plan_id,kind,status,idempotency_key,request_sha256,
-        project_slug,queue_priority,provider_mode,created_at,updated_at,portal_started_at,output_resolution,output_format)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        project_slug,queue_priority,provider_mode,created_at,updated_at,portal_started_at,output_resolution,output_format,output_edit)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .bind(id, userId, plan.plan_id, "production", "queued", key, fingerprint, slug, plan.queue_priority,
-          env.BILLING_MODE, time, time, time, resolution, format),
+          env.BILLING_MODE, time, time, time, resolution, format, edit),
       ...(brand ? [env.DB.prepare(`INSERT INTO order_brand_profiles(
         order_id,user_id,provider_mode,brand_id,display_name,audience,tone) VALUES(?,?,?,?,?,?,?)`)
         .bind(id, userId, env.BILLING_MODE, brand.id, brand.display_name, brand.audience, brand.tone)] : []),
@@ -185,6 +190,7 @@ export async function reserveOrder(request: Request, userId: string, env: OrderE
     queue_priority: plan.queue_priority, request_sha256: fingerprint, created_at: time, updated_at: time,
     output_resolution: resolution,
     output_format: format,
+    output_edit: edit,
     brand_id: brand?.id ?? null,
     brand_name: brand?.display_name ?? null,
   };
