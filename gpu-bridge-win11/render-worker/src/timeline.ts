@@ -4,6 +4,10 @@ export function sceneLength(scene: EditScene): number {
   return scene.source_end_frame - scene.source_start_frame;
 }
 
+export function socialFadeProgress(frame: number): number {
+  return Math.max(0, Math.min(1, (frame - SOCIAL_FADE_FRAME) / (AD_FRAMES - 1 - SOCIAL_FADE_FRAME)));
+}
+
 export function graphicFrames(scenes: readonly EditScene[], ad?: ScriptedAd): number[] {
   const changes = new Set([0]);
   let origin = 0;

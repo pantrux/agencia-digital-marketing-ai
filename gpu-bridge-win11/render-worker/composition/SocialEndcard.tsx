@@ -1,6 +1,7 @@
 import React from 'react';
 import {Easing, interpolate} from 'remotion';
-import {AD_FRAMES, SOCIAL_ENDCARD_FRAME, SOCIAL_ENTRANCE_FRAMES, SOCIAL_FADE_FRAME, type AdDestination} from '../src/contracts.ts';
+import {SOCIAL_ENDCARD_FRAME, SOCIAL_ENTRANCE_FRAMES, type AdDestination} from '../src/contracts.ts';
+import {socialFadeProgress} from '../src/timeline.ts';
 
 // Geometría de marca de Simple Icons 16.0.0, https://github.com/simple-icons/simple-icons/tree/16.0.0/icons.
 const artwork = {
@@ -10,12 +11,12 @@ const artwork = {
 };
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
-export function SocialEndcard({destination, brand, cta, frame, alpha}: {
-  destination: AdDestination; brand: string; cta: string; frame: number; alpha: boolean;
+export function SocialEndcard({destination, brand, cta, frame}: {
+  destination: AdDestination; brand: string; cta: string; frame: number;
 }) {
   const reveal = interpolate(frame, [SOCIAL_ENDCARD_FRAME, SOCIAL_ENDCARD_FRAME + SOCIAL_ENTRANCE_FRAMES], [0, 1],
     {...clamp, easing: Easing.out(Easing.cubic)});
-  const fade = alpha ? interpolate(frame, [SOCIAL_FADE_FRAME, AD_FRAMES - 1], [1, 0], clamp) : 1;
+  const fade = 1 - socialFadeProgress(frame);
   const icon = artwork[destination.channel];
   const address = destination.url.replace(/^https:\/\/(?:www\.)?/u, '');
   return <div style={{position:'absolute',left:0,right:0,bottom:0,height:610,opacity:reveal*fade,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {AD_MUSIC_ID, outputDimensions, parseInspect, parseRender, parseStills, WorkerError} from '../src/contracts.ts';
 import {compositionInput} from '../src/remotion.ts';
-import {graphicFrames} from '../src/timeline.ts';
+import {graphicFrames, socialFadeProgress} from '../src/timeline.ts';
 
 const request = () => ({
   project_id: 'sansevieras', job_id: 'trabajo-01', composition: 'AgencyVertical',
@@ -144,6 +144,9 @@ test('el CTA social conserva sólo el destino elegido y agenda cada fotograma an
     scenes:[{...scenes[0],audio_source_start_frame:17999},scenes[1]]}}),WorkerError);
   const frames = graphicFrames(value.props.scenes!,value.props.ad);
   assert.ok(frames.includes(1) && frames.includes(751) && frames.includes(899));
+  assert.equal(socialFadeProgress(863),0);
+  assert.ok(socialFadeProgress(882) > 0 && socialFadeProgress(882) < 1);
+  assert.equal(socialFadeProgress(899),1);
   for (const bad of ['https://instagram.com/rinconsansevieras','https://www.facebook.com.ejemplo.invalid/perfil','https://www.facebook.com/perfil?track=1']) {
     assert.throws(() => parseRender({...request(),props:{...props,ad:{...ad,destination:{...destination,url:bad}}}}),WorkerError);
   }

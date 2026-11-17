@@ -1,7 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, Easing, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {AD_ENDCARD_FRAME, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, TITLE_FADE_FRAMES, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
-import {graphicLabelTiming, sceneLength} from '../src/timeline.ts';
+import {graphicLabelTiming, sceneLength, socialFadeProgress} from '../src/timeline.ts';
 import {SocialEndcard} from './SocialEndcard.tsx';
 
 export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; scenes?: EditScene[]; ad?: ScriptedAd}
@@ -24,6 +24,8 @@ export const Reel: React.FC<ReelProps> = (props) => {
   const scale = useVideoConfig().width / 1080;
   const opacity = interpolate(frame, [0, TITLE_FADE_FRAMES], [0, 1], {extrapolateRight: 'clamp'});
   const social = props.ad?.destination;
+  // Las capturas con crudo comparten el fundido del MP4. La capa sola se combina en FFmpeg.
+  const previewFade = social && props.video_file && !props.transparent ? socialFadeProgress(frame) : 0;
   const endCard = props.ad && frame >= (social ? SOCIAL_ENDCARD_FRAME : AD_ENDCARD_FRAME);
   const caption = props.ad?.captions.find(cue => cue.start_frame <= frame && frame < cue.end_frame);
   const activeLabel = !endCard && props.scenes ? graphicLabelTiming(props.scenes, frame) : undefined;
@@ -62,7 +64,7 @@ export const Reel: React.FC<ReelProps> = (props) => {
         fontSize:51,fontWeight:700,lineHeight:1.13,textWrap:'balance',overflowWrap:'anywhere'}}>{caption.text}</span>
     </div>}
     {endCard && social && props.ad && <SocialEndcard destination={social} brand={props.ad.brand}
-      cta={props.ad.cta} frame={frame} alpha={props.transparent} />}
+      cta={props.ad.cta} frame={frame} />}
     {endCard && !social && <div style={{position:'absolute',left:84,right:165,bottom:320,
       background:'#f4f3eb',color:'#193325',padding:'25px 34px 29px',borderRadius:24,overflowWrap:'anywhere'}}>
       <div style={{fontSize:58,fontWeight:750,lineHeight:1.04,marginBottom:15}}>{props.ad!.brand}</div>
@@ -71,5 +73,6 @@ export const Reel: React.FC<ReelProps> = (props) => {
     </div>}
     {props.watermark ? <div style={{position: 'absolute', ...(props.ad ? {top: 100} : {bottom: 340}), left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
     </AbsoluteFill>
+    {previewFade > 0 && <AbsoluteFill style={{backgroundColor:'#000',opacity:previewFade}} />}
   </AbsoluteFill>;
 };
