@@ -21,7 +21,9 @@ MEDIA_ROOT = Path("/mnt/producciones")
 UUID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
 SHA = re.compile(r"[0-9a-f]{64}")
 MAX_RESPONSE = 2 * 1024**2
-MAX_REQUEST = 512 * 1024**2
+# El kit de producción admite 3 GiB. Reservar 1 MiB adicional para el multipart.
+MAX_MEDIA = 3 * 1024**3
+MAX_REQUEST = MAX_MEDIA + 1024**2
 CHUNK = 256 * 1024
 MAX_ROWS = 1000
 PREVIEW_STATUSES = {"processing", "ready", "broken", "missing"}
@@ -525,7 +527,7 @@ def _media_file(path):
                 stat.S_ISREG(before.st_mode)
                 and before.st_nlink == 1
                 and before.st_dev == device
-                and 32 <= before.st_size <= MAX_REQUEST,
+                and 32 <= before.st_size <= MAX_MEDIA,
                 "KITSU_MEDIO_INVALIDO",
             )
             yield stream, before.st_size
@@ -641,7 +643,7 @@ def attach_delivery_zip(
             _require(
                 _pattern(ident, UUID)
                 and type(size) is int
-                and 32 <= size <= MAX_REQUEST
+                and 32 <= size <= MAX_MEDIA
                 and row.get("extension") == "zip"
                 and row.get("reply_id") is None,
                 "KITSU_ADJUNTO_CONFLICTO",
