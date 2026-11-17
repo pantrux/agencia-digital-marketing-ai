@@ -13,8 +13,8 @@ type Brand = BrandFields & { id: string };
 type Order = { id: string; project_slug: string; status: string; created_at: number;
   brand?: Pick<Brand, "id" | "display_name">;
   received_at?: number | null; brief_confirmed_at?: number | null; production_issue?: "qa_rechazado" | "requiere_revision" | null };
-type BriefFields = { objective: string; audience: string; tone: string };
-type BriefStatus = { brief: (BriefFields & { confirmed_at: number }) | null; ready: boolean; brand?: Brand };
+type BriefFields = { ad_cta?: string; objective: string; audience: string; tone: string };
+type BriefStatus = { ad_available?: boolean; brief: (BriefFields & { confirmed_at: number }) | null; ready: boolean; brand?: Brand };
 const emptyBrand: BrandFields = { display_name: "", audience: "", tone: "" };
 type Kit = { id: string; title: string; url: string; prores?: { bytes: number; url: string } };
 type Dashboard = { person: Person; plan: Plan; orders: Order[]; kits: Kit[] };
@@ -103,6 +103,7 @@ function ConfirmBrief({ order }: { order: string }) {
   const [fault, setFault] = useState("");
   const [checkAttempt, setCheckAttempt] = useState(0);
   const waitingForVideo = !current?.ready && !current?.brief;
+  const cta = draft.ad_cta?.trim() ?? "";
   const fields = {
     objective: draft.objective ?? "",
     audience: draft.audience ?? current?.brand?.audience ?? "",
@@ -141,7 +142,7 @@ function ConfirmBrief({ order }: { order: string }) {
     setFault("");
     try {
       setCurrent(await api<BriefStatus>(path, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...fields, ...(current?.ad_available && cta ? { ad_cta: cta } : {}) }),
       }));
     } catch (error) { setFault(message(error)); }
     finally { setPending(false); }
@@ -153,7 +154,8 @@ function ConfirmBrief({ order }: { order: string }) {
     {fault && <p role="alert">{fault}</p>}
     {confirmed ? <div aria-live="polite"><p><strong>Brief confirmado</strong></p>
       <dl><dt>Objetivo</dt><dd>{confirmed.objective}</dd><dt>Audiencia</dt><dd>{confirmed.audience}</dd>
-        {confirmed.tone && <><dt>Tono</dt><dd>{confirmed.tone}</dd></>}</dl></div>
+        {confirmed.tone && <><dt>Tono</dt><dd>{confirmed.tone}</dd></>}
+        {confirmed.ad_cta && <><dt>Llamada a la acción</dt><dd>{confirmed.ad_cta}</dd></>}</dl></div>
       : <form onSubmit={submit}>
         <label htmlFor="brief-objective">Objetivo</label>
         <textarea id="brief-objective" rows={2} required maxLength={800} value={fields.objective} disabled={pending}
@@ -164,6 +166,12 @@ function ConfirmBrief({ order }: { order: string }) {
         <label htmlFor="brief-tone">Tono (opcional)</label>
         <textarea id="brief-tone" rows={1} maxLength={240} value={fields.tone} disabled={pending}
           onChange={(event) => setDraft({ ...draft, tone: event.currentTarget.value })} />
+        {current?.ad_available && <>
+          <label htmlFor="brief-ad-cta">Llamada a la acción para anuncio de 30 segundos (opcional)</label>
+          <input id="brief-ad-cta" maxLength={70} value={draft.ad_cta ?? ""} disabled={pending}
+            placeholder="Escríbenos por Facebook o Instagram"
+            onChange={(event) => setDraft({ ...draft, ad_cta: event.currentTarget.value })} />
+        </>}
         {current?.ready ? <button className="button" type="submit" disabled={pending || !fields.objective.trim() || !fields.audience.trim()}>Confirmar brief</button>
           : <button className="button secondary" type="button" disabled={pending} onClick={() => setCheckAttempt((attempt) => attempt + 1)}>Comprobar recepción del vídeo</button>}
         {current && !current.ready && <p role="status">Podrás confirmar el brief cuando se verifique la copia del vídeo.</p>}

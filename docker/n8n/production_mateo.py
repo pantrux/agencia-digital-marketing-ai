@@ -45,12 +45,13 @@ def confirmed(payload, order):
         return None
     if (
         type(brief) is not dict
-        or brief.keys() != set(BRIEF) | {"order_id", "user_id", "confirmed_at"}
+        or brief.keys() - {"ad_cta"} != set(BRIEF) | {"order_id", "user_id", "confirmed_at"}
         or brief["order_id"] != order["order_id"]
         or brief["user_id"] != order["user_id"]
         or type(brief["confirmed_at"]) is not int
         or brief["confirmed_at"] < 0
         or not text_fields(brief, BRIEF, ("tone",))
+        or ("ad_cta" in brief and not text_fields(brief, {"ad_cta": 70}))
     ):
         raise ValueError("Brief confirmado inválido")
     return brief
@@ -196,6 +197,7 @@ def run_mateo(receipt, brief, preliminary, target, owner, key):
         raise ValueError("El brief preliminar pertenece a otro medio")
     facts = {
         **{k: brief[k] for k in BRIEF},
+        **({"cta_confirmada": brief["ad_cta"]} if "ad_cta" in brief else {}),
         "preliminar": preliminary["brief"],
         "plan": order["plan_id"],
         "duracion_segundos": receipt["duration_seconds"],

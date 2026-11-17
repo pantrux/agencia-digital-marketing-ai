@@ -145,6 +145,19 @@ function normalizeAudio(count: number, duration: number, measured: Loudness, pea
 }
 const aacAudio = ['-c:a','aac','-b:a','256k','-ar','48000','-ac','2'];
 
+// Motivo instrumental original, cuatro notas con envolvente de cuerda pulsada.
+const adScore = "0.15*(sin(2*PI*(220+27.5*mod(floor(t/0.6),4))*mod(t,0.6))+0.19*sin(2*PI*440*mod(t,0.6)))*exp(-6*mod(t,0.6))*min(1,mod(t,0.6)*80)";
+
+export function mixAdAudio(speech: string, output: string): string[] {
+  const filter = '[0:a]aformat=channel_layouts=stereo,afade=t=out:st=25.85:d=0.15,asplit=2[voice][key];'
+    + '[1:a]aformat=channel_layouts=stereo,volume=0.30,afade=d=0.45,afade=t=out:st=28.9:d=1.1[music];'
+    + '[music][key]sidechaincompress=threshold=0.025:ratio=6:attack=14:release=260[bed];'
+    + '[voice][bed]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.94:level=0[audio]';
+  return ['-hide_banner','-nostdin','-v','error','-n','-i',speech,'-f','lavfi','-i',
+    'aevalsrc=' + adScore.replaceAll(',', '\\,') + ':s=48000:d=30',
+    '-filter_complex',filter,'-map','[audio]','-ar','48000','-c:a','pcm_s24le',output];
+}
+
 export function cutSceneAudio(input: string, output: string, scenes: readonly EditScene[]): string[] {
   const channels = scenes.map((_, index) => `[a${index}]`).join('');
   const pieces = scenes.map((scene, index) => `[a${index}]atrim=start_sample=${scene.source_start_frame * 1600}:end_sample=${scene.source_end_frame * 1600},asetpts=PTS-STARTPTS[p${index}]`);

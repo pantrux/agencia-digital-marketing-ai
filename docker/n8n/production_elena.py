@@ -224,6 +224,11 @@ def scene_checks(scenes):
 def review_video(path, digest, props, angle, plan, resolution, request_id, *, synthetic=False):
     scenes = props.get("scenes")
     checks = scene_checks(scenes) if scenes else []
+    ad = props.get("ad")
+    if ad:
+        checks = [sample for sample in checks if sample["segundo"] < 26][:7] + [
+            {"segundo": 28, "rotulo_esperado": None}
+        ]
     duration = props["duration_seconds"]
     metrics, images = decode(
         path,
@@ -265,6 +270,26 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
             " Usa cadena vacía en otro caso. Devuelve únicamente JSON con puntaje entero de 0 a 100,"
             " marca_free, observaciones (objetos con muestra y detalle) y defectos"
             f" (objetos con muestra y correccion). muestra es un entero de 1 a {len(images)}."
+        )
+    if ad:
+        for sample in checks:
+            frame = round(sample["segundo"] * 30)
+            sample["subtitulo_esperado"] = next(
+                (
+                    cue["text"]
+                    for cue in ad["captions"]
+                    if cue["start_frame"] <= frame < cue["end_frame"]
+                ),
+                None,
+            )
+        evidence["muestras_anuncio"] = checks
+        evidence["cta_final"] = ad["cta"]
+        evidence["marca_final"] = ad["brand"]
+        instructions += (
+            " En este anuncio hay subtítulos separados del rótulo. Revisa el gancho al comienzo "
+            "y al menos un subtítulo visible en móvil cuando coincida con la muestra. "
+            "En el cierre se exige marca y CTA completos en lugar del rótulo de escena. "
+            "Rechaza si el CTA falta, no coincide o invade una zona ilegible."
         )
     if synthetic:
         instructions += "Considera que el crudo es una demostración técnica con barras de color. "

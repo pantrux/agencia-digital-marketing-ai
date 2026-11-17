@@ -8,7 +8,8 @@ import {compositionCache} from './composition-cache.ts';
 export function compositionInput(request: RenderRequest, videoFile: string | null): Record<string, unknown> {
   return {title: request.props.title, subtitle: request.props.subtitle, duration_seconds: request.durationInFrames / 30, background: request.props.background, accent: request.props.accent, watermark: request.watermark, video_file: videoFile, resolution: request.resolution, transparent: request.transparent,
     ...(request.props.subtitle_size && {subtitle_size: request.props.subtitle_size}),
-    ...(request.props.scenes && {scenes: request.props.scenes})};
+    ...(request.props.scenes && {scenes: request.props.scenes}),
+    ...(request.props.ad && {ad: request.props.ad})};
 }
 export interface SceneOptions {request: RenderRequest; scratch: string; cacheRoot: string; browser: string; videoSource: string | null; signal: AbortSignal; overlay?: true}
 const defaultSdk = {bundle, makeCancelSignal, openBrowser, renderFrames, renderStill, selectComposition};

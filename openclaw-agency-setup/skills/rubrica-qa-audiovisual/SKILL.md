@@ -24,4 +24,8 @@ Entrega `qa_verdict.json` en JSON válido, usando el esquema aprobado si está d
 
 Al rechazar, devuelve el dictamen a Valeria y Lucas. Solicita una nueva versión sólo dentro de las rondas del plan y conserva los recibos de las versiones anteriores. Compara la nueva versión con las correcciones solicitadas y vuelve a verificar las reglas duras.
 
+## Anuncios de 30 segundos
+
+Comprueba que la apertura demuestre el gancho, los subtítulos sean legibles a tamaño móvil y la marca y CTA confirmados permanezcan visibles en el cierre. Verifica el diálogo con audio. Si sólo hay fotogramas y medición, deja la inteligibilidad y la sincronía auditiva pendientes de escucha. Bloquea la exportación cuando falte un componente obligatorio.
+
 [Fase 5](../../../docs/specs/FASE-5-OPENCLAW-Y-MCP.md) · [Plan de implementación](../../../docs/PLAN-DE-IMPLEMENTACION.md) · [Arquitectura, secciones 2.4, 3.2 y 4.1](../../../docs/ARQUITECTURA-PLATAFORMA-AUDIOVISUAL.md) · [Control de salida del renderer](../../../gpu-bridge-win11/render-worker/README.md#api-interna)

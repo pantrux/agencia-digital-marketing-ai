@@ -10,7 +10,7 @@ import {NasPaths} from './nas.ts';
 import {ScratchSpace} from './scratch.ts';
 import {runProcess} from './process.ts';
 import {renderScene} from './remotion.ts';
-import {alphaMaskArgs, alphaMaskSummary, audioAccepted, correctMp4Audio, cutSceneAudio, encodeOutput, encodeProresFragment, measureAudio, muxProresFragments, outputViolations, overlayInputSupported, overlayPacketTimingSupported, packetProbeArgs, parseLoudness, parseProbe, probeArgs, ebur128Args, parseEbur128, videoFrameCount, type MediaInfo} from './media.ts';
+import {alphaMaskArgs, alphaMaskSummary, audioAccepted, correctMp4Audio, cutSceneAudio, mixAdAudio, encodeOutput, encodeProresFragment, measureAudio, muxProresFragments, outputViolations, overlayInputSupported, overlayPacketTimingSupported, packetProbeArgs, parseLoudness, parseProbe, probeArgs, ebur128Args, parseEbur128, videoFrameCount, type MediaInfo} from './media.ts';
 import {contactSheet, normalizedRuler} from './qa.ts';
 import {graphicFrames, graphicLabel} from './timeline.ts';
 
@@ -240,15 +240,18 @@ export class RenderBackend implements Backend {
       const sceneProres = Boolean(scenes && request.transparent);
       if (!request.props.audio_path) throw new WorkerError(422, 'AUDIO_AUSENTE', 'El render final requiere una pista de audio.');
       const sourceAudio = await this.nas.input(request.props.audio_path, request.project_id);
+      const ad = request.props.ad;
+      const speech = path.join(work, 'speech.wav');
       const audio = path.join(work, 'audio' + (scenes ? '.wav' : path.extname(sourceAudio)));
-      await this.scratch.ensureSpace(scenes ? Math.ceil(duration) * 288000 + 1024 ** 2 : (await stat(sourceAudio)).size);
-      if (scenes) await this.deps.run(this.config.ffmpeg, cutSceneAudio(sourceAudio, audio, scenes), {timeoutMs: 120000, signal: bounded});
+      await this.scratch.ensureSpace(scenes ? Math.ceil(duration) * 288000 * (ad ? 2 : 1) + 1024 ** 2 : (await stat(sourceAudio)).size);
+      if (scenes) await this.deps.run(this.config.ffmpeg, cutSceneAudio(sourceAudio, ad ? speech : audio, scenes), {timeoutMs: 120000, signal: bounded});
       else await copyFile(sourceAudio, audio, constants.COPYFILE_EXCL);
-      const audioInfo = await this.#probe(audio, bounded);
+      const audioInfo = await this.#probe(ad ? speech : audio, bounded);
       if (!audioInfo.has_audio) throw new WorkerError(422, 'AUDIO_AUSENTE', 'La pista no contiene audio.');
       if (scenes && Math.abs(audioInfo.duration_seconds - duration) > 0.02) {
         throw new WorkerError(422, 'ESCENAS_FUERA_DEL_AUDIO', 'Los cortes deben conservar audio en todos los intervalos.');
       }
+      if (ad) await this.deps.run(this.config.ffmpeg, mixAdAudio(speech, audio), {timeoutMs: 120000, signal: bounded});
       const measured = parseLoudness((await this.deps.run(this.config.ffmpeg, measureAudio(audio, duration), {timeoutMs: 1200000, signal: bounded})).stderr);
       const framesStarted = performance.now();
       const video = await this.#videoInput(request, bounded);
@@ -259,7 +262,7 @@ export class RenderBackend implements Backend {
       const overlayMode = video && overlayInputSupported(video.probe, request);
       if (video && scenes) {
         const info = parseProbe(video.probe);
-        if (info.duration_seconds + 0.001 < scenes.at(-1)!.source_end_frame / 30
+        if (info.duration_seconds + 0.001 < Math.max(...scenes.map(cut => cut.source_end_frame)) / 30
           || info.color_transfer === 'smpte2084' || info.color_transfer === 'arib-std-b67') {
           throw new WorkerError(422, 'FUENTE_REEL_INVALIDA', 'Los cortes requieren vídeo SDR y deben quedar dentro de la fuente.');
         }
@@ -274,7 +277,7 @@ export class RenderBackend implements Backend {
           normalizeVideo = overlayMode === 'normalized';
         }
       }
-      const layerFrames = scenes ? graphicFrames(scenes)
+      const layerFrames = scenes ? graphicFrames(scenes, ad)
         : sourceVideo || staticProres ? Array.from({length: TITLE_FADE_FRAMES + 1}, (_, index) => index) : null;
       // La gráfica sin crudo solo renderiza el fundido. El margen del MOV se calcula tras codificar sus fragmentos.
       if (sceneProres) await this.scratch.ensureSpace((layerFrames?.length ?? 0) * frameBytes * 2);

@@ -1,9 +1,9 @@
 import React from 'react';
 import {AbsoluteFill, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {TITLE_FADE_FRAMES, type EditScene, type Resolution} from '../src/contracts.ts';
+import {AD_ENDCARD_FRAME, TITLE_FADE_FRAMES, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
 import {graphicLabel, sceneLength} from '../src/timeline.ts';
 
-export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; scenes?: EditScene[]}
+export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; scenes?: EditScene[]; ad?: ScriptedAd}
 const videoStyle = {width: '100%', height: '100%', objectFit: 'cover'} as const;
 
 function cutVideo(file: string, scenes: EditScene[]) {
@@ -22,7 +22,9 @@ export const Reel: React.FC<ReelProps> = (props) => {
   const frame = useCurrentFrame();
   const scale = useVideoConfig().width / 1080;
   const opacity = interpolate(frame, [0, TITLE_FADE_FRAMES], [0, 1], {extrapolateRight: 'clamp'});
-  const label = props.scenes && graphicLabel(props.scenes, frame);
+  const endCard = props.ad && frame >= AD_ENDCARD_FRAME;
+  const caption = props.ad?.captions.find(cue => cue.start_frame <= frame && frame < cue.end_frame);
+  const label = !endCard && props.scenes && graphicLabel(props.scenes, frame);
   // Todo movimiento depende del fotograma; no se utiliza reloj ni azar.
   return <AbsoluteFill style={{backgroundColor: props.transparent ? undefined : props.background, color: '#fff', fontFamily: 'Arial, sans-serif'}}>
     {props.video_file && (props.scenes
@@ -39,6 +41,16 @@ export const Reel: React.FC<ReelProps> = (props) => {
       ...(label.position === 'top' ? {top: 200} : {bottom: 480}),
       backgroundColor: '#141714', borderLeft: `8px solid ${props.accent}`, padding: '24px 28px', borderRadius: 12,
       fontSize: label.size === 'large' ? 84 : 58, lineHeight: 1.15, fontWeight: 700, overflowWrap: 'anywhere'}}>{label.text}</div>}
+    {caption && <div style={{position:'absolute',left:96,right:168,bottom:420,textAlign:'center',fontSize:54,
+      fontWeight:700,lineHeight:1.16,overflowWrap:'anywhere'}}>
+      <span style={{background:'#151a15',padding:'8px 18px',boxDecorationBreak:'clone',
+        WebkitBoxDecorationBreak:'clone',borderRadius:10}}>{caption.text}</span></div>}
+    {endCard && <div style={{position:'absolute',left:86,right:164,bottom:404,background:'#f5f3e8',
+      color:'#183d2b',padding:'30px 38px 36px',borderRadius:26,overflowWrap:'anywhere'}}>
+      <div style={{fontSize:60,fontWeight:750,lineHeight:1.05,marginBottom:25}}>{props.ad!.brand}</div>
+      <div style={{display:'inline-block',fontSize:43,fontWeight:650,lineHeight:1.12,background:'#204b36',
+        color:'#fff',padding:'14px 23px',borderRadius:16}}>{props.ad!.cta}</div>
+    </div>}
     {props.watermark ? <div style={{position: 'absolute', bottom: 340, left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
     </AbsoluteFill>
   </AbsoluteFill>;

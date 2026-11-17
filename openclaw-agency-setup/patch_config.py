@@ -31,6 +31,7 @@ ROSTER = {
             "social",
             "video",
             "meta-ads",
+            "protocolo-agencia-audiovisual",
         ),
     ),
     "agency-director": (
