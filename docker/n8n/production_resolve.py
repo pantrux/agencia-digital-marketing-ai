@@ -392,9 +392,8 @@ def main():
     intake, direction = (
         json.loads(read_regular(path, LIMIT)) for path in (args.ingesta, args.escaleta)
     )
-    result = actions[args.accion](
-        intake, direction, args.medios.resolve(strict=True), args.destino.absolute()
-    )
+    package = args.destino.parent.resolve(strict=True) / args.destino.name
+    result = actions[args.accion](intake, direction, args.medios.resolve(strict=True), package)
     print(json.dumps(result, ensure_ascii=False))
 
 
