@@ -32,9 +32,9 @@ from production_handoff import (
 from production_inbox import MEDIA, UUID, matches, render_format, render_resolution
 from production_intake import fingerprint
 from production_intake import identity as file_identity
-from production_lucas import submit_with_receipt, verify_file
+from production_lucas import submit_with_receipt, verified_inputs, verify_file
 from production_mateo import ORDER_ERRORS, lookup, strategy_reply
-from production_sofia import JOURNAL, LIMIT
+from production_sofia import INTAKE_LIMIT, JOURNAL, LIMIT
 from production_valeria import MATEO, source_paths
 
 LUCAS = Path("/var/lib/agency-production-lucas")
@@ -203,6 +203,10 @@ def approved_master(order, render, qa, brief):
         or qa["brief_sha256"] != brief_hash
         or render["source_sha256"] != order["media"]["sha256"]
         or render["job_id"] not in {order["order_id"] + f"-v{i}" for i in (1, 2, 3)}
+        or (
+            "direction_sha256" in render
+            and qa.get("direction_sha256") != render["direction_sha256"]
+        )
     ):
         raise ValueError("Brief o crudo ajeno a la entrega")
     master = MEDIA / render["master"]["path"]
@@ -245,12 +249,17 @@ def approved_graphic(order, intake, render, qa, direction, gpu, receipt):
         raise ValueError("Credencial del puente no disponible")
     original = direction["escaleta"]["render"]
     props = original["props"]
-    video, audio = source_paths(intake)
-    if intake["order"] != order or props["video_path"] != video or props["audio_path"] != audio:
-        raise ValueError("Las pistas de la gráfica difieren de la ingesta")
-    source = intake["audio"]
-    if fingerprint(MEDIA / audio) != {k: source[k] for k in ("bytes", "sha256")}:
-        raise ValueError("El audio de la gráfica cambió")
+    if order.get("additional_media"):
+        source = verified_inputs(order, intake, props, direction["brief_sha256"])
+        source_proof = {"materials": source["materials"]}
+    else:
+        video, audio = source_paths(intake)
+        if intake["order"] != order or props["video_path"] != video or props["audio_path"] != audio:
+            raise ValueError("Las pistas de la gráfica difieren de la ingesta")
+        source = intake["audio"]
+        if fingerprint(MEDIA / audio) != {k: source[k] for k in ("bytes", "sha256")}:
+            raise ValueError("El audio de la gráfica cambió")
+        source_proof = {"audio": source["sha256"]}
     body = {
         **original,
         "job_id": job + "-grafica",
@@ -265,7 +274,7 @@ def approved_graphic(order, intake, render, qa, direction, gpu, receipt):
         source={
             "master": qa["master_sha256"],
             "direction": direction_hash,
-            "audio": source["sha256"],
+            **source_proof,
         },
     )
     media, audio = result["media"], result["audio"]
@@ -333,7 +342,7 @@ def stage_package(order, master, render, qa, brief, *, caption=None, expected=No
 def deliver_pending_order(identity, entry, profile, dispatch, target, gpu):
     from kitsu_review import attach_delivery_zip, attach_preview
 
-    intake = json.loads(read_regular(JOURNAL / target.name, LIMIT))
+    intake = json.loads(read_regular(JOURNAL / target.name, INTAKE_LIMIT))
     order = intake["order"]
     validate(order, identity)
     if not eligible(order, profile):
@@ -474,7 +483,7 @@ def main():
     target = args.output / (fixture + ".json")
     if target.exists():
         return
-    receipt = json.loads(read_regular(JOURNAL / (fixture + ".json"), LIMIT))
+    receipt = json.loads(read_regular(JOURNAL / (fixture + ".json"), INTAKE_LIMIT))
     order = receipt["order"]
     validate(order, fixture)
     if order["mode"] != "sandbox" or order["plan_id"] != "free":

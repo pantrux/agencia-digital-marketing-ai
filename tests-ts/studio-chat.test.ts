@@ -15,7 +15,18 @@ const mac = (value: string) => createHmac("sha256", secret).update(value).digest
 function fixture(owned = true) {
   const first = vi.fn().mockResolvedValue(owned ? { id: order, plan_id: "free" } : null);
   const bind = vi.fn<(...values: string[]) => { first: typeof first }>(() => ({ first }));
-  const prepare = vi.fn<(sql: string) => { bind: typeof bind }>(() => ({ bind }));
+  const saved = { message: body.message.trim(), wire_message: body.message.trim(), reply: answer };
+  const prepare = vi.fn<(sql: string) => { bind: typeof bind }>((sql) => {
+    if (sql.includes("sofia_conversation_turns")) {
+      const historyBind = vi.fn().mockReturnValue({
+        run: vi.fn().mockResolvedValue({ results: [], meta: {} }),
+        first: vi.fn().mockResolvedValue(saved),
+        all: vi.fn().mockResolvedValue({ results: [], meta: {} }),
+      });
+      return { bind: historyBind as typeof bind };
+    }
+    return { bind };
+  });
   const env = {
     DB: { withSession: () => ({ prepare }) },
     BILLING_MODE: "sandbox", SOFIA_OWNER_USER_ID: user,
@@ -63,7 +74,8 @@ describe("Chat del portal con Sofía", () => {
     expect(result.headers.get("Cache-Control")).toBe("no-store");
     expect(await result.json()).toEqual({ text: answer, request_id: id });
     expect(bind).toHaveBeenCalledWith(order, user, "sandbox");
-    expect(prepare.mock.calls.at(0)?.[0]).toContain("s.status = 'completed'");
+    expect(prepare.mock.calls.at(0)?.[0]).toContain("u.status IN ('reserved', 'consumed')");
+    expect(prepare.mock.calls.at(0)?.[0]).not.toContain("JOIN upload_sessions");
     expect(send).toHaveBeenCalledTimes(1);
   });
 
@@ -74,17 +86,27 @@ describe("Chat del portal con Sofía", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("exige sandbox y titular fijado antes de consultar D1; excluye órdenes de pago", async () => {
+  it("transmite el plan real de una orden propia en producción", async () => {
+    const { env, first, bind } = fixture();
+    env.BILLING_MODE = "production";
+    first.mockResolvedValueOnce({ id: order, plan_id: "ilimitado" });
+    const send = vi.fn<typeof fetch>(async (_url, init) => {
+      const outgoing = JSON.parse(init?.body as string);
+      expect(outgoing).toMatchObject({ billing_mode: "production", plan_id: "ilimitado" });
+      const timestamp = new Headers(init?.headers).get("timestamp") ?? "";
+      return brokerReply(timestamp, { actor_id: outgoing.actor_id, order_id: order, request_id: id, text: answer });
+    });
+    expect((await handleSofiaChat(request(), env, user, send)).status).toBe(200);
+    expect(bind).toHaveBeenCalledWith(order, user, "production");
+  });
+
+  it("rechaza entornos y planes desconocidos antes de consultar al broker", async () => {
     const { env, first } = fixture();
     const send = vi.fn<typeof fetch>();
-    const withoutOwner = { ...env };
-    delete withoutOwner.SOFIA_OWNER_USER_ID;
-    for (const settings of [{ ...env, BILLING_MODE: "production" as const }, withoutOwner]) {
-      await expect(handleSofiaChat(request(), settings, user, send)).rejects.toMatchObject({ status: 503 });
-    }
-    await expect(handleSofiaChat(request(), env, id, send)).rejects.toMatchObject({ status: 403 });
+    const invalid = { ...env, BILLING_MODE: "invalido" } as unknown as ChatEnv;
+    await expect(handleSofiaChat(request(), invalid, user, send)).rejects.toMatchObject({ status: 503 });
     expect(first).not.toHaveBeenCalled();
-    first.mockResolvedValueOnce({ id: order, plan_id: "pro" });
+    first.mockResolvedValueOnce({ id: order, plan_id: "desconocido" });
     await expect(handleSofiaChat(request(), env, user, send)).rejects.toMatchObject({ status: 403 });
     expect(send).not.toHaveBeenCalled();
   });

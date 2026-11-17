@@ -1,0 +1,26 @@
+[Unit]
+Description=Procesa una solicitud de revisión audiovisual de Studio
+Wants=network-online.target
+After=network-online.target agency-production-publish.service
+RequiresMountsFor=/mnt/producciones
+
+[Service]
+Type=oneshot
+User=jandrade
+Group=jandrade
+UMask=0077
+StateDirectory=agency-production-revisions
+StateDirectoryMode=0700
+EnvironmentFile=/etc/agency-production-handoff/delivery-runtime.env
+LoadCredential=profile:/etc/agency-production-handoff/profile.json
+LoadCredential=dispatch:/etc/agency-production-handoff/dispatch-token
+LoadCredential=gpu:/etc/agency-production-handoff/gpu-render-token
+LoadCredential=r2:/etc/agency-production-handoff/publication-r2.json
+LoadCredential=hmac:/etc/agency-production-handoff/publication-hmac
+ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_revision.py %d/profile %d/dispatch %d/gpu %d/r2 %d/hmac /var/lib/agency-production-revisions
+TimeoutStartSec=75min
+ProtectSystem=full
+PrivateDevices=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

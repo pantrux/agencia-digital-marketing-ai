@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it, vi } from "vitest";
 import {
-  handleIngest, parseListedParts, type IngestBucket, type IngestEnv,
+  expireAbandonedReservations, handleIngest, parseListedParts, type IngestBucket, type IngestEnv,
 } from "../cloudflare-saas/studio-api-worker/src/ingest.js";
 import { signR2UploadPart } from "../src/media/r2-signing.js";
 import type { SqlDatabase, SqlRows, SqlStatement } from "../cloudflare-saas/studio-api-worker/src/platform.js";
@@ -11,6 +11,8 @@ import { handleProductionDispatch, productionDispatchPath } from "../cloudflare-
 import { handleProductionBrief } from "../cloudflare-saas/studio-api-worker/src/production-brief.js";
 import worker from "../cloudflare-saas/studio-api-worker/src/index.js";
 import { describePlan, listOrders, reserveOrder } from "../cloudflare-saas/studio-api-worker/src/orders.js";
+import { completeSourceUpload, createSourceUpload, listSourceParts, signSourcePart } from "../cloudflare-saas/studio-api-worker/src/source-upload.js";
+import { dispatchSourceOutbox, syncQueue, type JobEnv, type JobMessage } from "../cloudflare-saas/studio-api-worker/src/jobs.js";
 
 const order = "10b4d244-3ae5-4ea8-b56e-ddd35bfbdeed";
 const asset = "2037baa2-5189-4616-b6cc-cd9819e75543";
@@ -92,6 +94,7 @@ function databaseForIngest(output: "1080p" | "4k" = "1080p", format: "mp4" | "pr
   db.exec(readFileSync(new URL("../cloudflare-saas/migrations/0010_production_manual_review.sql", import.meta.url), "utf-8"));
   db.exec(readFileSync(new URL("../cloudflare-saas/migrations/0016_production_manual_adjustments.sql", import.meta.url), "utf-8"));
   db.exec(readFileSync(new URL("../cloudflare-saas/migrations/0017_upload_put_observations.sql", import.meta.url), "utf-8"));
+  db.exec(readFileSync(new URL("../cloudflare-saas/migrations/0023_production_sources.sql", import.meta.url), "utf-8"));
   return db;
 }
 
@@ -184,8 +187,8 @@ it("aísla los perfiles de marca y conserva la versión que tomó cada pedido", 
   } finally { db.close(); }
 });
 
-it.each(["full", "reel"] as const)("confirma el brief de una orden %s sin duplicarlo ni editarlo después", async (edit) => {
-  const db = databaseForIngest("1080p", "mp4", edit);
+it.each([["full", "mp4"], ["reel", "mp4"], ["reel", "prores4444"]] as const)("confirma el brief de una orden %s con %s sin duplicarlo ni editarlo después", async (edit, format) => {
+  const db = databaseForIngest("1080p", format, edit);
   try {
     for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql", "0021_brief_ad_engine.sql"]) {
       db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
@@ -294,6 +297,39 @@ it.each([["1080p", "mp4", "free", "full"], ["4k", "mp4", "ultra", "full"], ["4k"
     expect(await (await send({ action: "ack", order_id: order, lease: next.job.lease })).json()).toEqual({ received: true });
     expect(await (await send({ action: "claim" })).json()).toEqual({ job: null });
     expect(db.prepare("SELECT attempts, received_at FROM production_dispatch").get()).toMatchObject({ attempts: 2, received_at: expect.any(Number) });
+  } finally { db.close(); }
+});
+
+it.each([false, true])("el despacho múltiple exige que todas las fuentes lleguen al NAS: %s", async (allSynced) => {
+  const db = databaseForIngest();
+  try {
+    for (const file of ["0004_production_dispatch.sql", "0024_multiple_production_dispatch.sql"]) {
+      db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
+    }
+    const manifest = ["uno.mp4", "dos.mp4"].map((name) => ({ name, bytes: 7, sha256: digest, extension: "mp4" }));
+    db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+      .run(order, JSON.stringify(manifest), digest);
+    const sources = db.prepare("SELECT id FROM production_sources WHERE order_id=? ORDER BY position").all(order) as { id: string }[];
+    for (const { id } of sources) {
+      db.prepare(`INSERT INTO production_source_uploads(source_id,object_key,upload_id,status,created_at,expires_at)
+        VALUES (?,?,'multipart','open',unixepoch(),unixepoch()+3600)`).run(id, `ingest/${order}/${id}.mp4`);
+      db.prepare("UPDATE production_source_uploads SET status='completed',object_etag=? WHERE source_id=?").run(etag, id);
+    }
+    db.prepare("UPDATE production_source_outbox SET synced_at=unixepoch() WHERE source_id=?").run(sources[0]!.id);
+    if (allSynced) db.prepare("UPDATE production_source_outbox SET synced_at=unixepoch() WHERE source_id=?").run(sources[1]!.id);
+    db.exec("UPDATE usage_ledger SET status='consumed'; UPDATE orders SET status='processing'");
+    const token = "a".repeat(64);
+    const env = { DB: sqliteAdapter(db), BILLING_MODE: "production" as const, STUDIO_PRODUCTION_DISPATCH_TOKEN: token };
+    const result = await (await handleProductionDispatch(new Request(`https://studio.invalid${productionDispatchPath}`, {
+      method: "POST", body: JSON.stringify({ action: "claim" }),
+      headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
+    }), env)).json() as { job: null | { upload_id: string; media: { asset_id: string }; additional_media: { asset_id: string }[] } };
+    if (!allSynced) expect(result.job).toBeNull();
+    else {
+      expect(result.job?.upload_id).toBe(sources[0]!.id);
+      expect(result.job?.media.asset_id).toBe(sources[0]!.id);
+      expect(result.job?.additional_media.map((item) => item.asset_id)).toEqual([sources[1]!.id]);
+    }
   } finally { db.close(); }
 });
 
@@ -899,7 +935,9 @@ describe("Ingesta R2 multipart", () => {
     const db = databaseForIngest();
     try {
       const { bucket } = mockMedia(new Uint8Array(7));
-      const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production" } as IngestEnv;
+      const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production",
+        R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
+        R2_SECRET_ACCESS_KEY: credentials.secretAccessKey } as IngestEnv;
       const path = "/api/uploads";
       const payload = {
         order_id: order, project_slug: job.project_slug, extension: "mp4", bytes: 7, sha256: digest, content_type: "video/mp4",
@@ -916,6 +954,25 @@ describe("Ingesta R2 multipart", () => {
         .rejects.toMatchObject({ status: 422, code: "SUBIDA_ARGUMENTOS" });
       expect(bucket.createMultipartUpload).not.toHaveBeenCalled();
       expect(db.prepare("SELECT COUNT(*) AS total FROM upload_sessions").get()).toEqual({ total: 0 });
+    } finally { db.close(); }
+  });
+
+  it("no despacha el primer archivo de una orden con materiales registrados", async () => {
+    const db = databaseForIngest();
+    try {
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?, 'user', ?, ?)")
+        .run(order, JSON.stringify(["uno.mp4", "dos.mp4"].map((name) => ({
+          name, bytes: 7, sha256: digest, extension: "mp4",
+        }))), "a".repeat(64));
+      const { bucket } = mockMedia(new Uint8Array(7));
+      const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production" } as IngestEnv;
+      const path = "/api/uploads";
+      await expect(handleIngest(request(path, "POST", {
+        order_id: order, project_slug: job.project_slug, extension: "mp4", bytes: 7, sha256: digest, content_type: "video/mp4",
+      }), env, "user", path)).rejects.toMatchObject({ status: 409, code: "MATERIALES_EN_PREPARACION" });
+      expect(bucket.createMultipartUpload).not.toHaveBeenCalled();
+      expect(db.prepare("SELECT COUNT(*) AS total FROM upload_sessions").get()).toEqual({ total: 0 });
+      expect(db.prepare("SELECT COUNT(*) AS total FROM job_outbox").get()).toEqual({ total: 0 });
     } finally { db.close(); }
   });
 
@@ -1095,6 +1152,274 @@ describe("Ingesta R2 multipart", () => {
       expect({ ...resumed, newlyOpened: true }).toEqual(first);
       expect(bucket.createMultipartUpload).toHaveBeenCalledTimes(1);
     } finally { db.close(); }
+  });
+
+  it("computa cargas múltiples activas al reservar espacio para otra producción", async () => {
+    const db = databaseForIngest();
+    try {
+      const { bucket } = mockMedia(new Uint8Array(7));
+      const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production" } as IngestEnv;
+      const previous = "ae8ca550-12a5-4a4c-a50a-1aa11616c8f1";
+      db.exec("UPDATE plan_quotas SET storage_bytes=10,storage_limit_bytes=10 WHERE plan_id='free'");
+      db.prepare(`INSERT INTO orders(id,user_id,plan_id,kind,status,idempotency_key,request_sha256,project_slug,queue_priority)
+        VALUES (?,'user','free','production','queued','multi',?,'job-multi',0)`).run(previous, digest);
+      const manifest = [{ name: "detalle.mp4", bytes: 4, sha256: digest, extension: "mp4" }];
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(previous, JSON.stringify(manifest), digest);
+      const item = db.prepare("SELECT id FROM production_sources WHERE order_id=?").get(previous) as { id: string };
+      db.prepare(`INSERT INTO production_source_uploads(source_id,object_key,upload_id,status,created_at,expires_at)
+        VALUES (?,'ingest-fixture','multipart','open',unixepoch(),unixepoch()+3600)`).run(item.id);
+      const path = "/api/uploads";
+      const upload = () => handleIngest(request(path, "POST", {
+        order_id: order, project_slug: "job-fixture", extension: "mp4", bytes: 7, sha256: digest, content_type: "video/mp4",
+      }), env, "user", path);
+      await expect(upload()).rejects.toMatchObject({ status: 409, code: "ALMACENAMIENTO_AGOTADO" });
+      expect(bucket.createMultipartUpload).not.toHaveBeenCalled();
+      db.prepare("UPDATE production_source_uploads SET status='aborted' WHERE source_id=?").run(item.id);
+      expect(await (await upload()).json()).toMatchObject({ status: "open" });
+    } finally { db.close(); }
+  });
+
+  it("abre fuentes independientes con cuota atómica y reanuda la misma carga", async () => {
+    const db = databaseForIngest();
+    try {
+      db.exec("UPDATE plan_quotas SET storage_bytes=10,storage_limit_bytes=10 WHERE plan_id='free'");
+      const manifest = ["primero.mp4", "segundo.mp4"].map((name) => ({ name, bytes: 7, sha256: digest, extension: "mp4" }));
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order, JSON.stringify(manifest), digest);
+      const sources = db.prepare("SELECT id FROM production_sources WHERE order_id=? ORDER BY position").all(order) as { id: string }[];
+      const { bucket } = mockMedia(new Uint8Array(7));
+      const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production",
+        R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
+        R2_SECRET_ACCESS_KEY: credentials.secretAccessKey } as IngestEnv;
+      await expect(createSourceUpload(env, "otro", order, sources[0]!.id)).rejects.toMatchObject({ status: 404 });
+      const attempts = await Promise.allSettled(sources.map(({ id }) => createSourceUpload(env, "user", order, id)));
+      expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
+      expect(attempts.filter((attempt) => attempt.status === "rejected"))
+        .toEqual([{ status: "rejected", reason: expect.objectContaining({ code: "ALMACENAMIENTO_AGOTADO" }) }]);
+      const first = attempts.find((attempt) => attempt.status === "fulfilled") as PromiseFulfilledResult<Response>;
+      const opened = await first.value.json() as { id: string; uploadId: string; status: string };
+      expect(opened.status).toBe("open");
+      expect(await (await createSourceUpload(env, "user", order, opened.id)).json())
+        .toMatchObject({ id: opened.id, uploadId: opened.uploadId, status: "open" });
+      await expect(signSourcePart(env, "otro", order, opened.id, 1)).rejects.toMatchObject({ status: 404 });
+      await expect(signSourcePart(env, "user", order, opened.id, 2)).rejects.toMatchObject({ status: 405 });
+      const signed = await (await signSourcePart(env, "user", order, opened.id, 1)).json() as { url: string; headers: object };
+      expect(new URL(signed.url).searchParams.get("partNumber")).toBe("1");
+      expect(signed.headers).toEqual({ "Content-Type": "video/mp4" });
+      expect(signed.url).not.toContain(credentials.secretAccessKey);
+      const remote = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(
+        `<ListPartsResult><IsTruncated>false</IsTruncated><Part><PartNumber>1</PartNumber>
+        <Size>7</Size><ETag>"${etag}"</ETag></Part></ListPartsResult>`));
+      try {
+        await expect(listSourceParts(env, "otro", order, opened.id)).rejects.toMatchObject({ status: 404 });
+        expect(await (await listSourceParts(env, "user", order, opened.id)).json())
+          .toEqual({ parts: [{ PartNumber: 1, Size: 7, ETag: etag }] });
+      } finally { remote.mockRestore(); }
+      expect(bucket.createMultipartUpload).toHaveBeenCalledTimes(1);
+    } finally { db.close(); }
+  });
+
+  it("verifica cada fuente y solo declara completo el conjunto cuando están todas", async () => {
+    const db = databaseForIngest();
+    const bytes = new TextEncoder().encode("fixture");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const restore = installDigestStream();
+    const listing = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(
+      `<ListPartsResult><IsTruncated>false</IsTruncated><Part><PartNumber>1</PartNumber>
+       <Size>7</Size><ETag>"${etag}"</ETag></Part></ListPartsResult>`));
+    try {
+      const manifest = ["primero.mp4", "segundo.mp4"].map((name) => ({ name, bytes: 7, sha256, extension: "mp4" }));
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order, JSON.stringify(manifest), digest);
+      const sources = db.prepare("SELECT id FROM production_sources WHERE order_id=? ORDER BY position").all(order) as { id: string }[];
+      for (let index = 0; index < sources.length; index += 1) {
+        const { bucket } = mockMedia(bytes);
+        const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production",
+          R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
+          R2_SECRET_ACCESS_KEY: credentials.secretAccessKey } as IngestEnv;
+        const id = sources[index]!.id;
+        await createSourceUpload(env, "user", order, id);
+        const complete = () => completeSourceUpload(request("/unused", "POST", { parts: [{ PartNumber: 1, ETag: etag }] }),
+          env, "user", order, id);
+        expect(await (await complete()).json()).toEqual({ id, status: "completed", hash_verified: true,
+          all_sources_complete: index === 1 });
+        expect((await (await complete()).json()).all_sources_complete).toBe(index === 1);
+        expect(db.prepare("SELECT COUNT(*) AS n FROM production_source_outbox").get()).toEqual({ n: index + 1 });
+      }
+      expect(db.prepare("SELECT COUNT(*) AS n FROM job_outbox").get()).toEqual({ n: 0 });
+      const queued = db.prepare(`SELECT source_id,payload FROM production_source_outbox ORDER BY source_id`).all() as
+        { source_id: string; payload: string }[];
+      expect(queued.map(({ source_id, payload }) => {
+        const job = JSON.parse(payload) as { job_id: string; asset_id: string; sha256: string };
+        return [job.job_id, job.asset_id === source_id, job.sha256];
+      })).toEqual([[order, true, sha256], [order, true, sha256]]);
+    } finally { listing.mockRestore(); restore(); db.close(); }
+  });
+
+  it("sincroniza el primer archivo sin despachar la orden antes de recibir el segundo", async () => {
+    const db = databaseForIngest();
+    try {
+      for (const file of ["0004_production_dispatch.sql", "0024_multiple_production_dispatch.sql"]) {
+        db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
+      }
+      const manifest = ["uno.mp4", "dos.mp4"].map((name) => ({name, bytes:7, sha256:digest, extension:"mp4"}));
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order,JSON.stringify(manifest),digest);
+      const sources = db.prepare("SELECT id FROM production_sources WHERE order_id=? ORDER BY position").all(order) as {id:string}[];
+      const sent: unknown[] = [];
+      const env: JobEnv = {DB:sqliteAdapter(db), HOMELAB_SYNC_ORIGIN:"https://api-studio.e-scale.cl",
+        STUDIO_EDGE_TO_HOMELAB_HMAC_SECRET:"x".repeat(32), JOBS:{send:async (body) => {sent.push(body);}}};
+      const send = vi.fn<typeof fetch>(async (_url, init) => {
+        const job = JSON.parse(new TextDecoder().decode(init?.body as Uint8Array));
+        return Response.json({status:"completed",job_id:job.job_id,asset_id:job.asset_id,bytes:job.bytes,sha256:job.sha256});
+      });
+      const finish = async (id:string) => {
+        db.prepare(`INSERT INTO production_source_uploads(source_id,object_key,upload_id,status,created_at,expires_at)
+          VALUES (?,?,'multipart','open',unixepoch(),unixepoch()+3600)`).run(id,`ingest/${order}/${id}.mp4`);
+        db.prepare("UPDATE production_source_uploads SET status='completed',object_etag=? WHERE source_id=?").run(etag,id);
+        await dispatchSourceOutbox(env);
+        const message: JobMessage = {body:sent.at(-1),attempts:1,ack:vi.fn(),retry:vi.fn()};
+        await syncQueue([message],env,send);
+        expect(message.ack).toHaveBeenCalledOnce();
+      };
+      await finish(sources[0]!.id);
+      expect(db.prepare("SELECT status FROM orders WHERE id=?").get(order)).toEqual({status:"queued"});
+      expect(db.prepare("SELECT status FROM usage_ledger WHERE order_id=?").get(order)).toEqual({status:"reserved"});
+      expect(db.prepare("SELECT COUNT(*) AS n FROM production_dispatch").get()).toEqual({n:0});
+      await finish(sources[1]!.id);
+      expect(db.prepare("SELECT status FROM orders WHERE id=?").get(order)).toEqual({status:"processing"});
+      expect(db.prepare("SELECT COUNT(*) AS n FROM production_dispatch").get()).toEqual({n:1});
+    } finally {db.close();}
+  });
+
+  it("reanuda una confirmación múltiple interrumpida sin abrir otra carga", async () => {
+    const db = databaseForIngest();
+    const bytes = new TextEncoder().encode("fixture");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const { bucket, handle } = mockMedia(bytes);
+    const restore = installDigestStream();
+    const listing = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(
+      `<ListPartsResult><IsTruncated>false</IsTruncated><Part><PartNumber>1</PartNumber>
+       <Size>7</Size><ETag>"${etag}"</ETag></Part></ListPartsResult>`));
+    try {
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order, JSON.stringify([{ name: "uno.mp4", bytes: 7, sha256, extension: "mp4" }]), digest);
+      const source = db.prepare("SELECT id FROM production_sources WHERE order_id=?").get(order) as { id: string };
+      const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production",
+        R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
+        R2_SECRET_ACCESS_KEY: credentials.secretAccessKey } as IngestEnv;
+      await createSourceUpload(env, "user", order, source.id);
+      handle.complete.mockRejectedValueOnce(new Error("interrupción"));
+      await expect(completeSourceUpload(request("/unused", "POST", { parts: [{ PartNumber: 1, ETag: etag }] }),
+        env, "user", order, source.id)).rejects.toThrow("interrupción");
+      db.prepare("UPDATE production_source_uploads SET lease_until=unixepoch()-1 WHERE source_id=?").run(source.id);
+      expect(await (await createSourceUpload(env, "user", order, source.id)).json())
+        .toMatchObject({ id: source.id, status: "completed", all_sources_complete: true });
+      expect(bucket.createMultipartUpload).toHaveBeenCalledOnce();
+    } finally { listing.mockRestore(); restore(); db.close(); }
+  });
+
+  it("despacha todas las fuentes y activa la producción únicamente al confirmar la última", async () => {
+    const db = databaseForIngest();
+    try {
+      for (const file of ["0004_production_dispatch.sql", "0024_multiple_production_dispatch.sql"]) {
+        db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
+      }
+      const manifest = ["uno.mp4", "dos.mp4"].map((name) => ({ name, bytes: 7, sha256: digest, extension: "mp4" }));
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order, JSON.stringify(manifest), digest);
+      const sources = db.prepare("SELECT id FROM production_sources WHERE order_id=? ORDER BY position").all(order) as { id: string }[];
+      for (const { id } of sources) {
+        db.prepare(`INSERT INTO production_source_uploads(source_id,object_key,upload_id,status,created_at,expires_at)
+          VALUES (?,?,'multipart','open',unixepoch(),unixepoch()+3600)`).run(id, `ingest/${order}/${id}.mp4`);
+        db.prepare("UPDATE production_source_uploads SET status='completed',object_etag=? WHERE source_id=?").run(etag, id);
+      }
+      const sent: unknown[] = [];
+      const env: JobEnv = { DB: sqliteAdapter(db), HOMELAB_SYNC_ORIGIN: "https://api-studio.e-scale.cl",
+        STUDIO_EDGE_TO_HOMELAB_HMAC_SECRET: "x".repeat(32), JOBS: { send: async (body) => { sent.push(body); } } };
+      await dispatchSourceOutbox(env);
+      expect(sent).toHaveLength(2);
+      const send = vi.fn<typeof fetch>(async (url, init) => {
+        expect(url).toBe("https://api-studio.e-scale.cl/v2/sync");
+        expect(new Headers(init?.headers).get("signature")).toMatch(/^v2=[a-f0-9]{64}$/u);
+        const job = JSON.parse(new TextDecoder().decode(init?.body as Uint8Array));
+        return Response.json({ status: "completed", job_id: job.job_id, asset_id: job.asset_id, bytes: job.bytes, sha256: job.sha256 });
+      });
+      const message = (body: unknown): JobMessage => ({ body, attempts: 1, ack: vi.fn(), retry: vi.fn() });
+      send.mockResolvedValueOnce(Response.json({ status: "completed", job_id: order, asset_id: "ajeno", bytes: 7, sha256: digest }));
+      const rejected = message(sent[0]);
+      await syncQueue([rejected], env, send);
+      expect(rejected.retry).toHaveBeenCalledOnce();
+      expect(db.prepare("SELECT COUNT(*) AS n FROM production_source_outbox WHERE synced_at IS NOT NULL").get()).toEqual({ n: 0 });
+      const first = message(sent[0]);
+      await syncQueue([first], env, send);
+      expect(first.ack).toHaveBeenCalledOnce();
+      expect(db.prepare("SELECT COUNT(*) AS n FROM production_source_outbox WHERE synced_at IS NOT NULL").get()).toEqual({ n: 1 });
+      expect(db.prepare("SELECT status FROM orders WHERE id=?").get(order)).toEqual({ status: "queued" });
+      const second = message(sent[1]);
+      await syncQueue([second], env, send);
+      expect(second.ack).toHaveBeenCalledOnce();
+      expect(db.prepare("SELECT COUNT(*) AS n FROM production_source_outbox WHERE synced_at IS NOT NULL").get()).toEqual({ n: 2 });
+      expect(db.prepare("SELECT status FROM orders WHERE id=?").get(order)).toEqual({ status: "processing" });
+      expect(db.prepare("SELECT status FROM usage_ledger WHERE order_id=?").get(order)).toEqual({ status: "consumed" });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM production_dispatch WHERE order_id=?").get(order)).toEqual({ n: 1 });
+      const uploadEnv = { ...env, BILLING_MODE: "production", MEDIA: mockMedia(new Uint8Array(7)).bucket } as unknown as IngestEnv;
+      expect(await (await createSourceUpload(uploadEnv, "user", order, sources[0]!.id)).json())
+        .toMatchObject({ id: sources[0]!.id, status: "completed", hash_verified: true });
+      await syncQueue([message(sent[0])], env, send);
+      expect(send).toHaveBeenCalledTimes(3);
+    } finally { db.close(); }
+  });
+
+  it("conserva una orden antigua mientras una carga múltiple siga vigente y la libera al vencer", async () => {
+    const db = databaseForIngest();
+    try {
+      db.prepare("UPDATE orders SET created_at=unixepoch()-90000 WHERE id=?").run(order);
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order, JSON.stringify([{ name: "uno.mp4", bytes: 7, sha256: digest, extension: "mp4" }]), digest);
+      const source = db.prepare("SELECT id FROM production_sources WHERE order_id=?").get(order) as { id: string };
+      db.prepare(`INSERT INTO production_source_uploads(source_id,object_key,upload_id,status,created_at,expires_at)
+        VALUES (?,'objeto','multipart','open',unixepoch()-100,unixepoch()+100)`).run(source.id);
+      const env = { DB: sqliteAdapter(db), BILLING_MODE: "production" } as IngestEnv;
+      await expireAbandonedReservations(env);
+      expect(db.prepare("SELECT status FROM orders WHERE id=?").get(order)).toEqual({ status: "queued" });
+      db.prepare("UPDATE production_source_uploads SET expires_at=unixepoch()-1 WHERE source_id=?").run(source.id);
+      await expireAbandonedReservations(env);
+      expect(db.prepare("SELECT status FROM orders WHERE id=?").get(order)).toEqual({ status: "cancelled" });
+      expect(db.prepare("SELECT status FROM production_source_uploads WHERE source_id=?").get(source.id)).toEqual({ status: "aborted" });
+    } finally { db.close(); }
+  });
+
+  it("rechaza y elimina una fuente cuyo contenido no coincide con el hash declarado", async () => {
+    const db = databaseForIngest();
+    const bytes = new TextEncoder().encode("falsaso");
+    const expected = new TextEncoder().encode("fixture");
+    const expectedHash = createHash("sha256").update(expected).digest("hex");
+    const { bucket } = mockMedia(bytes);
+    const restore = installDigestStream();
+    const listing = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(
+      `<ListPartsResult><IsTruncated>false</IsTruncated><Part><PartNumber>1</PartNumber>
+       <Size>7</Size><ETag>"${etag}"</ETag></Part></ListPartsResult>`));
+    try {
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order, JSON.stringify([{ name: "uno.mp4", bytes: 7, sha256: expectedHash, extension: "mp4" }]), digest);
+      const source = db.prepare("SELECT id FROM production_sources WHERE order_id=?").get(order) as { id: string };
+      const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production",
+        R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
+        R2_SECRET_ACCESS_KEY: credentials.secretAccessKey } as IngestEnv;
+      await createSourceUpload(env, "user", order, source.id);
+      await expect(completeSourceUpload(request("/unused", "POST", { parts: [{ PartNumber: 1, ETag: etag }] }),
+        env, "user", order, source.id)).rejects.toMatchObject({ status: 422, code: "SUBIDA_HASH_DISTINTO" });
+      expect(bucket.delete).toHaveBeenCalledOnce();
+      expect(db.prepare("SELECT status FROM production_source_uploads WHERE source_id=?").get(source.id)).toEqual({ status: "aborted" });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM job_outbox").get()).toEqual({ n: 0 });
+      const correctBucket = mockMedia(expected).bucket;
+      const retry = { ...env, MEDIA: correctBucket };
+      expect(await (await createSourceUpload(retry, "user", order, source.id)).json()).toMatchObject({ status: "open" });
+      expect(await (await completeSourceUpload(request("/unused", "POST", { parts: [{ PartNumber: 1, ETag: etag }] }),
+        retry, "user", order, source.id)).json()).toMatchObject({ status: "completed", all_sources_complete: true });
+    } finally { listing.mockRestore(); restore(); db.close(); }
   });
 
   it.each([["free", 0, 1], ["ilimitado", 3, 2]] as const)(

@@ -50,6 +50,21 @@ class ProtocolTests(unittest.TestCase):
             data, timestamp, signature, secret, policy, now or (lambda: 1700000000)
         )
 
+    def test_protocolo_multiple_aisla_la_firma_del_protocolo_anterior(self):
+        signature = "v2=dcf43d6de3029e24817d533565d8308702727305a616e7670d668a11ddc2b0b9"
+        result = PROTOCOL.verify_source_request(
+            body(), TIME, signature, KEY, 12345, lambda: 1700000000
+        )
+        self.assertEqual(result.fingerprint, HASH)
+        with self.assertRaises(PROTOCOL.ProtocolError):
+            self.verify(signature=signature)
+        with self.assertRaises(PROTOCOL.ProtocolError):
+            PROTOCOL.verify_source_request(body(), TIME, SIGNATURE, KEY, 12345, lambda: 1700000000)
+        with self.assertRaises(PROTOCOL.ProtocolError):
+            PROTOCOL.verify_source_request(
+                body(), TIME, "v2=" + SIGNATURE[3:], KEY, 12345, lambda: 1700000000
+            )
+
     def test_vector_webcrypto_existente_ts_y_resultado_inmutable(self):
         result = self.verify(signature=SIGNATURE)
         self.assertEqual(result.fingerprint, HASH)

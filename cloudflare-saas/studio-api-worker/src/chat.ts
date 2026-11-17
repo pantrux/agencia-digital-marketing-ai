@@ -1,4 +1,5 @@
 import { HttpError, readJson, response, type SqlDatabase } from "./platform.js";
+import { prepareConversation, saveConversation } from "./conversation.js";
 
 const brokerOrigin = "https://api-studio.e-scale.cl";
 const brokerPath = "/v1/sofia/chat";
@@ -28,8 +29,8 @@ interface BrokerRequest {
   agent_id: "agency-account";
   actor_id: string;
   order_id: string;
-  billing_mode: "sandbox";
-  plan_id: "free";
+  billing_mode: "sandbox" | "production";
+  plan_id: "free" | "pro" | "ultra" | "ilimitado";
   request_id: string;
   message: string;
 }
@@ -143,10 +144,9 @@ export async function handleSofiaChat(
 ): Promise<Response> {
   if (request.method !== "POST") throw new HttpError(405, "METODO_INVALIDO");
   if (!isUuid(userId)) throw new HttpError(401, "AUTENTICACION_REQUERIDA");
-  if (env.BILLING_MODE !== "sandbox" || !isUuid(env.SOFIA_OWNER_USER_ID)) {
+  if (!["sandbox", "production"].includes(env.BILLING_MODE)) {
     throw new HttpError(503, "CHAT_NO_DISPONIBLE");
   }
-  if (userId !== env.SOFIA_OWNER_USER_ID) throw new HttpError(403, "CHAT_NO_AUTORIZADO");
   const requestId = request.headers.get("idempotency-key");
   if (!isUuid(requestId)) throw new HttpError(400, "IDEMPOTENCIA_INVALIDA");
   const body = await readJson(request, 12288);
@@ -156,19 +156,36 @@ export async function handleSofiaChat(
   }
   const key = await keyFor(env);
   const row = await env.DB.withSession("first-primary").prepare(`
-    SELECT o.id, o.plan_id FROM orders o
-    JOIN upload_sessions s ON s.order_id = o.id AND s.user_id = o.user_id
+    SELECT o.id, o.plan_id, o.output_resolution, o.output_format, o.output_edit,
+      b.objective, b.audience, b.tone, brand.display_name AS brand_name,
+      ref.source_url AS reference_url, ref.status AS reference_status,
+      ref.title AS reference_title, ref.description AS reference_description, ref.excerpt AS reference_excerpt
+    FROM orders o
     JOIN usage_ledger u ON u.order_id = o.id AND u.user_id = o.user_id
+    LEFT JOIN production_briefs b ON b.order_id=o.id AND b.user_id=o.user_id
+    LEFT JOIN order_brand_profiles brand ON brand.order_id=o.id AND brand.user_id=o.user_id
+    LEFT JOIN studio_reference_context ref ON ref.order_id=o.id AND ref.user_id=o.user_id
     WHERE o.id = ? AND o.user_id = ? AND COALESCE(o.provider_mode, 'production') = ?
       AND o.kind = 'production' AND o.status IN ('queued', 'processing', 'completed')
-      AND u.status IN ('reserved', 'consumed') AND s.status = 'completed' AND length(s.object_etag) > 0
-  `).bind(order_id, userId, env.BILLING_MODE).first<{ id: string; plan_id: string }>();
+      AND u.status IN ('reserved', 'consumed')
+  `).bind(order_id, userId, env.BILLING_MODE).first<{ id: string; plan_id: string;
+    output_resolution?: string; output_format?: string; output_edit?: string; objective?: string;
+    audience?: string; tone?: string; brand_name?: string; reference_url?: string; reference_status?: string;
+    reference_title?: string; reference_description?: string; reference_excerpt?: string }>();
   if (!row || row.id !== order_id) throw new HttpError(404, "ORDEN_NO_ENCONTRADA");
-  if (row.plan_id !== "free") throw new HttpError(403, "CHAT_NO_AUTORIZADO");
+  if (!["free", "pro", "ultra", "ilimitado"].includes(row.plan_id)) throw new HttpError(403, "CHAT_NO_AUTORIZADO");
+  const wireMessage = await prepareConversation(env, userId, order_id, requestId, message.trim(), {
+    referencia_estado: row.reference_status, referencia_titulo_publico: row.reference_title,
+    referencia_descripcion_publica: row.reference_description, referencia_texto_publico: row.reference_excerpt,
+    referencia_url: row.reference_url,
+    marca: row.brand_name, objetivo_confirmado: row.objective, audiencia_confirmada: row.audience,
+    tono_confirmado: row.tone, resolucion: row.output_resolution, entrega: row.output_format,
+    tipo_edicion: row.output_edit,
+  });
   const actor = hex(await crypto.subtle.sign("HMAC", key, encoder.encode(`${protocol}\nactor\n${userId}`)));
   const outbound: BrokerRequest = {
     agent_id: "agency-account", actor_id: actor, order_id,
-    billing_mode: "sandbox", plan_id: "free", request_id: requestId, message: message.trim(),
+    billing_mode: env.BILLING_MODE, plan_id: row.plan_id as BrokerRequest["plan_id"], request_id: requestId, message: wireMessage,
   };
   const raw = JSON.stringify(outbound);
   const timestamp = String(now());
@@ -191,5 +208,6 @@ export async function handleSofiaChat(
     throw new HttpError(503, "CHAT_NO_DISPONIBLE");
   }
   const reply = await verifyReply(receipt, outbound, key);
+  await saveConversation(env, userId, order_id, requestId, message.trim(), reply.text);
   return response({ text: reply.text, request_id: reply.request_id });
 }

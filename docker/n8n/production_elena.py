@@ -30,10 +30,10 @@ from production_handoff import (
     revision_from_stem,
     validate,
 )
-from production_inbox import MEDIA, render_resolution
+from production_inbox import MEDIA, UUID, matches, render_resolution
 from production_intake import identity
 from production_mateo import dispatch_request, lookup
-from production_sofia import JOURNAL, LIMIT, MAX_TRANSCRIPT, MCP, validate_transcript
+from production_sofia import INTAKE_LIMIT, JOURNAL, LIMIT, MAX_TRANSCRIPT, MCP, validate_transcript
 from production_valeria import AD_MUSIC_ID, MAX_JPEG, run_visual, visual_request
 
 AD_MUSIC_CREDIT = (
@@ -594,12 +594,26 @@ def audit_preview(order, edl, job, asset, out):
     return record
 
 
-def audit(order, edl, master_hash, request_id, out, rendered=None, revision=1, *, synthetic=False):
+def audit(
+    order,
+    edl,
+    master_hash,
+    request_id,
+    out,
+    rendered=None,
+    revision=1,
+    *,
+    synthetic=False,
+    revision_id=None,
+):
     decision = edl["escaleta"]
     render = decision["render"]
     job = order["media"]
     plan = render_plan(order)
     resolution = render_resolution(order)
+    if revision_id is not None and not matches(UUID, revision_id):
+        raise ValueError("Identidad de revisión inválida")
+    revised_job = f"{order['order_id']}-v{revision}" if revision_id is None else f"{revision_id}-r"
     if (
         edl["order_id"] != order["order_id"]
         or edl["source_sha256"] != job["sha256"]
@@ -614,24 +628,30 @@ def audit(order, edl, master_hash, request_id, out, rendered=None, revision=1, *
         / "proyectos"
         / job["project_slug"]
         / "06_renders"
-        / (render["job_id"] if rendered is None else f"{order['order_id']}-v{revision}")
+        / (render["job_id"] if rendered is None else revised_job)
         / "render"
     )
     master = directory / "master.mp4"
     if rendered is not None:
         asset = rendered["master"]
-        if rendered.get("resolution", "1080p") != resolution or (
-            rendered["order_id"],
-            rendered["source_sha256"],
-            rendered["brief_sha256"],
-            rendered["job_id"],
-            asset["sha256"],
-        ) != (
-            order["order_id"],
-            job["sha256"],
-            edl["brief_sha256"],
-            f"{order['order_id']}-v{revision}",
-            master_hash,
+        direction_hash = hashlib.sha256(canonical(edl)).hexdigest()
+        if (
+            ("direction_sha256" in rendered and rendered["direction_sha256"] != direction_hash)
+            or rendered.get("resolution", "1080p") != resolution
+            or (
+                rendered["order_id"],
+                rendered["source_sha256"],
+                rendered["brief_sha256"],
+                rendered["job_id"],
+                asset["sha256"],
+            )
+            != (
+                order["order_id"],
+                job["sha256"],
+                edl["brief_sha256"],
+                revised_job,
+                master_hash,
+            )
         ):
             raise ValueError("Recibo de Lucas ajeno al máster")
         master = MEDIA / asset["path"]
@@ -643,6 +663,7 @@ def audit(order, edl, master_hash, request_id, out, rendered=None, revision=1, *
         "job_id": directory.parent.name,
         "master_sha256": master_hash,
         "brief_sha256": edl["brief_sha256"],
+        "direction_sha256": hashlib.sha256(canonical(edl)).hexdigest(),
         **review_video(
             master,
             master_hash,
@@ -704,7 +725,7 @@ def run_pending(profile, dispatch, output):
         target = output / path.name
         if not direction.is_file() or not intake.is_file():
             continue
-        order = json.loads(read_regular(intake, LIMIT))["order"]
+        order = json.loads(read_regular(intake, INTAKE_LIMIT))["order"]
         validate(order, identity)
         synthetic = is_test_order(order, profile)
         if not eligible(order, profile) or revision > qa_rounds(order, profile):
@@ -783,7 +804,7 @@ def main():
         return
     if not re.fullmatch(r"[a-f0-9]{64}", pinned["sha256"]):
         raise ValueError("Huella de máster inválida")
-    receipt = json.loads(read_regular(JOURNAL / source, LIMIT))
+    receipt = json.loads(read_regular(JOURNAL / source, INTAKE_LIMIT))
     order = receipt["order"]
     validate(order, fixture)
     edl = json.loads(read_regular(VALERIA / source, LIMIT))

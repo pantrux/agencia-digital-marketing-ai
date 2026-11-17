@@ -21,12 +21,15 @@ export const SOCIAL_FADE_FRAME = 864;
 export const AD_FRAMES = 900;
 export const LABEL_ENTRANCE_FRAMES = 8;
 export const SOCIAL_ENTRANCE_FRAMES = 12;
-export interface EditScene {source_start_frame: number; source_end_frame: number; audio_source_start_frame?: number; label?: SceneLabel}
+export interface EditScene {source_start_frame: number; source_end_frame: number; source_id?: string; audio_source_start_frame?: number; label?: SceneLabel}
+export interface MultiSourceScene extends EditScene {source_id: string}
+export interface RenderSource {id: string; video_path: string; audio_path?: string}
 export interface CompositionProps {
   title: string; subtitle: string; duration_seconds: number;
   subtitle_size?: 'large';
   background: string; accent: string; video_path?: string; audio_path?: string;
   scenes?: EditScene[];
+  sources?: RenderSource[];
   ad?: ScriptedAd;
 }
 export interface RenderRequest {
@@ -77,21 +80,25 @@ function frameNumber(value: unknown, minimum: number, maximum: number): number {
   if (!Number.isInteger(frame)) invalid('Los límites de escena deben ser fotogramas enteros.');
   return frame;
 }
-function editScenes(value: unknown, count: number, ad: boolean): EditScene[] {
-  if (!Array.isArray(value) || value.length < 2 || value.length > (ad ? 12 : 6) || count < 900 || count > 1350) {
+function editScenes(value: unknown, count: number, ad: boolean, sourceIds?: ReadonlySet<string>): EditScene[] {
+  const minimum = sourceIds && !ad ? 30 : 900;
+  const maximum = sourceIds && !ad ? MAX_SEGMENT_SECONDS * 30 : 1350;
+  const sceneLimit = ad ? 12 : sourceIds ? 32 : 6;
+  if (!Array.isArray(value) || value.length < 2 || value.length > sceneLimit || count < minimum || count > maximum) {
     invalid('La cantidad de escenas o la duración no corresponde al montaje.');
   }
   let last = 0, total = 0, labels = 0;
   const scenes = value.map((entry: unknown): EditScene => {
-    const item = object(entry, ['source_start_frame', 'source_end_frame', 'audio_source_start_frame', 'label']);
-    const start = frameNumber(item.source_start_frame, ad ? 0 : last, MAX_SEGMENT_SECONDS * 30 - 15);
+    const item = object(entry, ['source_start_frame', 'source_end_frame', 'audio_source_start_frame', 'label', ...(sourceIds ? ['source_id'] : [])]);
+    if (sourceIds && (typeof item.source_id !== 'string' || !sourceIds.has(item.source_id))) invalid('La escena no pertenece a una fuente declarada.');
+    const start = frameNumber(item.source_start_frame, ad || sourceIds ? 0 : last, MAX_SEGMENT_SECONDS * 30 - 15);
     const end = frameNumber(item.source_end_frame, start + 15, MAX_SEGMENT_SECONDS * 30);
     last = end;
     total += end - start;
     if (item.audio_source_start_frame !== undefined && !ad) invalid('El audio alternativo requiere un anuncio.');
     const audioStart = item.audio_source_start_frame === undefined ? undefined
       : frameNumber(item.audio_source_start_frame, 0, MAX_SEGMENT_SECONDS * 30 - (end - start));
-    const scene = {source_start_frame: start, source_end_frame: end,
+    const scene = {source_start_frame: start, source_end_frame: end, ...(sourceIds ? {source_id: item.source_id as string} : {}),
       ...(audioStart === undefined ? {} : {audio_source_start_frame: audioStart})};
     if (item.label === undefined) return scene;
     const caption = object(item.label, ['text', 'start_frame', 'end_frame', 'position', 'size']);
@@ -108,12 +115,16 @@ function editScenes(value: unknown, count: number, ad: boolean): EditScene[] {
   });
   if (ad) {
     const sorted = [...scenes].sort((a,b) => a.source_start_frame - b.source_start_frame);
-    if (sorted.some((scene,i) => i > 0 && scene.source_start_frame < sorted[i-1]!.source_end_frame)
+    if (sorted.some((scene,i) => sorted.slice(0,i).some(previous => previous.source_id === scene.source_id && scene.source_start_frame < previous.source_end_frame))
       || !scenes[0]?.label || scenes[0].label.start_frame > 15 || scenes[0].label.end_frame < 60) {
       invalid('El anuncio requiere un gancho al inicio y tramos de origen sin solapamiento.');
     }
   }
-  if (!labels || total !== count) invalid('Los cortes deben sumar la duración del reel y contener al menos un rótulo.');
+  if (sourceIds && !ad && scenes.some((scene, index) => scenes.slice(0,index).some(previous =>
+    previous.source_id === scene.source_id && scene.source_start_frame < previous.source_end_frame && previous.source_start_frame < scene.source_end_frame))) {
+    invalid('Los cortes de una misma fuente no pueden superponerse.');
+  }
+  if (!labels || total !== count) invalid('Los cortes deben sumar la duración del montaje y contener al menos un rótulo.');
   return scenes;
 }
 const socialUrls = {
@@ -177,7 +188,7 @@ function base(value: unknown, stills: boolean): RenderRequest {
   if (resolution !== '1080p' && resolution !== '4k') invalid('La resolución no está permitida.');
   if (resolution === '4k' && plan !== 'Ultra' && plan !== 'Ilimitado') invalid('4K requiere Ultra o Ilimitado.');
   if (format === 'prores4444' && plan !== 'Ilimitado') invalid('ProRes4444 alfa requiere Ilimitado.');
-  const input = object(data.props, ['title', 'subtitle', 'subtitle_size', 'duration_seconds', 'background', 'accent', 'video_path', 'audio_path', 'scenes', 'ad']);
+  const input = object(data.props, ['title', 'subtitle', 'subtitle_size', 'duration_seconds', 'background', 'accent', 'video_path', 'audio_path', 'sources', 'scenes', 'ad']);
   const duration_seconds = numeric(input.duration_seconds, 0.1, durations[plan]);
   const durationInFrames = Math.max(1, Math.round(duration_seconds * 30));
   const props: CompositionProps = {
@@ -189,15 +200,31 @@ function base(value: unknown, stills: boolean): RenderRequest {
   else if (input.subtitle_size !== undefined) invalid('El tamaño del subtítulo no está permitido.');
   if (input.video_path !== undefined) props.video_path = mediaPath(input.video_path, project_id);
   if (input.audio_path !== undefined) props.audio_path = mediaPath(input.audio_path, project_id);
+  if (input.sources !== undefined) {
+    if (!Array.isArray(input.sources) || input.sources.length < 2 || input.sources.length > 32 || props.video_path || props.audio_path) invalid('Las fuentes múltiples requieren entre 2 y 32 materiales independientes.');
+    const ids = new Set<string>(), paths = new Set<string>();
+    props.sources = input.sources.map((entry): RenderSource => {
+      const source = object(entry, ['id', 'video_path', 'audio_path']);
+      if (typeof source.id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(source.id) || ids.has(source.id)) return invalid('La identidad de fuente no es válida.');
+      const video = mediaPath(source.video_path, project_id);
+      if (!new RegExp(`^proyectos/${project_id}/01_raw/${source.id}\\.(mp4|mov|webm)$`, 'u').test(video) || paths.has(video)) return invalid('El vídeo no coincide con la fuente.');
+      ids.add(source.id); paths.add(video);
+      const audio = source.audio_path === undefined ? undefined : mediaPath(source.audio_path, project_id);
+      if (audio && (paths.has(audio) || ![ `proyectos/${project_id}/03_assets/intake-source.wav`, `proyectos/${project_id}/03_assets/intake-source-${source.id}.wav` ].includes(audio))) return invalid('El audio no coincide con la fuente.');
+      if (audio) paths.add(audio);
+      return {id: source.id, video_path: video, ...(audio ? {audio_path: audio} : {})};
+    });
+  }
   if (input.ad !== undefined) {
-    if (format !== 'mp4' || durationInFrames !== 900 || !input.scenes) invalid('El anuncio requiere 30 segundos, escenas y salida MP4.');
+    if (durationInFrames !== 900 || !input.scenes) invalid('El anuncio requiere 30 segundos y escenas.');
     props.ad = scriptedAd(input.ad);
   }
   if (input.scenes !== undefined) {
-    if (Boolean(props.video_path) !== (format === 'mp4')) invalid('El MP4 por escenas requiere vídeo y el ProRes solo contiene la gráfica.');
-    props.scenes = editScenes(input.scenes, durationInFrames, Boolean(props.ad));
+    if (!props.sources && Boolean(props.video_path) !== (format === 'mp4')) invalid('El MP4 por escenas requiere vídeo y el ProRes solo contiene la gráfica.');
+    props.scenes = editScenes(input.scenes, durationInFrames, Boolean(props.ad), props.sources ? new Set(props.sources.map(source => source.id)) : undefined);
   }
-  if (!stills && !props.audio_path) invalid('El render final requiere una pista de audio verificable.');
+  if (props.sources && !props.scenes) invalid('Las fuentes múltiples requieren escenas.');
+  if (!stills && !props.audio_path && !props.sources?.some(source => source.audio_path)) invalid('El render final requiere una pista de audio verificable.');
   return {project_id, job_id, composition: 'AgencyVertical', plan, format, resolution, transparent: format === 'prores4444', props, watermark: plan === 'Free', ...outputDimensions(resolution), fps: 30, durationInFrames};
 }
 export function parseRender(value: unknown): RenderRequest {return base(value, false);}

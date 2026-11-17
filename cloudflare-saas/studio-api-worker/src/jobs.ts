@@ -1,7 +1,9 @@
-import { importSyncKey, signSyncJob, validateSyncJob, type SyncJob } from "../../../src/media/sync-contract.js";
+import { importSyncKey, signSyncJob, signSourceSyncJob, validateSyncJob, type SyncJob } from "../../../src/media/sync-contract.js";
 import type { SqlDatabase } from "./platform.js";
 
 interface OutboxRow { order_id: string; payload: string; attempts: number }
+interface SourceOutboxRow { source_id: string; order_id: string; payload: string; attempts: number }
+type QueueValue = SyncJob | { kind: "production_source"; job: SyncJob };
 export interface JobMessage {
   body: unknown;
   attempts: number;
@@ -10,7 +12,7 @@ export interface JobMessage {
 }
 export interface JobEnv {
   DB: SqlDatabase;
-  JOBS?: { send(message: SyncJob): Promise<void> };
+  JOBS?: { send(message: QueueValue): Promise<void> };
   STUDIO_EDGE_TO_HOMELAB_HMAC_SECRET?: string;
   HOMELAB_SYNC_ORIGIN?: string;
 }
@@ -24,15 +26,15 @@ const queueBudgetMs = 850_000;
 const maxSyncRequests = 45;
 
 async function awaitSync(job: SyncJob, secret: string, send: typeof fetch,
-  budget: { deadline: number; requests: number }): Promise<boolean> {
+  budget: { deadline: number; requests: number }, source = false): Promise<boolean> {
   const key = await importSyncKey(new TextEncoder().encode(secret));
   const deadline = Math.min(Date.now() + syncBudgetMs, budget.deadline);
   while (budget.requests > 0 && Date.now() < deadline) {
-    const signed = await signSyncJob(job, policy, key, String(Math.floor(Date.now() / 1000)));
+    const signed = await (source ? signSourceSyncJob : signSyncJob)(job, policy, key, String(Math.floor(Date.now() / 1000)));
     const remaining = deadline - Date.now();
     if (remaining <= 0) return false;
     budget.requests -= 1;
-    const response = await send(syncUrl, {
+    const response = await send(source ? syncUrl.replace("/v1/sync", "/v2/sync") : syncUrl, {
       method: "POST", redirect: "manual", signal: AbortSignal.timeout(Math.min(30_000, remaining)),
       headers: { "content-type": "application/json", timestamp: signed.timestamp, signature: signed.signature },
       body: Uint8Array.from(signed.body),
@@ -49,6 +51,70 @@ async function awaitSync(job: SyncJob, secret: string, send: typeof fetch,
     await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
   }
   return false;
+}
+
+export async function dispatchSourceOutbox(env: JobEnv): Promise<void> {
+  if (!env.JOBS || env.HOMELAB_SYNC_ORIGIN !== "https://api-studio.e-scale.cl") return;
+  const now = Math.floor(Date.now() / 1000);
+  const rows = await env.DB.withSession("first-primary").prepare(`SELECT q.source_id,s.order_id,q.payload,q.attempts
+    FROM production_source_outbox q JOIN production_sources s ON s.id=q.source_id JOIN orders o ON o.id=s.order_id
+    WHERE q.dispatched_at IS NULL AND q.available_at<=? AND q.synced_at IS NULL AND o.status='queued'
+    ORDER BY o.queue_priority DESC,q.available_at,s.position LIMIT 20`).bind(now).all<SourceOutboxRow>();
+  for (const row of rows.results) {
+    const claim = await env.DB.prepare(`UPDATE production_source_outbox SET available_at=?,attempts=attempts+1
+      WHERE source_id=? AND available_at<=? AND attempts=? AND dispatched_at IS NULL AND synced_at IS NULL`)
+      .bind(now + 60, row.source_id, now, row.attempts).run();
+    if (claim.meta.changes !== 1) continue;
+    try {
+      const job = validateSyncJob(JSON.parse(row.payload), policy);
+      if (job.job_id !== row.order_id || job.asset_id !== row.source_id) continue;
+      await env.JOBS.send({ kind: "production_source", job });
+      await env.DB.prepare("UPDATE production_source_outbox SET dispatched_at=? WHERE source_id=? AND dispatched_at IS NULL")
+        .bind(now, row.source_id).run();
+    } catch { /* El cron reintenta después del vencimiento de la concesión. */ }
+  }
+}
+
+async function syncSource(body: unknown, env: JobEnv, secret: string, send: typeof fetch,
+  budget: { deadline: number; requests: number }): Promise<"ack" | "retry"> {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return "retry";
+  const wrapper = body as Record<string, unknown>;
+  if (Object.keys(wrapper).sort().join(",") !== "job,kind" || wrapper.kind !== "production_source") return "retry";
+  const job = validateSyncJob(wrapper.job, policy);
+  const claim = await env.DB.withSession("first-primary").prepare(`SELECT o.status,u.status AS usage_status,q.payload,q.synced_at
+    FROM production_source_outbox q JOIN production_sources s ON s.id=q.source_id
+    JOIN production_source_uploads upload ON upload.source_id=s.id
+    JOIN orders o ON o.id=s.order_id JOIN usage_ledger u ON u.order_id=o.id AND u.user_id=o.user_id
+    WHERE s.id=? AND o.id=? AND upload.status='completed'`)
+    .bind(job.asset_id, job.job_id).first<{ status: string; usage_status: string; payload: string; synced_at: number | null }>();
+  if (!claim || claim.status === "cancelled" || claim.synced_at !== null) return "ack";
+  if (claim.status !== "queued" || claim.usage_status !== "reserved" ||
+    JSON.stringify(validateSyncJob(JSON.parse(claim.payload), policy)) !== JSON.stringify(job)) return "retry";
+  if (!await awaitSync(job, secret, send, budget, true)) return "retry";
+  const ready = `EXISTS (SELECT 1 FROM production_sources s WHERE s.order_id=?)
+    AND NOT EXISTS (SELECT 1 FROM production_sources s LEFT JOIN production_source_uploads up ON up.source_id=s.id
+      LEFT JOIN production_source_outbox pending ON pending.source_id=s.id WHERE s.order_id=?
+        AND (up.status IS NULL OR up.status<>'completed' OR pending.synced_at IS NULL))`;
+  const now = Math.floor(Date.now() / 1000);
+  const saved = await env.DB.batch([
+    env.DB.prepare(`UPDATE production_source_outbox SET synced_at=? WHERE source_id=? AND synced_at IS NULL
+    AND payload=? AND EXISTS (SELECT 1 FROM production_sources s JOIN orders o ON o.id=s.order_id
+      JOIN usage_ledger u ON u.order_id=o.id AND u.user_id=o.user_id
+      WHERE s.id=? AND o.id=? AND o.status='queued' AND u.status='reserved')`)
+      .bind(now, job.asset_id, claim.payload, job.asset_id, job.job_id),
+    env.DB.prepare(`UPDATE usage_ledger SET status='consumed',updated_at=? WHERE order_id=? AND status='reserved'
+      AND EXISTS (SELECT 1 FROM orders o WHERE o.id=usage_ledger.order_id AND o.status='queued') AND ${ready}`)
+      .bind(now, job.job_id, job.job_id, job.job_id),
+    env.DB.prepare(`UPDATE orders SET status='processing',updated_at=? WHERE id=? AND status='queued'
+      AND EXISTS (SELECT 1 FROM usage_ledger u WHERE u.order_id=orders.id AND u.user_id=orders.user_id AND u.status='consumed')
+      AND ${ready}`).bind(now, job.job_id, job.job_id, job.job_id),
+  ]);
+  if (saved[0]?.meta.changes === 1) return "ack";
+  const current = await env.DB.withSession("first-primary").prepare(`SELECT q.synced_at,o.status
+    FROM production_source_outbox q JOIN production_sources s ON s.id=q.source_id
+    JOIN orders o ON o.id=s.order_id WHERE q.source_id=? AND o.id=?`)
+    .bind(job.asset_id, job.job_id).first<{ synced_at: number | null; status: string }>();
+  return !current || current.status === "cancelled" || current.synced_at !== null ? "ack" : "retry";
 }
 
 export async function dispatchOutbox(env: JobEnv, orderId?: string): Promise<void> {
@@ -87,6 +153,11 @@ export async function syncQueue(messages: JobMessage[], env: JobEnv, send: typeo
       continue;
     }
     try {
+      if (message.body && typeof message.body === "object" && "kind" in message.body &&
+          (message.body as { kind?: unknown }).kind === "production_source") {
+        if (await syncSource(message.body, env, secret, send, budget) === "ack") message.ack(); else retry();
+        continue;
+      }
       const job = validateSyncJob(message.body, policy);
       const claim = await env.DB.withSession("first-primary").prepare(`SELECT o.status,u.status AS usage_status,j.payload
         FROM orders o JOIN usage_ledger u ON u.order_id=o.id JOIN job_outbox j ON j.order_id=o.id WHERE o.id=?`)

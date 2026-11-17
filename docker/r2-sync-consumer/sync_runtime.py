@@ -19,8 +19,8 @@ from pathlib import Path
 CODE_DIR = Path(__file__).absolute().parent
 HELPER_PINS = {
     "sync_storage.py": "b28b137b38039309bc86f3b4e4b7afd74d1f8515cc0b8241a15d9de0a7c45023",
-    "sync_ledger.py": "5759d30fe8ff94f64f3e030ddbddfc7c419859806c50f3045991bf31a181094e",
-    "sync_protocol.py": "4839968c238d50bb84fb7e71dd0693399cb8af9b050587bec349aa5ea02209a8",
+    "sync_ledger.py": "39c1e35120f63b337c50d9576793239ee28342603112c635e75428b3a92ccd2e",
+    "sync_protocol.py": "f15902a5798fa0efc43239284d3243a1c7175dd29c3163954146578da30ba312",
     "r2_client.py": "aa1f2da7b959e72941a94dade981bad6d5f567449b62dfff29175003b3ea5377",
 }
 CODE_FILES = frozenset((*HELPER_PINS, "sync_runtime.py", "sync_http.py"))
@@ -91,7 +91,7 @@ sys.path.insert(0, str(CODE_DIR))
 from r2_client import R2Credentials, R2Error, download  # noqa: E402
 from sync_ledger import Ledger, LedgerError, validate_publication  # noqa: E402
 from sync_ledger import Reservation as Reservation  # noqa: E402
-from sync_protocol import ProtocolError, verify_request  # noqa: E402
+from sync_protocol import ProtocolError, verify_request, verify_source_request  # noqa: E402
 from sync_storage import Publication as Publication  # noqa: E402
 from sync_storage import RootProof, StorageError, SyncStorage  # noqa: E402
 
@@ -281,8 +281,8 @@ class Runtime:
     def max_object_bytes(self):
         return self.config.max_object_bytes
 
-    def ledger(self):
-        return Ledger(self.config.state_root, self.config.state_proof)
+    def ledger(self, *, multi_source=False):
+        return Ledger(self.config.state_root, self.config.state_proof, multi_source=multi_source)
 
     def storage(self):
         return SyncStorage(
@@ -340,7 +340,10 @@ def decode_envelope(raw, runtime, now_seconds):
         body = base64.b64decode(value["body"], validate=True)
         if base64.b64encode(body).decode("ascii") != value["body"]:
             raise ValueError
-        return verify_request(
+        verifier = (
+            verify_source_request if str(value["signature"]).startswith("v2=") else verify_request
+        )
+        return verifier(
             body,
             value["timestamp"],
             value["signature"],
@@ -415,7 +418,11 @@ def process_envelope(
     now_seconds=lambda: int(time.time()),
 ):
     verified = decode_envelope(raw, runtime, now_seconds)
-    ledger = runtime.ledger() if ledger is None else ledger
+    ledger = (
+        (runtime.ledger(multi_source=True) if verified.protocol == "v2" else runtime.ledger())
+        if ledger is None
+        else ledger
+    )
     storage_factory = runtime.storage if storage_factory is None else storage_factory
     value = asdict(verified.job)
     try:
@@ -751,15 +758,19 @@ def main(argv=None):
     import signal
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("worker", "init-db"))
+    parser.add_argument("mode", choices=("worker", "init-db", "init-source-db", "check-source-db"))
     parser.add_argument("--config", required=True)
     args = parser.parse_args(argv)
     try:
         guard_code(CODE_DIR)
         runtime = load_runtime(args.config)
-        if args.mode == "init-db":
-            runtime.ledger().initialize()
+        if args.mode in ("init-db", "init-source-db"):
+            runtime.ledger(multi_source=args.mode == "init-source-db").initialize()
             sys.stdout.write('{"status":"initialized"}\n')
+            return 0
+        if args.mode == "check-source-db":
+            runtime.ledger(multi_source=True).check()
+            sys.stdout.write('{"status":"ready"}\n')
             return 0
         signal.signal(signal.SIGTERM, _cancel_worker)
         signal.signal(signal.SIGINT, _cancel_worker)

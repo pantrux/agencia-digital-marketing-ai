@@ -16,7 +16,7 @@ export interface KitsEnv {
   BILLING_MODE: KitMode;
   MEDIA: {
     head(key: string): Promise<KitObject | null>;
-    get(key: string): Promise<(KitObject & { body: ReadableStream }) | null>;
+    get(key: string, options?: { range: { offset: number; length: number } }): Promise<(KitObject & { body: ReadableStream }) | null>;
   };
 }
 
@@ -97,6 +97,57 @@ export function kitView(kit: KitRow): DeliveryKit {
     ...(kit.prores_bytes === null ? {} : { prores: { bytes: kit.prores_bytes, url: ROOT + "/" + kit.id + "/prores" } }) };
 }
 
+function videoEntry(bytes: Uint8Array, kitSize: number): { offset: number; size: number } {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.length < 30 || view.getUint32(0, true) !== 0x04034b50 ||
+      view.getUint16(8, true) !== 0 || (view.getUint16(6, true) & 9) !== 0) {
+    deny(409, "VIDEO_NO_DISPONIBLE");
+  }
+  const nameLength = view.getUint16(26, true);
+  const extraLength = view.getUint16(28, true);
+  const offset = 30 + nameLength + extraLength;
+  if (offset > bytes.length || new TextDecoder().decode(bytes.subarray(30, 30 + nameLength)) !== "01-video.mp4") {
+    deny(409, "VIDEO_NO_DISPONIBLE");
+  }
+  let size = view.getUint32(22, true);
+  if (size === 0xffffffff) {
+    let cursor = 30 + nameLength;
+    let found = false;
+    while (cursor + 4 <= offset) {
+      const type = view.getUint16(cursor, true), length = view.getUint16(cursor + 2, true);
+      cursor += 4;
+      if (cursor + length > offset) deny(409, "VIDEO_NO_DISPONIBLE");
+      if (type === 1 && length >= 16) {
+        const uncompressed = view.getBigUint64(cursor, true);
+        const compressed = view.getBigUint64(cursor + 8, true);
+        if (uncompressed !== compressed || uncompressed > BigInt(Number.MAX_SAFE_INTEGER)) deny(409, "VIDEO_NO_DISPONIBLE");
+        size = Number(uncompressed);
+        found = true;
+        break;
+      }
+      cursor += length;
+    }
+    if (!found) deny(409, "VIDEO_NO_DISPONIBLE");
+  } else if (size !== view.getUint32(18, true)) deny(409, "VIDEO_NO_DISPONIBLE");
+  if (!Number.isSafeInteger(size) || size <= 0 || offset + size > kitSize) deny(409, "VIDEO_NO_DISPONIBLE");
+  return { offset, size };
+}
+
+function videoRange(value: string | null, size: number): { start: number; end: number; partial: boolean } {
+  if (!value) return { start: 0, end: size - 1, partial: false };
+  const match = /^bytes=(\d*)-(\d*)$/u.exec(value);
+  if (!match || (!match[1] && !match[2])) throw new HttpError(416, "RANGO_INVALIDO");
+  const suffix = match[1] === "";
+  const first = Number(suffix ? match[2] : match[1]);
+  const last = match[2] && !suffix ? Number(match[2]) : size - 1;
+  if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last) || first < 0 ||
+      (suffix && first === 0)) throw new HttpError(416, "RANGO_INVALIDO");
+  const start = suffix ? Math.max(0, size - first) : first;
+  const end = Math.min(size - 1, last);
+  if (start >= size || start > end) throw new HttpError(416, "RANGO_INVALIDO");
+  return { start, end, partial: true };
+}
+
 function metadata(object: KitObject | null, key: string, bytes: number, digest: string): object is KitObject & { version: string } {
   return object !== null && object.key === key && object.size === bytes
     && object.customMetadata?.sha256 === digest && objectIdentity.test(object.etag)
@@ -172,7 +223,7 @@ export async function completeOrderWithKit(env: KitsEnv, input: ApprovedKitInput
   }
   const scope = `o.id=? AND o.user_id=? AND COALESCE(o.provider_mode,'production')=? AND o.kind='production'
     AND o.output_format=?
-    AND EXISTS (SELECT 1 FROM upload_sessions s WHERE s.order_id=o.id AND s.user_id=o.user_id
+    AND EXISTS (SELECT 1 FROM production_primary_sources s WHERE s.order_id=o.id AND s.user_id=o.user_id
       AND s.id=? AND s.sha256=? AND s.status='completed')
     AND EXISTS (SELECT 1 FROM usage_ledger u WHERE u.order_id=o.id AND u.user_id=o.user_id AND u.status='consumed')
     AND NOT EXISTS (SELECT 1 FROM production_manual_reviews r WHERE r.order_id=o.id)`;
@@ -220,6 +271,73 @@ export async function completeOrderWithKit(env: KitsEnv, input: ApprovedKitInput
   return publicationResult(selected?.results[0] as KitRow | undefined ?? null, Boolean(limit?.results.length), input, object, graphic);
 }
 
+/** Registra otra entrega sin alterar la original; el caller autentica al productor y su dictamen. */
+export async function publishRevisionKit(env: KitsEnv, input: ApprovedKitInput & {
+  revisionId:string; lease:string; prores?:{bytes:number; sha256:string};
+}): Promise<DeliveryKit> {
+  const {id,orderId,userId,title,bytes,sha256:digest,durationMs,revisionId,lease,prores,uploadId,sourceSha256} = input;
+  const billing = mode(env.BILLING_MODE);
+  validateKit(input);
+  if (!validId(id) || !validId(orderId) || !validId(userId) || !validId(revisionId) || !validId(lease)
+    || !validId(uploadId) || !sha256.test(sourceSha256)
+    || durationMs === undefined || (prores && (!Number.isSafeInteger(prores.bytes) || prores.bytes < 1
+      || prores.bytes > MAX_BYTES || !sha256.test(prores.sha256)))) deny(422,"KIT_DATOS_INVALIDOS");
+  const now = Math.floor(Date.now()/1000);
+  const state = await openRead(env).prepare(`SELECT r.status,r.result_kit_id FROM delivery_revision_requests r
+    JOIN orders o ON o.id=r.order_id AND o.user_id=r.user_id
+    WHERE r.id=? AND r.order_id=? AND r.user_id=? AND o.status='completed'
+      AND COALESCE(o.provider_mode,'production')=? AND o.output_format=?
+      AND EXISTS (SELECT 1 FROM production_primary_sources s WHERE s.order_id=o.id AND s.user_id=o.user_id
+        AND s.id=? AND s.sha256=? AND s.status='completed')
+      AND EXISTS (SELECT 1 FROM usage_ledger u WHERE u.order_id=o.id AND u.user_id=o.user_id AND u.status='consumed')`)
+    .bind(revisionId,orderId,userId,billing,prores ? "prores4444" : "mp4",uploadId,sourceSha256)
+    .first<{status:string; result_kit_id:string | null}>();
+  if (!state) deny(404,"REVISION_NO_ENCONTRADA");
+  if (state.status === "completed" && state.result_kit_id !== id) deny(409,"KIT_PUBLICACION_EN_CONFLICTO");
+  const key = deliveryKitKey(billing,orderId,id);
+  const object = await env.MEDIA.head(key);
+  if (!metadata(object,key,bytes,digest)) deny(409,"KIT_OBJETO_CAMBIO");
+  let graphic = noGraphic;
+  if (prores) {
+    const movieKey = deliveryKitKey(billing,orderId,id,"mov");
+    const movie = await env.MEDIA.head(movieKey);
+    if (!metadata(movie,movieKey,prores.bytes,prores.sha256)) deny(409,"KIT_OBJETO_CAMBIO");
+    graphic = [prores.bytes,prores.sha256,movie.etag,movie.version];
+  }
+  if (state.status === "completed") {
+    const saved = await openRead(env).prepare(published + " AND k.id=?").bind(userId,billing,billing,id).first<KitRow>();
+    return publicationResult(saved,false,input,object,graphic);
+  }
+  const scope = `o.id=? AND o.user_id=? AND COALESCE(o.provider_mode,'production')=? AND o.kind='production'
+    AND o.status='completed' AND o.output_format=?
+    AND EXISTS (SELECT 1 FROM production_primary_sources s WHERE s.order_id=o.id AND s.user_id=o.user_id
+      AND s.id=? AND s.sha256=? AND s.status='completed')
+    AND EXISTS (SELECT 1 FROM usage_ledger u WHERE u.order_id=o.id AND u.user_id=o.user_id AND u.status='consumed')
+    AND EXISTS (SELECT 1 FROM delivery_revision_requests r
+      WHERE r.id=? AND r.order_id=o.id AND r.user_id=o.user_id AND r.status='processing'
+        AND r.lease=? AND r.lease_until>? AND r.base_kit_id<>?)`;
+  const scoped = [orderId,userId,billing,prores ? "prores4444" : "mp4",uploadId,sourceSha256,revisionId,lease,now,id] as const;
+  const quota = storageQuotaArguments(bytes+(prores?.bytes ?? 0),now);
+  const insert = env.DB.prepare(`INSERT INTO delivery_kits(id,order_id,user_id,provider_mode,title,bytes,sha256,r2_etag,r2_version,
+    created_at,duration_ms,prores_bytes,prores_sha256,prores_r2_etag,prores_r2_version)
+    SELECT ?,o.id,o.user_id,?,?,?,?,?,?,?,?,?,?,?,? ${ordersWithPlan} WHERE ${scope}
+      AND ${storageFits} ON CONFLICT(id) DO NOTHING`)
+    .bind(id,billing,title,bytes,digest,object.etag,object.version,now,durationMs,...graphic,...scoped,...quota);
+  const finish = env.DB.prepare(`UPDATE delivery_revision_requests AS r SET status='completed',result_kit_id=?,
+    lease=NULL,lease_until=NULL,updated_at=? WHERE r.id=? AND r.order_id=? AND r.user_id=?
+    AND r.status='processing' AND r.lease=? AND r.lease_until>? AND EXISTS (SELECT 1 FROM delivery_kits k
+      WHERE k.id=? AND k.order_id=r.order_id AND k.user_id=r.user_id AND k.provider_mode=? AND k.title=?
+        AND k.bytes=? AND k.sha256=? AND k.r2_etag=? AND k.r2_version=? AND k.duration_ms=?
+        AND k.prores_bytes IS ? AND k.prores_sha256 IS ? AND k.prores_r2_etag IS ? AND k.prores_r2_version IS ?)`)
+    .bind(id,now,revisionId,orderId,userId,lease,now,id,billing,title,bytes,digest,object.etag,object.version,durationMs,...graphic);
+  const select = env.DB.prepare(published + " AND k.id=?").bind(userId,billing,billing,id);
+  const completed = env.DB.prepare("SELECT result_kit_id FROM delivery_revision_requests WHERE id=? AND status='completed' AND result_kit_id=?")
+    .bind(revisionId,id);
+  const [, , selected, done] = await env.DB.batch<KitRow | {result_kit_id:string}>([insert,finish,select,completed]);
+  if (!done?.results.length) deny(409,"REVISION_NO_PUBLICADA");
+  return publicationResult(selected?.results[0] as KitRow | undefined ?? null,false,input,object,graphic);
+}
+
 export function prepareKits(db: SqlSession, owner: SqlOwner | string, env: KitsEnv, now: number) {
   const billing = mode(env.BILLING_MODE);
   return prepareOwnedStatement(db, owner, selectPublished(ownerId) + " " + withinRetention + " ORDER BY k.created_at DESC,k.id DESC LIMIT ?",
@@ -243,7 +361,8 @@ export async function handleKits(request: Request, env: KitsEnv, userId: string,
   const parts = path.split("/");
   const id = parts[3];
   const prores = parts[4] === "prores";
-  if (parts.length !== 5 || parts[1] !== "api" || parts[2] !== "kits" || (!prores && parts[4] !== "download")
+  const video = parts[4] === "video";
+  if (parts.length !== 5 || parts[1] !== "api" || parts[2] !== "kits" || (!prores && !video && parts[4] !== "download")
     || id === undefined || !validId(id)) deny(404, "KIT_NO_ENCONTRADO");
   if (request.method !== "GET" && request.method !== "HEAD") deny(405, "METODO_NO_PERMITIDO");
   const kit = await openRead(env).prepare(published + " " + withinRetention + " AND k.id=?")
@@ -255,6 +374,29 @@ export async function handleKits(request: Request, env: KitsEnv, userId: string,
   const etag = prores ? kit.prores_r2_etag : kit.r2_etag;
   const version = prores ? kit.prores_r2_version : kit.r2_version;
   const key = deliveryKitKey(billing, kit.order_id, id, prores ? "mov" : "zip");
+  if (video) {
+    const header = await env.MEDIA.get(key, { range: { offset: 0, length: Math.min(kit.bytes, 4096) } });
+    if (!metadata(header, key, kit.bytes, kit.sha256) || header.etag !== kit.r2_etag || header.version !== kit.r2_version) {
+      await header?.body.cancel();
+      deny(409, "KIT_OBJETO_CAMBIO");
+    }
+    const entry = videoEntry(new Uint8Array(await new Response(header.body).arrayBuffer()), kit.bytes);
+    const range = videoRange(request.headers.get("range"), entry.size);
+    const length = range.end - range.start + 1;
+    const resultHeaders = new Headers({
+      "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+      "Cross-Origin-Resource-Policy": "same-origin", "Content-Type": "video/mp4",
+      "Content-Length": String(length), "Accept-Ranges": "bytes",
+    });
+    if (range.partial) resultHeaders.set("Content-Range", `bytes ${range.start}-${range.end}/${entry.size}`);
+    if (request.method === "HEAD") return new Response(null, { status: range.partial ? 206 : 200, headers: resultHeaders });
+    const object = await env.MEDIA.get(key, { range: { offset: entry.offset + range.start, length } });
+    if (!metadata(object, key, kit.bytes, kit.sha256) || object.etag !== kit.r2_etag || object.version !== kit.r2_version) {
+      await object?.body.cancel();
+      deny(409, "KIT_OBJETO_CAMBIO");
+    }
+    return new Response(object.body, { status: range.partial ? 206 : 200, headers: resultHeaders });
+  }
   const object = await (request.method === "HEAD" ? env.MEDIA.head(key) : env.MEDIA.get(key));
   const body = object && "body" in object ? object.body as ReadableStream : null;
   if (!metadata(object, key, bytes, digest) || object.etag !== etag

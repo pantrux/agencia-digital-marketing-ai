@@ -77,6 +77,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
   const prores = options.format === 'prores4444';
   const calls: string[][] = [];
   const captures: (number[] | null)[] = [];
+  const conformed: boolean[] = [];
   const duration = options.duration ?? 3;
   const count = duration * 30;
   const sourceCount = Math.floor(duration * 30000 / 1001);
@@ -84,6 +85,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
     verifyTools: async () => {}, verifyMapping: async () => {},
     scene: async (options, frames) => {
       captures.push(frames);
+      conformed.push(options.preconformed === true);
       const files = (frames ?? [0]).map(frame => path.join(options.scratch, frames ? `still-${frame}.png` : 'frame-0.png'));
       for (const file of files) await writeFile(file, 'imagen');
       return {files, frameCount: frames?.length ?? count};
@@ -121,7 +123,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
       return {stdout: '', stderr: ''};
     },
   });
-  return {root, nas, backend, calls, captures};
+  return {root, nas, backend, calls, captures, conformed};
 }
 test('salud no disponible antes de pruebas y publicación solo después de medición final aceptada', async () => {
   const fixture = await setup(false);
@@ -135,6 +137,46 @@ test('salud no disponible antes de pruebas y publicación solo después de medic
     await access(path.join(fixture.nas, result.files[0]!.path));
     assert.equal(result.audio.true_peak_dbtp, -1.4);
   } finally {await rm(fixture.root, {recursive: true, force: true});}
+});
+
+test('renderiza una escaleta con dos fuentes verificadas sin volver a cortar el montaje', async () => {
+  const fixture = await setup(false, {duration:30});
+  const first = '11111111-1111-4111-8111-111111111111', second = '22222222-2222-4222-8222-222222222222';
+  const raw = path.join(fixture.nas, 'proyectos', 'sansevieras', '01_raw');
+  const assets = path.join(fixture.nas, 'proyectos', 'sansevieras', '03_assets');
+  try {
+    await mkdir(raw, {recursive:true});
+    await writeFile(path.join(raw, `${first}.mp4`), 'primer video');
+    await writeFile(path.join(raw, `${second}.mp4`), 'segundo video');
+    await writeFile(path.join(assets, 'intake-source.wav'), 'primer audio');
+    await writeFile(path.join(assets, `intake-source-${second}.wav`), 'segundo audio');
+    const sources = [
+      {id:first,video_path:`proyectos/sansevieras/01_raw/${first}.mp4`,audio_path:'proyectos/sansevieras/03_assets/intake-source.wav'},
+      {id:second,video_path:`proyectos/sansevieras/01_raw/${second}.mp4`,audio_path:`proyectos/sansevieras/03_assets/intake-source-${second}.wav`},
+    ];
+    const payload = {project_id:'sansevieras',job_id:'multiple',composition:'AgencyVertical',plan:'Free',props:{
+      title:'Montaje',duration_seconds:30,sources,scenes:[
+        {source_id:second,source_start_frame:0,source_end_frame:300,label:{text:'Inicio',start_frame:0,end_frame:90,position:'top'}},
+        {source_id:first,source_start_frame:0,source_end_frame:600},
+      ],
+    }};
+    const edit = parseRender(payload);
+    await fixture.backend.initialize();
+    const result = await fixture.backend.render(edit, new AbortController().signal);
+    assert.equal(result.audio_verified, true);
+    const assembled = fixture.calls.find(args => path.basename(args.at(-1)!) === 'montaje-multiple.mp4');
+    assert.ok(assembled?.some(arg => arg.endsWith(`${first}.mp4`)));
+    assert.ok(assembled?.some(arg => arg.endsWith(`${second}.mp4`)));
+    const audio = fixture.calls.find(args => args.at(-1)?.endsWith('audio.wav') && args.includes('-filter_complex'));
+    assert.ok(audio?.some(arg => arg.endsWith(`intake-source-${second}.wav`)));
+    const final = fixture.calls.find(args => path.basename(args.at(-1)!) === 'master.mp4');
+    assert.ok(final?.some(arg => path.basename(arg) === 'montaje-multiple.mp4'));
+    assert.ok(!final?.some(arg => arg.includes('trim=start_frame')));
+    const preview = await fixture.backend.stills(parseStills({...payload,frames:[0,300]}), new AbortController().signal);
+    assert.deepEqual(preview.frames, [0,300]);
+    assert.equal(fixture.conformed.at(-1), true);
+    assert.ok(fixture.calls.some(args => path.basename(args.at(-1)!) === 'vista-previa-multiple.mp4'));
+  } finally { await rm(fixture.root, {recursive:true, force:true}); }
 });
 
 test('el ProRes por escenas codifica una vez cada estado del rótulo y sincroniza el MOV de 45 segundos', async () => {

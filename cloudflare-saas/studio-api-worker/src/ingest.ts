@@ -65,6 +65,7 @@ interface OrderWithReservation {
   id: string;
   project_slug: string;
   reserved: number;
+  has_source_set: number;
 }
 
 interface UploadRow {
@@ -178,7 +179,8 @@ async function createUpload(
   }
   const { order_id, project_slug, extension, bytes, sha256, content_type } = input;
   const orderLookup = (db: SqlSession) => prepareOwnedStatement(db, owner, `
-    SELECT o.id, o.project_slug, CASE WHEN o.status = 'queued' AND u.status = 'reserved' THEN 1 ELSE 0 END AS reserved
+    SELECT o.id, o.project_slug, CASE WHEN o.status = 'queued' AND u.status = 'reserved' THEN 1 ELSE 0 END AS reserved,
+      EXISTS(SELECT 1 FROM production_source_sets s WHERE s.order_id=o.id) AS has_source_set
     FROM orders o LEFT JOIN usage_ledger u ON u.order_id = o.id AND u.user_id = o.user_id
     WHERE o.id = ? AND o.user_id = ${ownerId} AND o.kind = 'production'
       AND COALESCE(o.provider_mode, 'production') = ?`, order_id, env.BILLING_MODE);
@@ -207,6 +209,7 @@ async function createUpload(
     JOIN plan_quotas p ON p.plan_id = o.plan_id
     WHERE o.id = ? AND o.user_id = ${ownerId} AND o.project_slug = ? AND o.kind = 'production' AND o.status = 'queued'
       AND u.status = 'reserved' AND COALESCE(o.provider_mode, 'production') = ?
+      AND NOT EXISTS (SELECT 1 FROM production_source_sets s WHERE s.order_id=o.id)
       AND ${storageFits}
     ON CONFLICT(order_id) DO NOTHING
   `, id, key, job.sha256, job.bytes, content_type, extension, operation,
@@ -223,6 +226,7 @@ async function createUpload(
   if (!matched || !inserted || !found) return fail(503, "SUBIDA_NO_DISPONIBLE");
   const order = matched.results[0];
   if (!order || !("reserved" in order) || order.project_slug !== job.project_slug) return fail(404, "ORDEN_NO_ENCONTRADA");
+  if ("has_source_set" in order && order.has_source_set) return fail(409, "MATERIALES_EN_PREPARACION");
   const row = found.results[0];
   if (!row) return fail(409, order.reserved ? "ALMACENAMIENTO_AGOTADO" : "ORDEN_NO_RESERVADA");
   if (!("status" in row)) return fail(503, "SUBIDA_NO_DISPONIBLE");
@@ -317,14 +321,18 @@ async function boundedXml(remote: Response): Promise<string> {
 }
 
 async function listParts(env: IngestEnv, row: UploadRow & { upload_id: string }): Promise<Part[]> {
-  const signed = await signR2ListParts(syncJob(row), { maxObjectBytes }, credentials(env), amzDate(), row.upload_id);
+  return listMultipartParts(env, syncJob(row), row.upload_id);
+}
+
+export async function listMultipartParts(env: IngestEnv, job: Readonly<SyncJob>, uploadId: string): Promise<Part[]> {
+  const signed = await signR2ListParts(job, { maxObjectBytes }, credentials(env), amzDate(), uploadId);
   const remote = await fetch(signed.url, { headers: { ...signed.headers }, redirect: "manual", signal: AbortSignal.timeout(15000) });
   if (remote.status === 404) return fail(409, "R2_MULTIPART_AUSENTE");
   if (!remote.ok) return fail(503, "R2_NO_DISPONIBLE");
   return parseListedParts(await boundedXml(remote));
 }
 
-function requestedParts(body: Plain, count: number): RequestedPart[] {
+export function requestedParts(body: Plain, count: number): RequestedPart[] {
   if (!hasOnly(body, ["parts"]) || !Array.isArray(body.parts) || body.parts.length !== count) {
     return fail(422, "SUBIDA_PARTES");
   }
@@ -374,7 +382,7 @@ function isOwnObject(object: ObjectMetadata, row: UploadRow): boolean {
 }
 
 type DigestWriter = WritableStream & { digest: Promise<ArrayBuffer> };
-async function verifyDigest(body: ReadableStream, expected: string): Promise<boolean> {
+export async function verifyDigest(body: ReadableStream, expected: string): Promise<boolean> {
   const implementation = crypto as Crypto & { DigestStream?: new (name: string) => DigestWriter };
   if (!implementation.DigestStream) {
     await body.cancel();
@@ -415,8 +423,11 @@ export async function expireAbandonedReservations(env: IngestEnv): Promise<void>
     AND COALESCE(o.provider_mode, 'production') = ? AND o.created_at <= ?
     AND NOT EXISTS (SELECT 1 FROM job_outbox j WHERE j.order_id = o.id)
     AND NOT EXISTS (SELECT 1 FROM upload_sessions s WHERE s.order_id = o.id
-      AND (s.status NOT IN ('creating', 'open', 'aborting') OR s.expires_at > ? OR s.lease_until > ?))`;
-  const scope = [env.BILLING_MODE, now - sessionTtl, now, now] as const;
+      AND (s.status NOT IN ('creating', 'open', 'aborting') OR s.expires_at > ? OR s.lease_until > ?))
+    AND NOT EXISTS (SELECT 1 FROM production_sources source JOIN production_source_uploads upload ON upload.source_id=source.id
+      WHERE source.order_id=o.id AND (upload.status NOT IN ('creating', 'open', 'aborting')
+        OR upload.expires_at > ? OR upload.lease_until > ?))`;
+  const scope = [env.BILLING_MODE, now - sessionTtl, now, now, now, now] as const;
   const due = await env.DB.withSession("first-primary").prepare(`
     SELECT o.id FROM orders o JOIN usage_ledger u ON u.order_id = o.id AND u.user_id = o.user_id
     WHERE ${aged} AND u.status = 'reserved'
@@ -438,6 +449,10 @@ export async function expireAbandonedReservations(env: IngestEnv): Promise<void>
       WHERE order_id IN (${slots}) AND status IN ('creating', 'open', 'aborting')
         AND EXISTS (SELECT 1 FROM orders o JOIN usage_ledger u ON u.order_id = o.id
           WHERE o.id = upload_sessions.order_id AND o.status = 'cancelled' AND u.status = 'released')`).bind(...ids),
+    env.DB.prepare(`UPDATE production_source_uploads SET status='aborted',operation_id=NULL,lease_until=NULL
+      WHERE source_id IN (SELECT source.id FROM production_sources source JOIN orders o ON o.id=source.order_id
+        JOIN usage_ledger u ON u.order_id=o.id WHERE source.order_id IN (${slots})
+          AND o.status='cancelled' AND u.status='released') AND status IN ('creating','open','aborting')`).bind(...ids),
   ]);
 }
 

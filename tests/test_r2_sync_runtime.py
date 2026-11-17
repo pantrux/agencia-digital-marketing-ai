@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import importlib
+import io
 import json
 import os
 import shutil
@@ -25,6 +26,33 @@ R = importlib.import_module("sync_runtime")
 
 SECRET = b"k" * 32
 NOW = 1_799_000_000
+
+
+class SourceLedgerReadinessTest(unittest.TestCase):
+    def test_check_source_db_no_inicializa_ni_modifica_el_ledger(self):
+        events = []
+
+        class Ledger:
+            def check(self):
+                events.append("check")
+
+            def initialize(self):
+                raise AssertionError("La comprobación no debe inicializar")
+
+        class Runtime:
+            def ledger(self, *, multi_source=False):
+                events.append(("ledger", multi_source))
+                return Ledger()
+
+        output = io.StringIO()
+        with (
+            patch.object(R, "guard_code"),
+            patch.object(R, "load_runtime", return_value=Runtime()),
+            patch.object(sys, "stdout", output),
+        ):
+            self.assertEqual(R.main(["check-source-db", "--config", "/privado/config.json"]), 0)
+        self.assertEqual(events, [("ledger", True), "check"])
+        self.assertEqual(json.loads(output.getvalue()), {"status": "ready"})
 
 
 def job():
@@ -157,6 +185,30 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(events, ["lock", "reserve", "unlock"])
         self.assertEqual(result["sha256"], job()["sha256"])
 
+    def test_worker_v2_selecciona_registro_de_fuentes(self):
+        events = []
+        operation = FakeOperation(events, state="completed", is_new=False)
+
+        class Ledger:
+            @contextmanager
+            def operation(self, *_args, **_kwargs):
+                yield operation
+
+        class Runtime(FakeRuntime):
+            def ledger(self, *, multi_source=False):
+                events.append(("ledger", multi_source))
+                return Ledger()
+
+        raw = json.dumps(job(), separators=(",", ":")).encode()
+        digest = hashlib.sha256(raw).hexdigest()
+        mac = hmac.digest(SECRET, f"v2\n{NOW}\nPOST\n/v2/sync\n{digest}".encode(), "sha256").hex()
+        signed = R.encode_envelope(raw, str(NOW), "v2=" + mac, FakeRuntime.snapshot)
+        result = R.process_envelope(
+            Runtime(), signed, storage_factory=lambda: None, now_seconds=lambda: NOW
+        )
+        self.assertEqual(result["status"], "completed")
+        self.assertIn(("ledger", True), events)
+
     def test_pending_previo_reconcilia_antes_de_complete(self):
         _, events = self.drive(is_new=False)
         self.assertLess(events.index("reconcile"), events.index("complete"))
@@ -276,6 +328,31 @@ class HttpTests(unittest.TestCase):
         )
         self.assertNotIn(FakeRuntime.snapshot.encode(), response)
         self.assertEqual(len(calls), 1)
+
+    def test_ruta_multiple_exige_firma_propia_y_usa_registro_separado(self):
+        service, calls = self.service()
+        service.source_ledger = service.ledger
+        raw = json.dumps(job(), separators=(",", ":")).encode()
+        digest = hashlib.sha256(raw).hexdigest()
+        mac = hmac.digest(SECRET, f"v2\n{NOW}\nPOST\n/v2/sync\n{digest}".encode(), "sha256").hex()
+        headers = [
+            ("Host", "localhost"),
+            ("Content-Length", str(len(raw))),
+            ("timestamp", str(NOW)),
+            ("signature", "v2=" + mac),
+        ]
+        response = self.exchange(self.request(raw, headers=headers, path="/v2/sync"), service)
+        self.assertTrue(response.startswith(b"HTTP/1.1 202 "))
+        self.assertEqual(
+            R.decode_envelope(
+                R.encode_envelope(raw, str(NOW), "v2=" + mac, FakeRuntime.snapshot),
+                FakeRuntime(),
+                lambda: NOW,
+            ).protocol,
+            "v2",
+        )
+        response = self.exchange(self.request(raw, headers=headers, path="/v1/sync"), service)
+        self.assertTrue(response.startswith(b"HTTP/1.1 401 "))
 
     def exchange_receipt(self, service, *, status=200):
         until = time.monotonic() + 2

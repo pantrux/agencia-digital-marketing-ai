@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { completeOrderWithKit, deliveryKitKey, handleKits, publishDeliveryKit, type KitsEnv } from "../cloudflare-saas/studio-api-worker/src/kits.js";
+import { completeOrderWithKit, deliveryKitKey, handleKits, publishDeliveryKit, publishRevisionKit, type KitsEnv } from "../cloudflare-saas/studio-api-worker/src/kits.js";
 import { handleKitProducer, kitProducerPath } from "../cloudflare-saas/studio-api-worker/src/kit-producer.js";
+import { claimDeliveryRevision, failDeliveryRevision, handleDeliveryRevisions, renewDeliveryRevision } from "../cloudflare-saas/studio-api-worker/src/delivery-revisions.js";
 import { createHmac } from "node:crypto";
 import type { SqlDatabase, SqlRows, SqlStatement } from "../cloudflare-saas/studio-api-worker/src/platform.js";
 
@@ -62,8 +63,9 @@ function context(): KitsEnv {
 beforeEach(() => {
   db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys=ON");
-  for (const name of ["0001_schema.sql", "0003_delivery_kits.sql", "0007_delivery_duration.sql",
-    "0010_production_manual_review.sql", "0011_production_output_format.sql", "0012_delivery_prores.sql"]) {
+  for (const name of ["0001_schema.sql", "0003_delivery_kits.sql", "0023_production_sources.sql", "0007_delivery_duration.sql",
+    "0010_production_manual_review.sql", "0011_production_output_format.sql", "0012_delivery_prores.sql",
+    "0026_delivery_revision_requests.sql"]) {
     db.exec(readFileSync(new URL("../cloudflare-saas/migrations/" + name, import.meta.url), "utf8"));
   }
   const person = db.prepare("INSERT INTO users (id,google_sub,email) VALUES (?,?,?)");
@@ -77,6 +79,103 @@ beforeEach(() => {
 });
 
 afterEach(() => db.close());
+
+it("protege la entrega original y vincula la revisión solo a su titular y a una nueva entrega", async () => {
+  await publishDeliveryKit(env, input);
+  const revisionId = "00000000-0000-4000-8000-000000000004";
+  const insert = db.prepare(`INSERT INTO delivery_revision_requests
+    (id,order_id,user_id,base_kit_id,request_key,instructions,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,1,1)`);
+  expect(() => insert.run(revisionId, OTHER, "other", KIT, "ajeno", "Cambiar música")).toThrow();
+  insert.run(revisionId, ORDER, "owner", KIT, "primer-ajuste", "Cambiar música");
+  expect(() => insert.run("00000000-0000-4000-8000-000000000005", ORDER, "owner", KIT,
+    "segundo-ajuste", "Cambiar texto")).toThrow();
+  expect(() => db.prepare("UPDATE delivery_revision_requests SET instructions='Otro' WHERE id=?").run(revisionId)).toThrow();
+  db.prepare("UPDATE delivery_revision_requests SET status='processing',updated_at=2,lease='test',lease_until=100,attempts=1 WHERE id=?").run(revisionId);
+  expect(() => db.prepare("UPDATE delivery_revision_requests SET status='completed',result_kit_id=?,lease=NULL,lease_until=NULL,updated_at=3 WHERE id=?")
+    .run(KIT,revisionId)).toThrow();
+  const next = "00000000-0000-4000-8000-000000000006";
+  env.MEDIA.head = vi.fn(async (objectKey) => ({...signedMetadata,key:objectKey}));
+  await publishDeliveryKit(env, {...input,id:next});
+  db.prepare("UPDATE delivery_revision_requests SET status='completed',result_kit_id=?,lease=NULL,lease_until=NULL,updated_at=3 WHERE id=?")
+    .run(next,revisionId);
+  expect(db.prepare("SELECT status,result_kit_id FROM delivery_revision_requests WHERE id=?").get(revisionId))
+    .toEqual({status:"completed",result_kit_id:next});
+  expect(db.prepare("SELECT count(*) AS n FROM delivery_kits WHERE order_id=?").get(ORDER)).toEqual({n:2});
+});
+
+it("registra una solicitud posterior idempotente únicamente para el titular", async () => {
+  await publishDeliveryKit(env,input);
+  const active = {...env,STUDIO_DELIVERY_REVISION_ENABLED:"true"};
+  const request = (instructions="Cambiar la música", key="peticion-1") => new Request("https://studio.invalid/api",{
+    method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":key},
+    body:JSON.stringify({base_kit_id:KIT,instructions}),
+  });
+  await expect(handleDeliveryRevisions(request(),env,"owner",ORDER)).rejects.toMatchObject({status:404});
+  await expect(handleDeliveryRevisions(request(),active,"other",ORDER)).rejects.toMatchObject({status:404});
+  const created = await handleDeliveryRevisions(request(),active,"owner",ORDER);
+  expect(created.status).toBe(201);
+  const payload = await created.json();
+  expect(payload).toMatchObject({revision:{base_kit_id:KIT,status:"pending",instructions:"Cambiar la música"}});
+  expect(await (await handleDeliveryRevisions(request(),active,"owner",ORDER)).json()).toEqual(payload);
+  await expect(handleDeliveryRevisions(request("Otros cambios"),active,"owner",ORDER)).rejects.toMatchObject({status:409});
+  await expect(handleDeliveryRevisions(request("Otros cambios","otra"),active,"owner",ORDER))
+    .rejects.toMatchObject({status:409,code:"AJUSTE_EN_CURSO"});
+  const history = await handleDeliveryRevisions(new Request("https://studio.invalid/api"),active,"owner",ORDER);
+  expect(await history.json()).toEqual({revisions:[payload.revision]});
+  const time = Math.floor(Date.now()/1000);
+  const first = await (await claimDeliveryRevision(active,time)).json();
+  expect(first.revision).toMatchObject({id:payload.revision.id,attempts:1,lease_until:time+3600,base_kit_sha256:SHA});
+  expect(await (await renewDeliveryRevision(active,payload.revision.id,first.revision.lease,time)).json())
+    .toMatchObject({revision:{id:payload.revision.id,lease_until:time+3600}});
+  expect(await (await claimDeliveryRevision(active,time+1)).json()).toEqual({revision:null});
+  expect(await (await renewDeliveryRevision(active,payload.revision.id,first.revision.lease,time+1)).json())
+    .toMatchObject({revision:{id:payload.revision.id,lease_until:time+3601}});
+  expect(await (await claimDeliveryRevision(active,time+3600)).json()).toEqual({revision:null});
+  const retried = await (await claimDeliveryRevision(active,time+3601)).json();
+  expect(retried.revision).toMatchObject({id:payload.revision.id,attempts:2});
+  expect(retried.revision.lease).not.toBe(first.revision.lease);
+  await expect(renewDeliveryRevision(active,payload.revision.id,first.revision.lease,time+3602))
+    .rejects.toMatchObject({status:409,code:"RESERVA_VENCIDA"});
+  await expect(failDeliveryRevision(active,payload.revision.id,first.revision.lease,"quality",time+3602))
+    .rejects.toMatchObject({status:409});
+  expect(await (await failDeliveryRevision(active,payload.revision.id,retried.revision.lease,"quality",time+3602)).json())
+    .toEqual({recorded:true});
+  expect(db.prepare("SELECT status,failure_stage FROM delivery_revision_requests WHERE id=?").get(payload.revision.id))
+    .toEqual({status:"failed",failure_stage:"quality"});
+});
+
+it("reproduce el MP4 del ZIP acreditado con rangos y verifica el titular", async () => {
+  const name = new TextEncoder().encode("01-video.mp4");
+  const payload = new Uint8Array([1, 2, 3, 4, 5, 6]);
+  const zip = new Uint8Array(30 + name.length + payload.length);
+  const header = new DataView(zip.buffer);
+  header.setUint32(0, 0x04034b50, true);
+  header.setUint32(18, payload.length, true);
+  header.setUint32(22, payload.length, true);
+  header.setUint16(26, name.length, true);
+  zip.set(name, 30);
+  zip.set(payload, 30 + name.length);
+  const metadata = { ...signedMetadata, size: zip.length };
+  env.MEDIA.head = vi.fn(async () => metadata);
+  env.MEDIA.get = vi.fn(async (_key, options) => {
+    const range = options?.range;
+    const bytes = range ? zip.slice(range.offset, range.offset + range.length) : zip;
+    return { ...metadata, body: new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(bytes); controller.close(); },
+    }) };
+  });
+  await publishDeliveryKit(env, { ...input, bytes: zip.length });
+  const target = base + "/" + KIT + "/video";
+  const preview = await send("GET", target, "owner", { range: "bytes=1-3" });
+  expect(preview.status).toBe(206);
+  expect(preview.headers.get("content-range")).toBe("bytes 1-3/6");
+  expect(new Uint8Array(await preview.arrayBuffer())).toEqual(new Uint8Array([2, 3, 4]));
+  const head = await send("HEAD", target);
+  expect(head.headers.get("content-length")).toBe("6");
+  await expect(send("GET", target, "other")).rejects.toMatchObject({ status: 404 });
+  await expect(send("GET", target, "owner", { range: "bytes=8-9" })).rejects.toMatchObject({ status: 416 });
+});
 
 function send(method: string, target: string, userId = "owner", headers?: HeadersInit) {
   return handleKits(new Request("https://studio.e-scale.cl" + target, { method, headers: headers ?? {} }),
@@ -198,6 +297,57 @@ function processingOrder(format: "mp4" | "prores4444" = "mp4") {
   return { ...input, userId, orderId, uploadId, sourceSha256: SHA };
 }
 
+it("publica la revisión con reserva vigente y preserva la entrega anterior", async () => {
+  const original = processingOrder();
+  db.exec("UPDATE usage_ledger SET status='consumed'");
+  await completeOrderWithKit(env,{...original,durationMs:30000});
+  const active = {...env,STUDIO_DELIVERY_REVISION_ENABLED:"true"};
+  const req = new Request("https://studio.invalid/api",{method:"POST",
+    headers:{"Content-Type":"application/json","Idempotency-Key":"revision"},
+    body:JSON.stringify({base_kit_id:original.id,instructions:"Cambia la música"})});
+  const created = await (await handleDeliveryRevisions(req,active,original.userId,original.orderId)).json();
+  const claimed = await (await claimDeliveryRevision(active,Math.floor(Date.now()/1000))).json();
+  const next = "00000000-0000-4000-8000-000000000007";
+  const revised = {...original,id:next,durationMs:30000,revisionId:created.revision.id,lease:claimed.revision.lease};
+  await expect(publishRevisionKit(env,{...revised,lease:"00000000-0000-4000-8000-000000000008"}))
+    .rejects.toMatchObject({status:409});
+  expect(db.prepare("SELECT count(*) AS n FROM delivery_kits WHERE order_id=?").get(original.orderId)).toEqual({n:1});
+  const result = await publishRevisionKit(env,revised);
+  expect(result.id).toBe(next);
+  expect(await publishRevisionKit(env,revised)).toEqual(result);
+  expect(db.prepare("SELECT status,result_kit_id FROM delivery_revision_requests WHERE id=?").get(created.revision.id))
+    .toEqual({status:"completed",result_kit_id:next});
+  expect(db.prepare("SELECT count(*) AS n FROM delivery_kits WHERE order_id=?").get(original.orderId)).toEqual({n:2});
+});
+
+it("firma la revisión con el productor y vincula la reserva al manifiesto", async () => {
+  const original = processingOrder();
+  db.exec("UPDATE usage_ledger SET status='consumed'");
+  await completeOrderWithKit(env,{...original,durationMs:30000});
+  const active = {...env,STUDIO_DELIVERY_REVISION_ENABLED:"true",STUDIO_KIT_PRODUCER_HMAC_SECRET:"a".repeat(64)};
+  const userRequest = new Request("https://studio.invalid/api",{method:"POST",
+    headers:{"Content-Type":"application/json","Idempotency-Key":"revision"},
+    body:JSON.stringify({base_kit_id:original.id,instructions:"Cambia el ritmo"})});
+  const created = await (await handleDeliveryRevisions(userRequest,active,original.userId,original.orderId)).json();
+  const claimed = await (await claimDeliveryRevision(active,Math.floor(Date.now()/1000))).json();
+  const id = "00000000-0000-4000-8000-000000000007", timestamp = String(Math.floor(Date.now()/1000));
+  const body = {id,orderId:original.orderId,userId:original.userId,title:original.title,bytes:original.bytes,
+    sha256:original.sha256,uploadId:original.uploadId,sourceSha256:original.sourceSha256,durationMs:30000,
+    revisionId:created.revision.id,lease:claimed.revision.lease};
+  const values = [body.id,body.orderId,body.userId,body.title,body.bytes,body.sha256,body.uploadId,
+    body.sourceSha256,body.durationMs,body.revisionId,body.lease];
+  const signed = JSON.stringify(["studio-kit-v4","POST",kitProducerPath,"sandbox",timestamp,values]);
+  const signature = "v4=" + createHmac("sha256",active.STUDIO_KIT_PRODUCER_HMAC_SECRET).update(signed).digest("hex");
+  const post = (value:object) => new Request("https://studio.invalid"+kitProducerPath,{method:"POST",
+    headers:{"Content-Type":"application/json",timestamp,signature},body:JSON.stringify(value)});
+  await expect(handleKitProducer(post({...body,lease:"00000000-0000-4000-8000-000000000008"}),active))
+    .rejects.toMatchObject({status:401});
+  const result = await (await handleKitProducer(post(body),active)).json();
+  expect(result.kit.id).toBe(id);
+  expect(db.prepare("SELECT result_kit_id FROM delivery_revision_requests WHERE id=?").get(body.revisionId))
+    .toEqual({result_kit_id:id});
+});
+
 it("cierra Ilimitado solo con ZIP y MOV, cuenta ambos archivos y protege la descarga", async () => {
   const approved = processingOrder("prores4444");
   db.exec("UPDATE usage_ledger SET status='consumed'; UPDATE plan_quotas SET storage_bytes=11,storage_limit_bytes=11 WHERE plan_id='ilimitado'");
@@ -233,6 +383,33 @@ it("cierra Ilimitado solo con ZIP y MOV, cuenta ambos archivos y protege la desc
   expect(env.MEDIA.get).toHaveBeenCalledWith(movieKey);
   env.MEDIA.get = vi.fn(async () => ({ ...movie, version: "changed", body: new Response(graphic).body! }));
   await expect(send("GET", route, approved.userId)).rejects.toMatchObject({ status: 409 });
+});
+
+it("reproduce el MP4 de una entrega que también tiene gráfica ProRes", async () => {
+  const approved = processingOrder("prores4444");
+  db.exec("UPDATE usage_ledger SET status='consumed'");
+  const name = new TextEncoder().encode("01-video.mp4"), video = new Uint8Array([5, 6, 7, 8]);
+  const zip = new Uint8Array(30 + name.length + video.length), header = new DataView(zip.buffer);
+  header.setUint32(0, 0x04034b50, true);
+  header.setUint32(18, video.length, true); header.setUint32(22, video.length, true);
+  header.setUint16(26, name.length, true); zip.set(name, 30); zip.set(video, 30 + name.length);
+  const zipKey = deliveryKitKey("sandbox", approved.orderId, approved.id);
+  const movKey = deliveryKitKey("sandbox", approved.orderId, approved.id, "mov");
+  const zipMeta = {...signedMetadata, key:zipKey, size:zip.length};
+  const movMeta = {...signedMetadata, key:movKey, size:4, customMetadata:{sha256:"b".repeat(64)}};
+  env.MEDIA.head = vi.fn(async (objectKey) => objectKey === movKey ? movMeta : zipMeta);
+  const result = await completeOrderWithKit(env, {...approved, bytes:zip.length, durationMs:30000,
+    prores:{bytes:4,sha256:"b".repeat(64)}});
+  expect(result.prores?.url).toBe(`${base}/${KIT}/prores`);
+  env.MEDIA.get = vi.fn(async (_key, options) => {
+    const range = options?.range;
+    const chunk = range ? zip.slice(range.offset, range.offset + range.length) : zip;
+    return {...zipMeta, body:new Response(chunk).body!};
+  });
+  const preview = await send("GET", `${base}/${KIT}/video`, approved.userId, {range:"bytes=1-2"});
+  expect(preview.status).toBe(206);
+  expect(new Uint8Array(await preview.arrayBuffer())).toEqual(new Uint8Array([6,7]));
+  await expect(send("GET", `${base}/${KIT}/video`, "other")).rejects.toMatchObject({status:404});
 });
 
 it("la firma v3 vincula el tamaño y la huella del MOV con la entrega", async () => {
