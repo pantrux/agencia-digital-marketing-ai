@@ -1,9 +1,9 @@
 import {after, mock, test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, writeFile, rm, access} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, rm, access, readFile, stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {RenderBackend} from '../src/backend.ts';
+import {RenderBackend, timelineImages} from '../src/backend.ts';
 import {outputDimensions, parseRender, parseStills, TITLE_FADE_FRAMES, type OutputFormat, type Resolution} from '../src/contracts.ts';
 import type {RuntimeConfig} from '../src/config.ts';
 import {ScratchSpace} from '../src/scratch.ts';
@@ -13,6 +13,23 @@ mock.method(ScratchSpace.prototype, 'ensureSpace', async (bytes: number) => {
   assert.ok(Number.isFinite(bytes) && bytes >= 0);
 });
 after(() => mock.restoreAll());
+
+test('el reel de 45 segundos mantiene los fotogramas transparentes sin superar el límite NTFS', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'rotulos-secundarios-'));
+  try {
+    const title = path.join(root, 'titulo.png'), transparent = path.join(root, 'transparente.png');
+    await writeFile(title, 'título');
+    await writeFile(transparent, 'alfa');
+    const pattern = await timelineImages(root, [0, 90], [title, transparent], 1350, new AbortController().signal);
+    const frame = (index: number) => pattern.replace('%d', String(index));
+    assert.equal(await readFile(frame(89), 'utf8'), 'título');
+    assert.equal(await readFile(frame(90), 'utf8'), 'alfa');
+    assert.equal(await readFile(frame(1349), 'utf8'), 'alfa');
+    for (const index of [90, 602, 1114, 1349]) assert.ok((await stat(frame(index))).nlink <= 513);
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
 
 const request = parseRender({project_id: 'sansevieras', job_id: 'prueba', composition: 'AgencyVertical', plan: 'Free', props: {title: 'Prueba sintética', duration_seconds: 3, audio_path: 'proyectos/sansevieras/03_assets/voz.wav'}});
 async function setup(badPeak: boolean, options: {format?: OutputFormat; resolution?: Resolution; badAlpha?: boolean; failProresProbe?: boolean; missingColor?: boolean; duration?: number; badTiming?: boolean; recoverPeak?: boolean; normalizedVideo?: boolean} = {}) {

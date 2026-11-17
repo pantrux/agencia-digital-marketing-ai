@@ -531,11 +531,7 @@ def prior_rejection(order, brief, revision, output, review):
     return {
         **direction["escaleta"],
         "dictamen": review["dictamen"],
-        **(
-            {"muestras": review["muestras"]}
-            if "scenes" in direction["escaleta"]["render"]["props"]
-            else {}
-        ),
+        **({"muestras": review["muestras"]} if order.get("output_edit") == "reel" else {}),
     }
 
 

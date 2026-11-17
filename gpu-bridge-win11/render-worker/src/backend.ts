@@ -19,15 +19,22 @@ interface Artifact {path: string; bytes: number; sha256: string}
 const receiptName = '.recibo-puente-v1.json';
 const hashPattern = /^[a-f0-9]{64}$/;
 type RenderStage = 'render' | 'stills';
+const linksPerImage = 512;
 
-async function timelineImages(work: string, frames: number[], files: string[], count: number, signal: AbortSignal) {
+export async function timelineImages(work: string, frames: number[], files: string[], count: number, signal: AbortSignal) {
   const dir = path.join(work, 'rotulos');
   await mkdir(dir);
   // Los enlaces comparten los PNG de cada estado y mantienen el reloj exacto de 30 fps.
   for (const [index, start] of frames.entries()) {
+    let image = files[index]!;
     for (let frame = start; frame < (frames[index + 1] ?? count); frame += 1) {
       signal.throwIfAborted();
-      await link(files[index]!, path.join(dir, `still-${frame}.png`));
+      // NTFS limita los enlaces por archivo. Cada bloque usa su propio PNG.
+      if (frame > start && (frame - start) % linksPerImage === 0) {
+        image = path.join(dir, `estado-${frame}.png`);
+        await copyFile(files[index]!, image, constants.COPYFILE_EXCL);
+      }
+      await link(image, path.join(dir, `still-${frame}.png`));
     }
   }
   return path.join(dir, 'still-%d.png');
@@ -254,7 +261,10 @@ export class RenderBackend implements Backend {
       const layerFrames = scenes ? graphicFrames(scenes)
         : sourceVideo || staticProres ? Array.from({length: TITLE_FADE_FRAMES + 1}, (_, index) => index) : null;
       // La gráfica sin crudo solo renderiza el fundido. El margen del MOV se calcula tras codificar sus fragmentos.
-      if (scenes) await this.scratch.ensureSpace((layerFrames?.length ?? 0) * frameBytes + outputs);
+      if (scenes) {
+        const clones = Math.floor(request.durationInFrames / linksPerImage);
+        await this.scratch.ensureSpace(((layerFrames?.length ?? 0) + clones) * frameBytes + outputs);
+      }
       else if (staticProres) await this.scratch.ensureSpace((TITLE_FADE_FRAMES + 1) * frameBytes * 2);
       else if (!sourceVideo) await this.scratch.ensureSpace(videoBytes + request.durationInFrames * frameBytes + outputs);
       const scene = await this.#scene(request, work, layerFrames, bounded, sourceVideo ? null : video?.source ?? null, sourceVideo ? true : undefined);
