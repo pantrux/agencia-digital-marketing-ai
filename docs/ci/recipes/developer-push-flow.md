@@ -159,6 +159,8 @@ Para habilitar el montaje por escenas, comprobar el despacho de `output_edit` y 
 
 Para el anuncio por guion, aplicar primero `0019_brief_ad_cta.sql`, verificar que los briefs anteriores siguen respondiendo y probar el CTA, el reordenamiento de tomas y la aprobación de vista previa con una orden MP4 de ensayo. Publicar la interfaz después del Worker, los agentes y el renderer. Antes de habilitar anuncios, provisionar `_biblioteca_global/musica-stock/carefree-usuan1400037.mp3` desde la ficha oficial de [Carefree](https://www.incompetech.com/music/royalty-free/index.html?isrc=USUAN1400037) y cotejar la huella definida por el renderer. Verificar con una orden de ensayo el nivel de música al cierre y el crédito en el ZIP.
 
+Para aceptar el piloto de acabado en Resolve, preparar el OTIO y los cinco archivos vinculados al recibo en un destino dedicado. Cotejar la importación de 900 fotogramas y las pistas de voz y música en una estación con Resolve Studio activado. Tras exportar, ejecutar el revisor de Elena contra la huella del MP4 producido y conservar su dictamen. Las pruebas de GitHub cubren el contrato y la comparación de la música. El ensayo del editor se registra por separado. Consulta el procedimiento en `docs/specs/ENTREGAS-FASE-6.md`.
+
 ```bash
 ./node_modules/.bin/eslint cloudflare-saas/studio-api-worker/src
 python -m ruff check ingress

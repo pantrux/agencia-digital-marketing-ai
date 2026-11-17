@@ -79,5 +79,8 @@ flowchart TB
     GUION --> QAAD["Vista previa con subtítulos y mezcla"]
     MUSICAD["Catálogo musical con huella y licencia"] --> QAAD
     QAAD -->|"Dictamen aprobado"| MP4AD["Publicar máster de 30 segundos"]
+    GUION -. "Acabado optativo" .-> PAQUETERESOLVE["OTIO, imagen, voz, música y SRT"]
+    PAQUETERESOLVE --> FAIRLIGHT["Montaje y mezcla en Resolve Studio"]
+    FAIRLIGHT --> QARESOLVE["Elena coteja la mezcla y registra el dictamen por huella del MP4"]
     LIMITE -. "Solicitud de cambio futura" .-> PREVIEW
     LIMITE -. "Entrega futura a main" .-> SALVA

@@ -114,3 +114,23 @@ journalctl -u agency-studio-delivery-metrics.service --since today
 En una orden **Reel por escenas** con salida MP4, confirma el brief con una llamada a la acción de hasta 70 caracteres y el nombre de marca que aparecerá al cierre. Studio activa un anuncio de 30 segundos con planos del original, subtítulos de la voz y una placa de marca y CTA entre los segundos 26 y 30. La mezcla utiliza «Carefree» de Kevin MacLeod, con licencia CC BY 4.0, y atenúa la pista durante el diálogo. La biblioteca conserva la fuente original con huella fijada. El ZIP incluye el crédito para la publicación del anuncio. La revisión transcribe la mezcla final y mide la coincidencia temporal con los subtítulos antes de aprobar.
 
 Aplica primero la migración D1 `0019_brief_ad_cta.sql`. Despliega el Worker, las recetas de los agentes y el renderer antes de publicar la interfaz. Las órdenes con el campo vacío siguen la ruta habitual. El máster sólo se genera tras el dictamen de vista previa y conserva los controles técnicos del perfil de la orden. La revisión comprueba encuadre de apertura, subtítulos por frases y el nivel de la música al final. Escuchar la mezcla sigue siendo una comprobación editorial independiente.
+
+## Acabado de anuncios en DaVinci Resolve
+
+Lucas puede preparar un anuncio guiado de 30 s de un plan pagado con `docker/n8n/production_resolve.py`. El piloto es optativo y usa los recibos privados de ingesta y dirección. Coteja las huellas de las fuentes, escribe una copia vertical a 30 fps y entrega un OTIO a 900 fotogramas con pistas de imagen, voz y música, un SRT y marcadores de los rótulos y el CTA. Mantén el paquete con sus referencias y guarda los cambios en el proyecto de Resolve.
+
+En Windows, instala `opentimelineio==0.18.1` en el entorno de preparación y usa el FFmpeg del puente. Ejemplo con argumentos del proyecto seleccionado:
+
+```powershell
+python docker/n8n/production_resolve.py preparar --ingesta $ingesta --escaleta $escaleta --medios P:/ --destino $paquete
+```
+
+Para abrir la línea de tiempo desde un comando, activa **External Scripting Using → Local** en DaVinci Resolve Studio, abre la aplicación y agrega a `PYTHONPATH` el directorio `Developer\Scripting\Modules` del SDK instalado por Blackmagic. Con los mismos argumentos, cambia `preparar` por `abrir`. El comando crea un proyecto vertical dedicado y abre Fairlight. También puedes importar `montaje.otio` desde **Archivo → Importar → Línea de tiempo** y abrir Fairlight. Importa `subtitulos.srt`, compone los rótulos según los marcadores, restaura el nombre de marca y el CTA de 26 a 30 s, y mezcla las pistas de voz y música conservando la música del catálogo en el cierre.
+
+Lucas puede aplicar ganancias de clip mediante el SDK local. Abre el proyecto acreditado, selecciona su línea de tiempo `Anuncio de Studio` y ejecuta `mezclar` con los mismos argumentos más `--voz-db <dB> --musica-db <dB>`. Decide esos niveles a partir de la escucha y del MP4 de prueba. El comando abre Fairlight, aplica los niveles a las dos pistas, verifica lo leído del editor y guarda el proyecto. Si un ajuste falla, restaura los niveles anteriores.
+
+Exporta `exportacion.mp4` en el paquete con H.264, BT.709, 1080 × 1920 a 30 fps y audio estéreo. Desde OpenClaw, usa `revisar` con las rutas NFS del mismo paquete e ingesta. Elena usa el archivo exportado, mide la mezcla, coteja el tramo de música sin diálogo con la referencia, transcribe el audio y registra su dictamen audiovisual por SHA-256. Publica en Kitsu como revisión del proyecto si el operador lo solicita. El piloto registra evidencia de revisión y mantiene el flujo automático de entregas de Studio.
+
+- [Blackmagic Design · DaVinci Resolve Studio](https://www.blackmagicdesign.com/products/davinciresolve/studio)
+- [Blackmagic Design · Fairlight](https://www.blackmagicdesign.com/products/davinciresolve/fairlight)
+- [OpenTimelineIO](https://opentimelineio.readthedocs.io/en/v0.18.1/)
