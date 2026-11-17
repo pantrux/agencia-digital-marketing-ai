@@ -37,7 +37,7 @@ export const Reel: React.FC<ReelProps> = (props) => {
     </div>}
     {label && <div style={{position: 'absolute', left: 60, right: 120, ...(label.position === 'top' ? {top: 200} : {bottom: 480}),
       backgroundColor: '#141714', borderLeft: `8px solid ${props.accent}`, padding: '24px 28px', borderRadius: 12,
-      fontSize: 58, lineHeight: 1.15, fontWeight: 700, overflowWrap: 'anywhere'}}>{label.text}</div>}
+      fontSize: label.size === 'large' ? 74 : 58, lineHeight: 1.15, fontWeight: 700, overflowWrap: 'anywhere'}}>{label.text}</div>}
     {props.watermark ? <div style={{position: 'absolute', bottom: 340, left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
     </AbsoluteFill>
   </AbsoluteFill>;

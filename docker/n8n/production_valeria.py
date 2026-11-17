@@ -78,7 +78,12 @@ def reel_scenes(items, duration):
         scene = {"source_start_frame": start, "source_end_frame": end}
         if "rotulo" in item:
             label = item["rotulo"]
-            if type(label) is not dict or label.keys() != {"texto", "desde", "hasta", "posicion"}:
+            if type(label) is not dict or label.keys() - {"tamano"} != {
+                "texto",
+                "desde",
+                "hasta",
+                "posicion",
+            }:
                 raise VisualResponseFormatError("Rótulo inválido")
             title, position = label["texto"], label["posicion"]
             if (
@@ -87,6 +92,7 @@ def reel_scenes(items, duration):
                 or re.search(r"[\x00-\x1f\x7f\ud800-\udfff]", title)
                 or len(title.encode("utf-16-le")) // 2 > 80
                 or position not in ("superior", "inferior")
+                or label.get("tamano", "normal") not in ("normal", "grande")
             ):
                 raise VisualResponseFormatError("Texto o posición de rótulo inválidos")
             first, last = (boundary(label[k], length / 30) for k in ("desde", "hasta"))
@@ -97,6 +103,7 @@ def reel_scenes(items, duration):
                 "start_frame": first,
                 "end_frame": last,
                 "position": "top" if position == "superior" else "bottom",
+                **({"size": "large"} if label.get("tamano") == "grande" else {}),
             }
         scenes.append(scene)
         cursor = end
@@ -320,7 +327,8 @@ def plan_request(
             " Selecciona el ángulo de campaña más fiel. Proporciona segundos de origen desde y"
             " hasta para cada escena. En al menos una escena incluye rotulo con texto breve"
             " (máximo 80), desde y hasta en segundos relativos al comienzo de ESA escena,"
-            " duración entre 0.5 y 6, y posicion superior o inferior. Da espacio a rostros,"
+            " duración entre 0.5 y 6, posicion superior o inferior y tamano normal o grande opcional."
+            " Da espacio a rostros,"
             " productos y subtítulos existentes. Puedes omitir el rótulo de cualquier otra escena."
             " Devuelve un único JSON con angulo entero de 1 a 3, titulo (máximo 120),"
             " subtitulo (máximo 240), observacion (máximo 600), apto_sin_cambios booleano y"

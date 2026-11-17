@@ -9,7 +9,7 @@ export class WorkerError extends Error {
 export type Plan = 'Free' | 'Pro' | 'Ultra' | 'Ilimitado';
 export type Resolution = '1080p' | '4k';
 export type OutputFormat = 'mp4' | 'prores4444';
-export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom'}
+export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom'; size?: 'large'}
 export interface EditScene {source_start_frame: number; source_end_frame: number; label?: SceneLabel}
 export interface CompositionProps {
   title: string; subtitle: string; duration_seconds: number;
@@ -78,15 +78,17 @@ function editScenes(value: unknown, count: number): EditScene[] {
     total += end - start;
     const scene = {source_start_frame: start, source_end_frame: end};
     if (item.label === undefined) return scene;
-    const caption = object(item.label, ['text', 'start_frame', 'end_frame', 'position']);
+    const caption = object(item.label, ['text', 'start_frame', 'end_frame', 'position', 'size']);
     const label = text(caption.text, '', 80);
     const labelStart = frameNumber(caption.start_frame, 0, end - start - 15);
     const labelEnd = frameNumber(caption.end_frame, labelStart + 15, Math.min(end - start, labelStart + 180));
     if (!label.trim() || (caption.position !== 'top' && caption.position !== 'bottom')) {
       invalid('El rótulo requiere texto y posición.');
     }
+    if (caption.size !== undefined && caption.size !== 'large') invalid('El tamaño del rótulo no está permitido.');
     labels += 1;
-    return {...scene, label: {text: label, start_frame: labelStart, end_frame: labelEnd, position: caption.position}};
+    return {...scene, label: {text: label, start_frame: labelStart, end_frame: labelEnd, position: caption.position,
+      ...(caption.size === 'large' ? {size: caption.size} : {})}};
   });
   if (!labels || total !== count) invalid('Los cortes deben sumar la duración del reel y contener al menos un rótulo.');
   return scenes;

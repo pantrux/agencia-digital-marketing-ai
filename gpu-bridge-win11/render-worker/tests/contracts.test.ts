@@ -20,7 +20,7 @@ test('contrato vertical local con marca de agua obligatoria en Free', () => {
 test('un reel conserva cortes y rótulos con extremos exclusivos en fotogramas', () => {
   const props = {...request().props, duration_seconds: 36, video_path: 'proyectos/sansevieras/01_raw/crudo.mp4'};
   const scenes = [
-    {source_start_frame: 30, source_end_frame: 390, label: {text: 'Catálogo', start_frame: 0, end_frame: 90, position: 'bottom'}},
+    {source_start_frame: 30, source_end_frame: 390, label: {text: 'Catálogo', start_frame: 0, end_frame: 90, position: 'bottom', size: 'large'}},
     {source_start_frame: 1200, source_end_frame: 1920},
   ];
   const reel = parseRender({...request(), props: {...props, scenes}});
