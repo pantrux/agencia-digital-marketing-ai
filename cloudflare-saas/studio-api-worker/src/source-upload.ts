@@ -245,8 +245,8 @@ export async function completeSourceUpload(
       SELECT 1 FROM production_sources source JOIN production_source_sets s ON s.order_id=source.order_id
       JOIN orders o ON o.id=s.order_id AND o.user_id=s.user_id JOIN usage_ledger l ON l.order_id=o.id AND l.user_id=o.user_id
       WHERE source.id=? AND o.id=? AND o.user_id=? AND COALESCE(o.provider_mode,'production')=?
-        AND o.status='queued' AND l.status='reserved')`)
-    .bind(object.etag, sourceId, token, sourceId, order, user, env.BILLING_MODE).run();
-  if (committed.meta.changes !== 1) throw new HttpError(409, "SUBIDA_EN_TRANSICION");
+        AND o.status='queued' AND l.status='reserved') RETURNING source_id`)
+    .bind(object.etag, sourceId, token, sourceId, order, user, env.BILLING_MODE).first<{ source_id: string }>();
+  if (!committed) throw new HttpError(409, "SUBIDA_EN_TRANSICION");
   return readiness();
 }

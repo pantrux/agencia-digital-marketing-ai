@@ -33,7 +33,7 @@ function request(path: string, method: string, body?: Record<string, unknown>): 
 
 type SqlValue = string | number | null;
 
-function sqliteAdapter(database: DatabaseSync): SqlDatabase {
+function sqliteAdapter(database: DatabaseSync, countTriggerChanges = false): SqlDatabase {
   type Executable = SqlStatement & { values<T>(): SqlRows<T> };
   function prepared(sql: string, values: SqlValue[] = []): Executable {
     const statement = database.prepare(sql);
@@ -41,7 +41,12 @@ function sqliteAdapter(database: DatabaseSync): SqlDatabase {
       bind: (...params) => prepared(sql, params),
       first: async <T>() => (statement.get(...values) as T | undefined) ?? null,
       all: async <T>() => ({ results: statement.all(...values) as T[], meta: {} }),
-      run: async () => ({ results: [], meta: { changes: Number(statement.run(...values).changes) } }),
+      run: async () => {
+        const before = countTriggerChanges ? Number((database.prepare('SELECT total_changes() AS n').get() as {n:number}).n) : 0;
+        const direct = Number(statement.run(...values).changes);
+        const changes = countTriggerChanges ? Number((database.prepare('SELECT total_changes() AS n').get() as {n:number}).n) - before : direct;
+        return { results: [], meta: { changes } };
+      },
       values: <T>() => statement.columns().length > 0
         ? { results: statement.all(...values) as T[], meta: { changes: 0 } }
         : { results: [], meta: { changes: Number(statement.run(...values).changes) } },
@@ -1235,7 +1240,7 @@ describe("Ingesta R2 multipart", () => {
       const sources = db.prepare("SELECT id FROM production_sources WHERE order_id=? ORDER BY position").all(order) as { id: string }[];
       for (let index = 0; index < sources.length; index += 1) {
         const { bucket } = mockMedia(bytes);
-        const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production",
+        const env = { DB: sqliteAdapter(db, true), MEDIA: bucket, BILLING_MODE: "production",
           R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
           R2_SECRET_ACCESS_KEY: credentials.secretAccessKey } as IngestEnv;
         const id = sources[index]!.id;
