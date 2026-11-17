@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {outputDimensions, parseInspect, parseRender, parseStills, WorkerError} from '../src/contracts.ts';
+import {AD_MUSIC_ID, outputDimensions, parseInspect, parseRender, parseStills, WorkerError} from '../src/contracts.ts';
 import {compositionInput} from '../src/remotion.ts';
 import {graphicFrames} from '../src/timeline.ts';
 
@@ -45,7 +45,8 @@ test('el anuncio reordena la fuente y programa los cambios de subtítulo y CTA',
   const props = {...request().props,duration_seconds:30,video_path:'proyectos/sansevieras/01_raw/crudo.mp4',scenes,ad};
   const adRequest = parseRender({...request(),props});
   assert.deepEqual(adRequest.props.scenes, scenes);
-  assert.deepEqual(compositionInput(adRequest,null).ad,ad);
+  assert.deepEqual(compositionInput(adRequest,null).ad,{...ad,soundtrack:AD_MUSIC_ID});
+  assert.throws(() => parseRender({...request(), props:{...props,ad:{...ad,soundtrack:'external-file'}}}),WorkerError);
   assert.deepEqual(graphicFrames(adRequest.props.scenes!,adRequest.props.ad),[0,20,60,90,780]);
   assert.throws(() => parseRender({...request(),props:{...props,ad:undefined}}),WorkerError);
   assert.throws(() => parseRender({...request(),props:{...props,ad:{...ad,captions:[{...ad.captions[0],end_frame:781}]}}}),WorkerError);

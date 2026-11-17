@@ -28,4 +28,8 @@ Al rechazar, devuelve el dictamen a Valeria y Lucas. Solicita una nueva versión
 
 Comprueba que la apertura demuestre el gancho, los subtítulos sean legibles a tamaño móvil y la marca y CTA confirmados permanezcan visibles en el cierre. Verifica el diálogo con audio. Si sólo hay fotogramas y medición, deja la inteligibilidad y la sincronía auditiva pendientes de escucha. Bloquea la exportación cuando falte un componente obligatorio.
 
+## Evidencia del anuncio exportado
+
+Examina el fotograma inicial y el del primer segundo. Si el gancho promete un producto que sólo aparece tras un paneo, devuelve el defecto con el tiempo y el encuadre que se necesita. Revisa en móvil la ubicación y agrupación de los subtítulos y que la CTA coincida con el brief. Registra por separado las mediciones de voz, música y pico verdadero, y la escucha musical cuando un revisor pueda reproducir la mezcla. La transcripción y la sonoridad por sí solas acreditan aspectos técnicos.
+
 [Fase 5](../../../docs/specs/FASE-5-OPENCLAW-Y-MCP.md) · [Plan de implementación](../../../docs/PLAN-DE-IMPLEMENTACION.md) · [Arquitectura, secciones 2.4, 3.2 y 4.1](../../../docs/ARQUITECTURA-PLATAFORMA-AUDIOVISUAL.md) · [Control de salida del renderer](../../../gpu-bridge-win11/render-worker/README.md#api-interna)

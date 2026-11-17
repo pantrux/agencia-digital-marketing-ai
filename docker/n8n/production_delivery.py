@@ -111,6 +111,11 @@ def package(order, master, render, qa, brief, *, caption=None, output=None):
         if not isinstance(caption, str) or not 1 <= len(caption.strip()) <= 700:
             raise ValueError("Caption fuera del contrato de entrega")
         files["05-caption.txt"] = (caption.strip() + "\n").encode()
+    if "creditos_musica" in qa:
+        credits = qa["creditos_musica"]
+        if not isinstance(credits, str) or not 1 <= len(credits.strip()) <= 400:
+            raise ValueError("Crédito de música fuera del contrato")
+        files["06-creditos-musica.txt"] = (credits.strip() + "\n").encode()
     files["SHA256SUMS"] = (
         f"{digest}  01-video.mp4\n"
         + "".join(f"{hashlib.sha256(body).hexdigest()}  {name}\n" for name, body in files.items())

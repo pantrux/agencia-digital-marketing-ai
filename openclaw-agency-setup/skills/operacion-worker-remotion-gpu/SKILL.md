@@ -27,4 +27,8 @@ El worker admite 600 segundos por pieza y hasta 20 minutos de procesamiento. Las
 
 Monta las escenas en el orden de la escaleta y comprueba su correspondencia con la voz original. Proyecta los subtítulos en el reloj de salida y valida el MP4 final a 30 segundos. Mantén la música por debajo de la voz y mide la mezcla terminada. Verifica gancho, subtítulos y CTA en la vista previa antes de generar el máster.
 
+## Música de catálogo y montaje
+
+Para un anuncio comercial, usa una pista instrumental publicada en el catálogo aprobado, con autor, licencia y huella. Reserva la voz como referencia de nivel. Comprueba fundidos y volumen de la música durante el cierre del MP4. Usa las marcas de Whisper para construir subtítulos por frases y conserva uniones como «mi marido» o «de interior». Para ajustes de oído, abre la copia exacta del MP4 en un entorno de reproducción o en una línea de tiempo de edición.
+
 [Fase 5](../../../docs/specs/FASE-5-OPENCLAW-Y-MCP.md) · [Plan de implementación](../../../docs/PLAN-DE-IMPLEMENTACION.md) · [Arquitectura, sección 4.1](../../../docs/ARQUITECTURA-PLATAFORMA-AUDIOVISUAL.md) · [API del renderer](../../../gpu-bridge-win11/render-worker/README.md#api-interna)

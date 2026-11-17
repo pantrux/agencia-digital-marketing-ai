@@ -11,7 +11,8 @@ export type Resolution = '1080p' | '4k';
 export type OutputFormat = 'mp4' | 'prores4444';
 export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom'; size?: 'large'}
 export interface AdCaption {start_frame: number; end_frame: number; text: string}
-export interface ScriptedAd {cta: string; brand: string; captions: AdCaption[]}
+export const AD_MUSIC_ID = 'carefree-usuan1400037' as const;
+export interface ScriptedAd {cta: string; brand: string; captions: AdCaption[]; soundtrack: typeof AD_MUSIC_ID}
 export const AD_ENDCARD_FRAME = 780;
 export interface EditScene {source_start_frame: number; source_end_frame: number; label?: SceneLabel}
 export interface CompositionProps {
@@ -105,7 +106,8 @@ function editScenes(value: unknown, count: number, ad: boolean): EditScene[] {
   return scenes;
 }
 function scriptedAd(value: unknown): ScriptedAd {
-  const input = object(value, ['cta', 'brand', 'captions']);
+  const input = object(value, ['cta', 'brand', 'captions', 'soundtrack']);
+  if (input.soundtrack !== undefined && input.soundtrack !== AD_MUSIC_ID) invalid('La pista no pertenece al catálogo del anuncio.');
   const cta = text(input.cta, '', 70), brand = text(input.brand, '', 80);
   if (!cta.trim() || !brand.trim() || !Array.isArray(input.captions)
     || !input.captions.length || input.captions.length > 60) invalid('Falta CTA, marca o subtítulos.');
@@ -119,7 +121,7 @@ function scriptedAd(value: unknown): ScriptedAd {
     previousEnd = end_frame;
     return {start_frame,end_frame,text:caption};
   });
-  return {cta,brand,captions};
+  return {cta,brand,captions,soundtrack:AD_MUSIC_ID};
 }
 
 export function mediaPath(value: unknown, project: string): string {

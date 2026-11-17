@@ -41,15 +41,16 @@ export const Reel: React.FC<ReelProps> = (props) => {
       ...(label.position === 'top' ? {top: 200} : {bottom: props.ad ? 520 : 480}),
       backgroundColor: '#141714', borderLeft: `8px solid ${props.accent}`, padding: '24px 28px', borderRadius: 12,
       fontSize: label.size === 'large' ? 84 : 58, lineHeight: 1.15, fontWeight: 700, overflowWrap: 'anywhere'}}>{label.text}</div>}
-    {props.ad && <div style={{position:'absolute',left:0,right:0,top:1438,bottom:0,
-      background:'#17221b',borderTop:`6px solid ${props.accent}`}} />}
-    {caption && <div style={{position:'absolute',left:84,right:165,top:1474,textAlign:'center',fontSize:59,
-      fontWeight:700,lineHeight:1.16,overflowWrap:'anywhere'}}>{caption.text}</div>}
-    {endCard && <div style={{position:'absolute',left:84,right:165,top:1470,color:'#f5f3e8',
-      overflowWrap:'anywhere'}}>
-      <div style={{fontSize:58,fontWeight:750,lineHeight:1.04,marginBottom:18}}>{props.ad!.brand}</div>
-      <div style={{display:'inline-block',fontSize:45,fontWeight:650,lineHeight:1.12,background:'#b8e1c0',
-        color:'#163323',padding:'13px 22px',borderRadius:14}}>{props.ad!.cta}</div>
+    {caption && <div style={{position:'absolute',left:82,right:155,bottom:330,textAlign:'center'}}>
+      <span style={{display:'inline-block',maxWidth:'100%',boxSizing:'border-box',
+        background:'rgba(17,28,21,.92)',borderRadius:20,padding:'10px 24px 12px',
+        fontSize:51,fontWeight:700,lineHeight:1.13,textWrap:'balance',overflowWrap:'anywhere'}}>{caption.text}</span>
+    </div>}
+    {endCard && <div style={{position:'absolute',left:84,right:165,bottom:320,
+      background:'#f4f3eb',color:'#193325',padding:'25px 34px 29px',borderRadius:24,overflowWrap:'anywhere'}}>
+      <div style={{fontSize:58,fontWeight:750,lineHeight:1.04,marginBottom:15}}>{props.ad!.brand}</div>
+      <div style={{display:'inline-block',fontSize:44,fontWeight:700,lineHeight:1.12,background:'#285640',
+        color:'#fff',padding:'13px 22px',borderRadius:14}}>{props.ad!.cta}</div>
     </div>}
     {props.watermark ? <div style={{position: 'absolute', ...(props.ad ? {top: 100} : {bottom: 340}), left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
     </AbsoluteFill>

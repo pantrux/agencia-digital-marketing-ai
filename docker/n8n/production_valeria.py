@@ -125,6 +125,15 @@ def reel_scenes(items, duration, *, ad=False):
     return scenes, total
 
 
+CAPTION_CONNECTORS = frozenset(
+    "a al con de del el en la las los mi mis por que se su sus tu un una y".split()
+)
+
+
+def cue_text(group):
+    return " ".join(part[2] for part in group)
+
+
 def ad_captions(scenes, words):
     cues, offset = [], 0
     for scene in scenes:
@@ -142,20 +151,23 @@ def ad_captions(scenes, words):
             ):
                 continue
             first, last = offset + first - start, offset + last - start
+            word_on_timeline = (first, last, text)
             if group and (
-                len(group) >= 6
-                or first - group[-1][1] >= 15
-                or last - group[0][0] > 75
-                or len(" ".join([part[2] for part in group] + [text]).encode("utf-16-le")) // 2 > 68
+                first - group[-1][1] >= 15
+                or last - group[0][0] > 105
+                or len(cue_text([*group, word_on_timeline]).encode("utf-16-le")) // 2 > 68
             ):
-                cues.append((group[0][0], group[-1][1], " ".join(part[2] for part in group)))
-                group = []
-            group.append((first, last, text))
-            if text.endswith((".", "?", "!")):
-                cues.append((group[0][0], group[-1][1], " ".join(part[2] for part in group)))
+                cut = len(group)
+                while cut > 1 and group[cut - 1][2].casefold() in CAPTION_CONNECTORS:
+                    cut -= 1
+                cues.append((group[0][0], group[cut - 1][1], cue_text(group[:cut])))
+                group = group[cut:]
+            group.append(word_on_timeline)
+            if text.endswith((".", "?", "!", ";")):
+                cues.append((group[0][0], group[-1][1], cue_text(group)))
                 group = []
         if group:
-            cues.append((group[0][0], group[-1][1], " ".join(part[2] for part in group)))
+            cues.append((group[0][0], group[-1][1], cue_text(group)))
         offset += end - start
     result = []
     i = 0
@@ -455,7 +467,9 @@ def plan_request(
             "palabra] a 30 fps. Divide entre 30 para ubicar las frases. Registra las duraciones "
             "en segundos con al menos dos decimales. Devuelve una escaleta lista para vista previa "
             "cuando el crudo tenga evidencia del producto y voz usable. La sincronía se valida "
-            "sobre esa vista previa. Los últimos cuatro segundos "
+            "sobre esa vista previa. La primera toma debe mostrar completo desde el inicio "
+            "el objeto que demuestra la promesa, sin depender de un paneo para revelarlo. "
+            "Los últimos cuatro segundos "
             "usan una imagen de producto despejada para la marca y el CTA confirmado; el renderer "
             "coloca la marca y la CTA confirmadas y silencia la voz en ese intervalo. "
             "subtitulo sintetiza el argumento y observacion explica el guion."
