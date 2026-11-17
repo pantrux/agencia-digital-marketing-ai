@@ -249,10 +249,7 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
         "Incluye en defectos únicamente cambios necesarios para poder entregar. "
     )
     if checks:
-        evidence["rotulos_por_muestra"] = [
-            check["rotulo_esperado"]["text"] if check["rotulo_esperado"] else None
-            for check in checks
-        ]
+        evidence["rotulos_por_muestra"] = [check["rotulo_esperado"] for check in checks]
         instructions = (
             f"Eres Elena, auditora audiovisual. Revisa {len(images)} muestras del montaje en"
             " el orden suministrado. La primera es la apertura y la última el cierre."
@@ -260,7 +257,10 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
             " debe quedar despejado; los textos esperados sólo aparecen en sus tiempos."
             " Si un rótulo tapa ojos, rostro o producto principal, decláralo como defecto"
             " y pide una corrección concreta de posición, texto o duración."
-            " Revisa contraste y legibilidad en móvil. No infieras locución desde imágenes."
+            " Revisa contraste y legibilidad en móvil. Si el texto se lee completo, una mejora"
+            " de tamaño o estilo va en observaciones. Usa defectos para problemas que impiden"
+            " publicar, como texto ilegible, recortado, en un tiempo incorrecto o sobre el sujeto."
+            " No infieras locución desde imágenes."
             " Transcribe en marca_free sólo la marca «Creado con Agencia AI Free» si es visible."
             " Usa cadena vacía en otro caso. Devuelve únicamente JSON con puntaje entero de 0 a 100,"
             " marca_free, observaciones (objetos con muestra y detalle) y defectos"
@@ -296,6 +296,7 @@ def audit_preview(order, edl, job, asset, out):
         "direction_sha256": hashlib.sha256(canonical(edl)).hexdigest(),
         "master_sha256": asset["sha256"],
         "fase": "vista_previa",
+        "rubrica": "reel-v1",
     }
     if out.exists():
         saved = json.loads(read_regular(out, LIMIT))
