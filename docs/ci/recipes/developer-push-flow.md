@@ -155,6 +155,8 @@ Ejecutar los controles según los componentes presentes. Los tipos del Worker se
 
 El control de infraestructura ejecuta la misma comprobación de D1 desde una carpeta temporal. Wrangler aplica las migraciones ordenadas sobre la base ficticia y un segundo pase coteja que el registro de migraciones siga idéntico. Ambos pases verifican integridad y claves foráneas. [Migraciones locales de D1](https://developers.cloudflare.com/d1/wrangler-commands/#d1-migrations-apply)
 
+Para habilitar el montaje por escenas, comprobar el despacho de `output_edit` y el rechazo de vista previa antes del máster. Aplicar la migración `0018_production_edit.sql` y verificar el receptor, los agentes y el puente antes de publicar el selector del portal.
+
 ```bash
 ./node_modules/.bin/eslint cloudflare-saas/studio-api-worker/src
 python -m ruff check ingress
