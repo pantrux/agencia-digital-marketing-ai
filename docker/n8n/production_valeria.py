@@ -246,6 +246,11 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None):
                 "ad": {
                     "cta": ad,
                     "brand": brief["ad_brand"],
+                    **(
+                        {"destination": brief["ad_destination"]}
+                        if "ad_destination" in brief
+                        else {}
+                    ),
                     "soundtrack": AD_MUSIC_ID,
                     "captions": ad_captions(scenes, transcript["words"] if transcript else []),
                 }

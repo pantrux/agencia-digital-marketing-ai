@@ -1,3 +1,4 @@
+import {AD_FRAMES, SOCIAL_FADE_FRAME} from './contracts.ts';
 import {MAX_SEGMENT_SECONDS, outputDimensions, TITLE_FADE_FRAMES, WorkerError, type EditScene, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
 
 export interface Loudness {integrated_lufs: number; true_peak_dbtp: number; range_lu: number; threshold_lufs: number; offset_lu: number}
@@ -146,9 +147,11 @@ function normalizeAudio(count: number, duration: number, measured: Loudness, pea
 const aacAudio = ['-c:a','aac','-b:a','256k','-ar','48000','-ac','2'];
 
 // El archivo de catálogo se verifica y se copia al directorio privado antes de mezclar.
-export function mixAdAudio(speech: string, music: string, output: string): string[] {
-  const filter = '[0:a]aformat=channel_layouts=stereo,afade=t=out:st=25.85:d=0.15,asplit=2[voice][key];'
-    + '[1:a]aformat=channel_layouts=stereo,aresample=48000,atrim=duration=30,asetpts=PTS-STARTPTS,volume=0.25,afade=d=0.35,afade=t=out:st=28.8:d=1.2[music];'
+export function mixAdAudio(speech: string, music: string, output: string, social = false): string[] {
+  const voiceFades = social ? 'afade=d=0.025,afade=t=out:st=25.95:d=0.08' : 'afade=t=out:st=25.85:d=0.15';
+  const musicFades = social ? 'afade=d=1,afade=t=out:st=28.5:d=1.5' : 'afade=d=0.35,afade=t=out:st=28.8:d=1.2';
+  const filter = `[0:a]aformat=channel_layouts=stereo,${voiceFades},asplit=2[voice][key];`
+    + `[1:a]aformat=channel_layouts=stereo,aresample=48000,atrim=duration=30,asetpts=PTS-STARTPTS,volume=0.25,${musicFades}[music];`
     + '[music][key]sidechaincompress=threshold=0.025:ratio=6:attack=14:release=260[bed];'
     + '[voice][bed]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.94:level=0[audio]';
   return ['-hide_banner','-nostdin','-v','error','-n','-i',speech,'-ss','5','-i',music,
@@ -157,14 +160,18 @@ export function mixAdAudio(speech: string, music: string, output: string): strin
 
 export function cutSceneAudio(input: string, output: string, scenes: readonly EditScene[]): string[] {
   const channels = scenes.map((_, index) => `[a${index}]`).join('');
-  const pieces = scenes.map((scene, index) => `[a${index}]atrim=start_sample=${scene.source_start_frame * 1600}:end_sample=${scene.source_end_frame * 1600},asetpts=PTS-STARTPTS[p${index}]`);
+  const pieces = scenes.map((scene, index) => {
+    const start = scene.audio_source_start_frame ?? scene.source_start_frame;
+    const end = start + scene.source_end_frame - scene.source_start_frame;
+    return `[a${index}]atrim=start_sample=${start * 1600}:end_sample=${end * 1600},asetpts=PTS-STARTPTS[p${index}]`;
+  });
   const concat = scenes.map((_, index) => `[p${index}]`).join('');
   const filter = [`[0:a:0]aformat=sample_rates=48000:channel_layouts=stereo,asplit=${scenes.length}${channels}`,
     ...pieces, `${concat}concat=n=${scenes.length}:v=0:a=1[audio]`].join(';');
   return ['-hide_banner','-nostdin','-nostats','-n','-i',input,'-filter_complex',filter,'-map','[audio]','-c:a','pcm_s24le',output];
 }
 
-export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string): string[] {
+export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string, social = false): string[] {
   if (scenes && !sourceVideo) return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);
   const {width,height} = outputDimensions(resolution);
@@ -187,12 +194,13 @@ export function encodeNvenc(frames: string, audio: string, output: string, count
   const crop = `crop=${width}:${height},setsar=1`;
   const graphicsInput = scenes?.length ?? 1;
   const overlay = 'alpha=straight:eof_action=repeat:repeatlast=1';
+  const pictureFade = social ? ',fade=t=out:s=' + SOCIAL_FADE_FRAME + ':n=' + (AD_FRAMES - SOCIAL_FADE_FRAME - 1) : '';
   // El crudo admitido ya está en YUV BT.709. Solo se convierte la capa RGBA.
   const filter = [
     ...cuts,
     `${scale}:${scenes ? 'out_color_matrix=bt709:out_range=tv' : 'in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=tv'},${crop},format=yuv420p[video]`,
     `[${graphicsInput}:v]scale=in_range=pc:out_range=tv:out_color_matrix=bt709,format=yuva420p[capa]`,
-    `[video][capa]overlay=format=yuv420:${overlay},${limitedBt709}[comp]`,
+    `[video][capa]overlay=format=yuv420:${overlay}${pictureFade},${limitedBt709}[comp]`,
   ].join(';');
   const inputs = sourceVideo
     ? ['-xerror','-filter_complex_threads','4',...videoInputs,...images,'-i',audio,'-filter_complex',filter,'-map','[comp]','-map',`${graphicsInput + 1}:a:0`]
@@ -227,8 +235,8 @@ export function muxProresFragments(list: string, audio: string, output: string, 
     '-video_track_timescale',String(proresTimescale),'-af',audioFilter,...pcmAudio,'-f','mov',output];
 }
 
-export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string): string[] {
-  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo, normalize, scenes, musicId);
+export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string, social = false): string[] {
+  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo, normalize, scenes, musicId, social);
   outputDimensions(resolution);
   if (format !== 'prores4444') return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);

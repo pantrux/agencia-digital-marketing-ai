@@ -210,3 +210,9 @@ Los contratos Node del renderer comprueban también compilación estática únic
 Para la primera actualización de un repositorio nuevo, el control 7 obtiene el commit y su árbol completo por API de solo lectura: exige identidad coincidente, respuesta sin truncar y presencia del workflow, esta receta y el diagrama. No necesita historial local ni ejecutar comandos Git.
 
 Si falla la calidad, consultar el registro del trabajo y corregir la causa. Si falla una entrega futura, usar la [receta SRE](sre-rollback.md) y el [índice de incidentes](../README.md).
+
+Para el CTA social, aplica `0020_brief_ad_contacts.sql` antes de desplegar
+el Worker. Actualiza la validación de briefs en el despacho y los agentes,
+el renderer y después el portal. Verifica que el brief devuelve al titular
+los tres campos y que el despacho sólo transfiere el canal seleccionado.
+Comprueba los fundidos, el icono y la URL en un MP4 de ensayo.

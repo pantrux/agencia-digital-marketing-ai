@@ -76,7 +76,8 @@ flowchart TB
     end
     LIMITE -. "Verificación operativa del anuncio" .-> D1AD["D1 0019, Worker y agentes"]
     D1AD --> GUION["Brief con CTA y escaleta verificable"]
-    GUION --> QAAD["Vista previa con subtítulos y mezcla"]
+    GUION --> CTASOC["CTA opcional: validar tres perfiles y pasar un destino al renderer"]
+    CTASOC --> QAAD["Vista previa con subtítulos y mezcla"]
     MUSICAD["Catálogo musical con huella y licencia"] --> QAAD
     QAAD -->|"Dictamen aprobado"| MP4AD["Publicar máster de 30 segundos"]
     GUION -. "Acabado optativo" .-> PAQUETERESOLVE["OTIO, imagen, voz, música y SRT"]

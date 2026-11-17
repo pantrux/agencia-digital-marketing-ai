@@ -387,6 +387,7 @@ def review_video(
     scenes = props.get("scenes")
     checks = scene_checks(scenes) if scenes else []
     ad = props.get("ad")
+    destination = ad.get("destination") if ad else None
     if ad:
         cue = max(ad["captions"], key=lambda row: row["end_frame"] - row["start_frame"])
         frame = (cue["start_frame"] + cue["end_frame"]) // 2
@@ -396,9 +397,12 @@ def review_video(
         checks = [item for item in candidates if item["segundo"] in mandatory]
         checks += [
             item for item in candidates if item["segundo"] not in mandatory and item["segundo"] < 26
-        ][: 7 - len(checks)]
+        ][: (6 if destination else 7) - len(checks)]
         checks.sort(key=lambda item: item["segundo"])
         checks.append({"segundo": 28, "rotulo_esperado": None})
+        if destination:
+            checks[0] = {"segundo": 0, "rotulo_esperado": None}
+            checks.append({"segundo": 29.966, "rotulo_esperado": None})
     duration = props["duration_seconds"]
     decode_options = {"stamps": [check["segundo"] for check in checks]} if checks else {}
     audio_check = None
@@ -432,8 +436,13 @@ def review_video(
         evidence["rotulos_por_muestra"] = [check["rotulo_esperado"] for check in checks]
         instructions = (
             f"Eres Elena, auditora audiovisual. Revisa {len(images)} muestras del montaje en"
-            " el orden suministrado. La primera es la apertura y la última el cierre."
-            " Usa los segundos y rótulos esperados del JSON. En un intervalo sin rótulo"
+            " el orden suministrado. La primera es la apertura."
+            + (
+                " Revisa el CTA en la penúltima muestra; la última enseña el fin del fundido."
+                if destination
+                else " La última es el cierre."
+            )
+            + " Usa los segundos y rótulos esperados del JSON. En un intervalo sin rótulo"
             " debe quedar despejado; los textos esperados sólo aparecen en sus tiempos."
             " Si un rótulo tapa ojos, rostro o producto principal, decláralo como defecto"
             " y pide una corrección concreta de posición, texto o duración."
@@ -464,6 +473,15 @@ def review_video(
         )
         evidence["cta_final"] = ad["cta"]
         evidence["marca_final"] = ad["brand"]
+        if destination:
+            evidence["destino_confirmado"] = destination
+            instructions += (
+                " Comprueba en el cierre el icono del canal seleccionado y la URL del destino "
+                " confirmado, visible a los 28 s. Se admite mostrarla sin https:// ni www. "
+                "En el fotograma cero la planta debe ser visible y el gancho puede estar entrando. "
+                "A los 29.966 s se espera un fundido a negro, sin texto legible. Rechaza un destino "
+                "distinto, una URL ilegible o un icono de otro canal."
+            )
         instructions += (
             " En este anuncio hay subtítulos separados del rótulo. Revisa el gancho al comienzo "
             "y al menos un subtítulo visible en móvil cuando coincida con la muestra. "
@@ -471,7 +489,7 @@ def review_video(
             "segundo: si sólo se ve parcialmente al comenzar o el encuadre tarda en "
             "mostrarlo, registra un defecto en apertura. Comprueba si la caja de subtítulos "
             "oculta el elemento destacado o si queda legible sin ocupar una franja vacía. "
-            "En el cierre se exige marca y CTA completos en lugar del rótulo de escena. "
+            "En la placa de cierre se exige marca y CTA completos en lugar del rótulo de escena. "
             "Rechaza si el CTA falta, no coincide o invade una zona ilegible."
         )
     if synthetic:

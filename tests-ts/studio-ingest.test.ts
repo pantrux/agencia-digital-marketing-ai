@@ -98,7 +98,7 @@ function databaseForIngest(output: "1080p" | "4k" = "1080p", format: "mp4" | "pr
 it("aísla los perfiles de marca y conserva la versión que tomó cada pedido", async () => {
   const db = databaseForIngest();
   try {
-    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql"]) {
+    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
       db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
     }
     db.exec(`INSERT INTO users (id,google_sub,email) VALUES
@@ -187,14 +187,14 @@ it("aísla los perfiles de marca y conserva la versión que tomó cada pedido", 
 it.each(["full", "reel"] as const)("confirma el brief de una orden %s sin duplicarlo ni editarlo después", async (edit) => {
   const db = databaseForIngest("1080p", "mp4", edit);
   try {
-    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql"]) {
+    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
       db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
     }
     db.prepare("UPDATE orders SET provider_mode='sandbox' WHERE id=?").run(order);
     const env = { DB: sqliteAdapter(db), BILLING_MODE: "sandbox" as const };
     const brief = { objective: "Invitar a reservar una demo", audience: "Dueños de negocios", tone: "Directo",
       ...(edit === "reel" ? { ad_cta: "Escríbenos para reservar", ad_brand: "Vivero de prueba" } : {}) };
-    const send = (who: string, data?: typeof brief) => handleProductionBrief(
+    const send = (who: string, data?: typeof brief & { ad_contacts?: unknown }) => handleProductionBrief(
       request(`/api/orders/${order}/brief`, data ? "POST" : "GET", data), env, who, order,
     );
     const owned = async () => (await (await listOrders("user", env)).json()).orders[0];
@@ -213,17 +213,42 @@ it.each(["full", "reel"] as const)("confirma el brief de una orden %s sin duplic
       expect(await (await send("user")).json()).toMatchObject({ ad_available: true });
       await expect(send("user", { ...brief, ad_cta: "Escríbenos\nAhora" })).rejects.toMatchObject({ status: 422 });
     }
-    const stored = await (await send("user", brief)).json();
+    const contacts = { channel: "instagram", facebook: "https://facebook.com/viverodeprueba",
+      instagram: "https://instagram.com/vivero.prueba/", whatsapp: "https://wa.me/56911112222" };
+    const valid = edit === "reel" ? { ...brief, ad_contacts: contacts } : brief;
+    if (edit === "reel") {
+      for (const ad_contacts of [
+        { ...contacts, channel: "otro" },
+        { channel: "facebook", instagram: contacts.instagram },
+        { ...contacts, facebook: "https://www.facebook.com.ejemplo.invalid/perfil" },
+        { ...contacts, instagram: "https://instagram.com/p/video" },
+        { ...contacts, whatsapp: "https://wa.me/056911112222" },
+        { ...contacts, instagram: "https://instagram.com/perfil?redireccion=1" },
+      ]) await expect(send("user", { ...brief, ad_contacts })).rejects.toMatchObject({ status: 422, code: "CTA_DESTINO_INVALIDO" });
+    } else {
+      await expect(send("user", { ...brief, ad_contacts: contacts, ad_brand: "Vivero" })).rejects.toMatchObject({ status: 422 });
+    }
+    const stored = await (await send("user", valid)).json();
+    if (edit === "reel") {
+      expect(stored.brief.ad_contacts).toEqual({
+        channel: "instagram", facebook: "https://www.facebook.com/viverodeprueba",
+        instagram: "https://www.instagram.com/vivero.prueba", whatsapp: contacts.whatsapp,
+      });
+      await expect(send("user", { ...brief, ad_contacts: { ...contacts, channel: "facebook" } }))
+        .rejects.toMatchObject({ status: 409 });
+    }
     expect(stored).toMatchObject({ brief: { ...brief, confirmed_at: expect.any(Number) } });
     expect(await owned()).toMatchObject({ brief_confirmed_at: stored.brief.confirmed_at });
     expect(await (await listOrders("otro", env)).json()).toEqual({ orders: [] });
-    expect(await (await send("user", brief)).json()).toEqual(stored);
+    expect(await (await send("user", valid)).json()).toEqual(stored);
     expect(await (await send("user")).json()).toEqual(stored);
     const lookup = () => handleProductionDispatch(new Request(`https://studio.invalid${productionDispatchPath}`, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${"a".repeat(64)}` },
       body: JSON.stringify({ action: "brief", order_id: order }),
     }), { ...env, STUDIO_PRODUCTION_DISPATCH_TOKEN: "a".repeat(64) });
-    expect(await (await lookup()).json()).toEqual({ brief: { ...stored.brief, order_id: order, user_id: "user" } });
+    const { ad_contacts, ...dispatchBrief } = stored.brief;
+    expect(await (await lookup()).json()).toEqual({ brief: { ...dispatchBrief, order_id: order, user_id: "user",
+      ...(ad_contacts ? { ad_destination: { channel: "instagram", url: "https://www.instagram.com/vivero.prueba" } } : {}) } });
     await expect(send("user", { ...brief, objective: "Otro" })).rejects.toMatchObject({ status: 409 });
     await expect(send("otro")).rejects.toMatchObject({ status: 404 });
     expect(db.prepare("SELECT COUNT(*) AS total FROM production_briefs").get()).toMatchObject({ total: 1 });
@@ -274,7 +299,7 @@ it.each([["1080p", "mp4", "free", "full"], ["4k", "mp4", "ultra", "full"], ["4k"
 it.each([false, true])("registra el dictamen y expone el motivo al titular sin la huella (manual: %s)", async (manual) => {
   const db = databaseForIngest();
   try {
-    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql"]) {
+    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
       db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
     }
     const id = "c4eec711-eb76-4bd2-a6a3-d2bb3a0aae61";
@@ -360,7 +385,7 @@ it.each([
 ])("aplica el cupo del ajuste y espera el resultado autenticado en $plan", async ({ plan, priority, limit, outcome }) => {
   const db = databaseForIngest();
   try {
-    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql"]) {
+    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
       db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
     }
     const userId = "9b7eb194-c462-40de-b44c-f37a100601b1";
@@ -809,7 +834,7 @@ describe("Ingesta R2 multipart", () => {
   it.each([1, 2])("carga el panel con sesión de formato %s y una sola llamada a D1", async (version) => {
     const db = databaseForIngest();
     try {
-      for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0007_delivery_duration.sql", "0019_brief_ad_cta.sql"]) {
+      for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0007_delivery_duration.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
         db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
       }
       db.exec("INSERT INTO users(id,google_sub,email) VALUES('otro','google-otro','otro@example.invalid')");

@@ -274,7 +274,7 @@ export class RenderBackend implements Backend {
       }
       if (ad) {
         const track = await stageAdMusic(this.nas, this.scratch, request.project_id, work, bounded);
-        await this.deps.run(this.config.ffmpeg, mixAdAudio(speech, track, audio), {timeoutMs: 120000, signal: bounded});
+        await this.deps.run(this.config.ffmpeg, mixAdAudio(speech, track, audio, Boolean(ad.destination)), {timeoutMs: 120000, signal: bounded});
       }
       const measured = parseLoudness((await this.deps.run(this.config.ffmpeg, measureAudio(audio, duration), {timeoutMs: 1200000, signal: bounded})).stderr);
       const framesStarted = performance.now();
@@ -334,7 +334,7 @@ export class RenderBackend implements Backend {
           ? correctMp4Audio(previousOutput, audio, output, request.durationInFrames, duration, measured, peak)
           : proresList
           ? muxProresFragments(proresList, audio, output, request.durationInFrames, duration, measured, peak)
-          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, scenes, ad ? AD_MUSIC_ID : undefined);
+          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, scenes, ad ? AD_MUSIC_ID : undefined, Boolean(ad?.destination));
         await this.deps.run(this.config.ffmpeg, encode, {timeoutMs: 1200000, signal: bounded});
         const outputProbe = await this.#readProbe(output, bounded);
         if ((sourceVideo || proresList || correctingMp4 || scenes) && videoFrameCount(outputProbe) !== request.durationInFrames) {

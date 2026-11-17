@@ -84,3 +84,13 @@ WHERE blob1 = 'produccion' AND timestamp >= NOW() - INTERVAL '30' DAY
 GROUP BY ruta, conexion
 ORDER BY ruta, conexion
 ```
+
+### Perfiles opcionales para el CTA
+
+Un brief de anuncio en MP4 puede enviar `ad_contacts` con las URLs opcionales
+`facebook`, `instagram`, `whatsapp` y un `channel` que tenga URL. WhatsApp
+usa `https://wa.me/` seguido del número internacional sin signos. Si
+se omite `ad_cta`, se genera el texto para el canal elegido. El titular puede
+consultar todos los datos guardados. El despacho envía un único
+`ad_destination` con `channel` y `url`. Los briefs anteriores siguen
+respondiendo con su texto de CTA. [Migración 0020](../migrations/0020_brief_ad_contacts.sql)

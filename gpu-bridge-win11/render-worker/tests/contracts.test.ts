@@ -125,3 +125,20 @@ test('ProRes4444 alfa es exclusivo de Ilimitado y conserva 1080p o 4K y capturas
   for (const plan of ['Free', 'Pro', 'Ultra']) assert.throws(() => parseRender({...request(), plan, format: 'prores4444'}), WorkerError);
   for (const format of ['mov', 'prores', 'h264', null]) assert.throws(() => parseRender({...request(), plan: 'Ilimitado', format}), WorkerError);
 });
+
+test('el CTA social conserva sólo el destino elegido y agenda cada fotograma animado', () => {
+  const scenes = [
+    {source_start_frame: 2000, source_end_frame: 2300, label: {text:'Gancho', start_frame:0, end_frame:90, position:'top'}},
+    {source_start_frame: 400, source_end_frame:1000},
+  ];
+  const destination = {channel:'facebook',url:'https://www.facebook.com/rinconsansevieras'};
+  const ad = {cta:'Escríbenos',brand:'Vivero',captions:[{start_frame:20,end_frame:60,text:'Nuestra colección'}],destination};
+  const props = {...request().props,duration_seconds:30,video_path:'proyectos/sansevieras/01_raw/crudo.mp4',scenes,ad};
+  const value = parseRender({...request(),props});
+  assert.deepEqual(value.props.ad?.destination,destination);
+  const frames = graphicFrames(value.props.scenes!,value.props.ad);
+  assert.ok(frames.includes(1) && frames.includes(751) && frames.includes(899));
+  for (const bad of ['https://instagram.com/rinconsansevieras','https://www.facebook.com.ejemplo.invalid/perfil','https://www.facebook.com/perfil?track=1']) {
+    assert.throws(() => parseRender({...request(),props:{...props,ad:{...ad,destination:{...destination,url:bad}}}}),WorkerError);
+  }
+});
