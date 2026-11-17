@@ -58,6 +58,7 @@ ROSTER = {
             "ai-image-generation",
             "ai-video-generation",
             "operacion-worker-remotion-gpu",
+            "resolve-audio-lucas",
             "hyperframes",
             "hyperframes-cli",
             "hyperframes-registry",

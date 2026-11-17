@@ -218,3 +218,7 @@ el Worker. Actualiza la validación de briefs en el despacho y los agentes,
 el renderer y después el portal. Verifica que el brief devuelve al titular
 los tres campos y que el despacho sólo transfiere el canal seleccionado.
 Comprueba los fundidos, el icono y la URL en un MP4 de ensayo.
+
+Para cambios en `resolve-audio-lucas`, coteja la huella del manifiesto de
+skills. La conexión real de OpenClaw con Resolve Studio y la revisión del
+vídeo exportado se comprueban en el entorno del proyecto.

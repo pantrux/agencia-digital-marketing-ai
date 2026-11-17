@@ -117,6 +117,25 @@ Aplica primero la migración D1 `0019_brief_ad_cta.sql`. Despliega el Worker, la
 
 ## Acabado de anuncios en DaVinci Resolve
 
+Lucas usa `resolve-audio-lucas` con davinci-resolve-mcp 5.3.1, fijado al
+[commit de origen](https://github.com/samuelgursky/davinci-resolve-mcp/tree/e4bcd1d9eeefe59ebda9acc9dd17059e1358af02).
+El MCP usa HTTP con token sobre un túnel SSH inverso con ambos extremos en
+loopback. Guarda `DAVINCI_MCP_TOKEN` en la bóveda y en el entorno privado de
+OpenClaw. Inicia `src/server.py --transport streamable-http` desde el entorno
+Python del MCP en Windows con Resolve Studio abierto y con las rutas de scripts
+de Blackmagic. Usa `DAVINCI_MCP_HOST=127.0.0.1` y `DAVINCI_MCP_PORT=48765`.
+El reenvío SSH `-R 127.0.0.1:48765:127.0.0.1:48765` hacia el host de OpenClaw
+establece la conexión. Registra `davinci-resolve` como `streamable-http` con la
+URL `http://127.0.0.1:48765/mcp`, el encabezado
+`Authorization: Bearer ${DAVINCI_MCP_TOKEN}` y
+`codex.agents: ["agency-editor"]` para el agente Lucas. Mantén el filtro de
+herramientas en `resolve_control`, `timeline`, `timeline_item`, `media_pool`,
+`project_manager` y `render`.
+Pide a Lucas leer la versión y la línea de tiempo activa antes de editar una
+copia. Conserva el render, su huella y el dictamen de Elena en el área privada
+de revisión.
+
+
 Lucas puede preparar un anuncio guiado de 30 s de un plan pagado con `docker/n8n/production_resolve.py`. El piloto es optativo y usa los recibos privados de ingesta y dirección. Coteja las huellas de las fuentes, escribe una copia vertical a 30 fps y entrega un OTIO a 900 fotogramas con pistas de imagen, voz y música, un SRT y marcadores de los rótulos y el CTA. Mantén el paquete con sus referencias y guarda los cambios en el proyecto de Resolve.
 
 En Windows, instala `opentimelineio==0.18.1` en el entorno de preparación y usa el FFmpeg del puente. Ejemplo con argumentos del proyecto seleccionado:
