@@ -1,4 +1,4 @@
-import {copyFile, lstat, readFile, writeFile, stat} from 'node:fs/promises';
+import {copyFile, link, lstat, mkdir, readFile, writeFile, stat} from 'node:fs/promises';
 import {constants, createReadStream} from 'node:fs';
 import {createHash, createHmac, timingSafeEqual} from 'node:crypto';
 import path from 'node:path';
@@ -10,14 +10,28 @@ import {NasPaths} from './nas.ts';
 import {ScratchSpace} from './scratch.ts';
 import {runProcess} from './process.ts';
 import {renderScene} from './remotion.ts';
-import {alphaMaskArgs, alphaMaskSummary, audioAccepted, correctMp4Audio, encodeOutput, encodeProresFragment, measureAudio, muxProresFragments, outputViolations, overlayInputSupported, overlayPacketTimingSupported, packetProbeArgs, parseLoudness, parseProbe, probeArgs, ebur128Args, parseEbur128, videoFrameCount, type MediaInfo} from './media.ts';
+import {alphaMaskArgs, alphaMaskSummary, audioAccepted, correctMp4Audio, cutSceneAudio, encodeOutput, encodeProresFragment, measureAudio, muxProresFragments, outputViolations, overlayInputSupported, overlayPacketTimingSupported, packetProbeArgs, parseLoudness, parseProbe, probeArgs, ebur128Args, parseEbur128, videoFrameCount, type MediaInfo} from './media.ts';
 import {contactSheet, normalizedRuler} from './qa.ts';
+import {graphicFrames, graphicLabel} from './timeline.ts';
 
 interface Dependencies {run: typeof runProcess; scene: typeof renderScene; verifyTools(config: RuntimeConfig): Promise<void>; verifyMapping(config: RuntimeConfig): Promise<void>}
 interface Artifact {path: string; bytes: number; sha256: string}
 const receiptName = '.recibo-puente-v1.json';
 const hashPattern = /^[a-f0-9]{64}$/;
 type RenderStage = 'render' | 'stills';
+
+async function timelineImages(work: string, frames: number[], files: string[], count: number, signal: AbortSignal) {
+  const dir = path.join(work, 'rotulos');
+  await mkdir(dir);
+  // Los enlaces comparten los PNG de cada estado y mantienen el reloj exacto de 30 fps.
+  for (const [index, start] of frames.entries()) {
+    for (let frame = start; frame < (frames[index + 1] ?? count); frame += 1) {
+      signal.throwIfAborted();
+      await link(files[index]!, path.join(dir, `still-${frame}.png`));
+    }
+  }
+  return path.join(dir, 'still-%d.png');
+}
 
 async function sha256File(filename: string, signal?: AbortSignal): Promise<string> {
   const digest = createHash('sha256');
@@ -200,20 +214,34 @@ export class RenderBackend implements Backend {
       const pixels = request.width * request.height;
       const frameBytes = pixels * 4 + 1024 ** 2;
       const outputs = request.format === 'prores4444' ? request.durationInFrames * pixels * 16 : 4 * 1024 ** 3;
+      const scenes = request.props.scenes;
       if (!request.props.audio_path) throw new WorkerError(422, 'AUDIO_AUSENTE', 'El render final requiere una pista de audio.');
-      const sourceAudio = await this.nas.input(request.props.audio_path, request.project_id), audio = path.join(work, 'audio' + path.extname(sourceAudio));
-      await this.scratch.ensureSpace((await stat(sourceAudio)).size);
-      await copyFile(sourceAudio, audio, constants.COPYFILE_EXCL);
-      if (!(await this.#probe(audio, bounded)).has_audio) throw new WorkerError(422, 'AUDIO_AUSENTE', 'La pista no contiene audio.');
+      const sourceAudio = await this.nas.input(request.props.audio_path, request.project_id);
+      const audio = path.join(work, 'audio' + (scenes ? '.wav' : path.extname(sourceAudio)));
+      await this.scratch.ensureSpace(scenes ? Math.ceil(duration) * 288000 + 1024 ** 2 : (await stat(sourceAudio)).size);
+      if (scenes) await this.deps.run(this.config.ffmpeg, cutSceneAudio(sourceAudio, audio, scenes), {timeoutMs: 120000, signal: bounded});
+      else await copyFile(sourceAudio, audio, constants.COPYFILE_EXCL);
+      const audioInfo = await this.#probe(audio, bounded);
+      if (!audioInfo.has_audio) throw new WorkerError(422, 'AUDIO_AUSENTE', 'La pista no contiene audio.');
+      if (scenes && Math.abs(audioInfo.duration_seconds - duration) > 0.02) {
+        throw new WorkerError(422, 'ESCENAS_FUERA_DEL_AUDIO', 'Los cortes deben conservar audio en todos los intervalos.');
+      }
       const measured = parseLoudness((await this.deps.run(this.config.ffmpeg, measureAudio(audio, duration), {timeoutMs: 1200000, signal: bounded})).stderr);
       const framesStarted = performance.now();
       const video = await this.#videoInput(request, bounded);
-      const staticProres = request.format === 'prores4444' && !video && request.durationInFrames > TITLE_FADE_FRAMES + 1;
+      const staticProres = !scenes && request.format === 'prores4444' && !video && request.durationInFrames > TITLE_FADE_FRAMES + 1;
       const videoBytes = video ? (await stat(video.source)).size : 0;
       let sourceVideo: string | undefined;
       let normalizeVideo = false;
       const overlayMode = video && overlayInputSupported(video.probe, request);
-      if (video && overlayMode) {
+      if (video && scenes) {
+        const info = parseProbe(video.probe);
+        if (info.duration_seconds + 0.001 < scenes.at(-1)!.source_end_frame / 30
+          || info.color_transfer === 'smpte2084' || info.color_transfer === 'arib-std-b67') {
+          throw new WorkerError(422, 'FUENTE_REEL_INVALIDA', 'Los cortes requieren vídeo SDR y deben quedar dentro de la fuente.');
+        }
+        sourceVideo = video.source;
+      } else if (video && overlayMode) {
         await this.scratch.ensureSpace(videoBytes + (TITLE_FADE_FRAMES + 1) * frameBytes + outputs);
         const localVideo = path.join(work, 'crudo.mp4');
         await copyFile(video.source, localVideo, constants.COPYFILE_EXCL);
@@ -223,15 +251,19 @@ export class RenderBackend implements Backend {
           normalizeVideo = overlayMode === 'normalized';
         }
       }
-      const layerFrames = sourceVideo || staticProres ? Array.from({length: TITLE_FADE_FRAMES + 1}, (_, index) => index) : null;
+      const layerFrames = scenes ? graphicFrames(scenes)
+        : sourceVideo || staticProres ? Array.from({length: TITLE_FADE_FRAMES + 1}, (_, index) => index) : null;
       // La gráfica sin crudo solo renderiza el fundido. El margen del MOV se calcula tras codificar sus fragmentos.
-      if (staticProres) await this.scratch.ensureSpace((TITLE_FADE_FRAMES + 1) * frameBytes * 2);
+      if (scenes) await this.scratch.ensureSpace((layerFrames?.length ?? 0) * frameBytes + outputs);
+      else if (staticProres) await this.scratch.ensureSpace((TITLE_FADE_FRAMES + 1) * frameBytes * 2);
       else if (!sourceVideo) await this.scratch.ensureSpace(videoBytes + request.durationInFrames * frameBytes + outputs);
       const scene = await this.#scene(request, work, layerFrames, bounded, sourceVideo ? null : video?.source ?? null, sourceVideo ? true : undefined);
       const encodeStarted = performance.now();
       if (scene.frameCount !== (layerFrames?.length ?? request.durationInFrames)
         || scene.files.length !== (layerFrames?.length ?? 1)) throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'La composición no produjo todos los fotogramas.');
-      const framePattern = layerFrames ? path.join(work, 'frames', 'still-%d.png') : scene.files[0]!;
+      const framePattern = scenes && layerFrames
+        ? await timelineImages(work, layerFrames, scene.files, request.durationInFrames, bounded)
+        : layerFrames ? path.join(work, 'frames', 'still-%d.png') : scene.files[0]!;
       const proresList = staticProres
         ? await this.#prepareStaticProres(work, framePattern, scene.files.at(-1)!, request.durationInFrames, bounded)
         : null;
@@ -246,13 +278,13 @@ export class RenderBackend implements Backend {
           ? correctMp4Audio(previousOutput, audio, output, request.durationInFrames, duration, measured, peak)
           : proresList
           ? muxProresFragments(proresList, audio, output, request.durationInFrames, duration, measured, peak)
-          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo);
+          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, scenes);
         await this.deps.run(this.config.ffmpeg, encode, {timeoutMs: 1200000, signal: bounded});
         const outputProbe = await this.#readProbe(output, bounded);
-        if ((sourceVideo || proresList || correctingMp4) && videoFrameCount(outputProbe) !== request.durationInFrames) {
+        if ((sourceVideo || proresList || correctingMp4 || scenes) && videoFrameCount(outputProbe) !== request.durationInFrames) {
           throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'El máster no conserva todos los fotogramas esperados.');
         }
-        if (proresList || normalizeVideo) {
+        if (proresList || normalizeVideo || scenes) {
           const {stdout} = await this.deps.run(this.config.ffprobe, packetProbeArgs(output), {timeoutMs: 30000, signal: bounded});
           if (!overlayPacketTimingSupported(stdout, request.durationInFrames)) {
             throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'El máster no conserva las marcas de tiempo esperadas.');
@@ -265,7 +297,9 @@ export class RenderBackend implements Backend {
       if (!audioAccepted(finalAudio)) throw new WorkerError(422, 'AUDIO_FUERA_DE_OBJETIVO', 'El audio final no cumple sonoridad y pico verdadero.');
       const violations = info ? outputViolations(info,request) : ['metadata'];
       if (!info || violations.length) throw new WorkerError(502, 'VIDEO_FUERA_DE_CONTRATO', 'El archivo final no cumple el contrato técnico: '+violations.join(', ')+'.');
-      const alpha = request.transparent ? {...await this.#alpha(output, work, 'render', duration / 2, bounded), sample_seconds: duration / 2} : null;
+      const labelFrame = scenes && layerFrames?.find(frame => graphicLabel(scenes, frame));
+      const alphaAt = labelFrame === undefined ? duration / 2 : labelFrame / 30;
+      const alpha = request.transparent ? {...await this.#alpha(output, work, 'render', alphaAt, bounded), sample_seconds: alphaAt} : null;
       bounded.throwIfAborted();
       const publishStarted = performance.now();
       const files = await publish([output]);
@@ -276,7 +310,7 @@ export class RenderBackend implements Backend {
         codificacion_y_control: Math.round(publishStarted - encodeStarted),
         publicacion_nas: Math.round(finished - publishStarted),
       };
-      const render_pipeline = sourceVideo ? 'capas_remotion_nvenc' : staticProres ? 'prores_grafica_estatica' : 'fotogramas_remotion';
+      const render_pipeline = scenes ? 'capas_por_escena' : sourceVideo ? 'capas_remotion_nvenc' : staticProres ? 'prores_grafica_estatica' : 'fotogramas_remotion';
       return {files, codec: request.format === 'mp4' ? 'h264_nvenc' : 'prores_ks', hardware_acceleration: request.format === 'mp4', resolution: request.resolution, watermark: request.watermark, audio_verified: true, audio: finalAudio, alpha_verified: request.transparent && alpha?.has_transparency === true, alpha, media: info, elapsed_ms: Math.round(finished - started), stage_ms, render_pipeline};
     }));
   }

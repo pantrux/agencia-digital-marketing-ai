@@ -17,6 +17,24 @@ test('contrato vertical local con marca de agua obligatoria en Free', () => {
   assert.equal(value.height, 1920);
 });
 
+test('un reel conserva cortes y rótulos con extremos exclusivos en fotogramas', () => {
+  const props = {...request().props, duration_seconds: 36, video_path: 'proyectos/sansevieras/01_raw/crudo.mp4'};
+  const scenes = [
+    {source_start_frame: 30, source_end_frame: 390, label: {text: 'Catálogo', start_frame: 0, end_frame: 90, position: 'bottom'}},
+    {source_start_frame: 1200, source_end_frame: 1920},
+  ];
+  const reel = parseRender({...request(), props: {...props, scenes}});
+  assert.deepEqual(reel.props.scenes, scenes);
+  assert.deepEqual(compositionInput(reel, null).scenes, scenes);
+  assert.throws(() => parseRender({...request(), props: {...props, duration_seconds: 35, scenes}}), WorkerError);
+  assert.throws(() => parseRender({...request(), props: {...props, scenes: [
+    scenes[0], {source_start_frame: 389, source_end_frame: 1109},
+  ]}}), WorkerError);
+  assert.throws(() => parseRender({...request(), props: {...props, scenes: [
+    {...scenes[0], label: {...scenes[0]!.label, end_frame: 361}}, scenes[1],
+  ]}}), WorkerError);
+});
+
 test('rechaza composición remota, propiedades desconocidas y duración fuera del plan', () => {
   for (const value of [
     {...request(), composition: 'https://ejemplo.invalid/composicion'},

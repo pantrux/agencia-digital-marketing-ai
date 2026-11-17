@@ -9,10 +9,13 @@ export class WorkerError extends Error {
 export type Plan = 'Free' | 'Pro' | 'Ultra' | 'Ilimitado';
 export type Resolution = '1080p' | '4k';
 export type OutputFormat = 'mp4' | 'prores4444';
+export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom'}
+export interface EditScene {source_start_frame: number; source_end_frame: number; label?: SceneLabel}
 export interface CompositionProps {
   title: string; subtitle: string; duration_seconds: number;
   subtitle_size?: 'large';
   background: string; accent: string; video_path?: string; audio_path?: string;
+  scenes?: EditScene[];
 }
 export interface RenderRequest {
   project_id: string; job_id: string; composition: 'AgencyVertical'; plan: Plan;
@@ -57,6 +60,37 @@ function numeric(value: unknown, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) invalid('El valor numérico supera los límites.');
   return value;
 }
+function frameNumber(value: unknown, minimum: number, maximum: number): number {
+  const frame = numeric(value, minimum, maximum);
+  if (!Number.isInteger(frame)) invalid('Los límites de escena deben ser fotogramas enteros.');
+  return frame;
+}
+function editScenes(value: unknown, count: number): EditScene[] {
+  if (!Array.isArray(value) || value.length < 2 || value.length > 6 || count < 900 || count > 1350) {
+    invalid('Un reel requiere entre dos y seis escenas y entre 30 y 45 segundos.');
+  }
+  let last = 0, total = 0, labels = 0;
+  const scenes = value.map((entry: unknown): EditScene => {
+    const item = object(entry, ['source_start_frame', 'source_end_frame', 'label']);
+    const start = frameNumber(item.source_start_frame, last, MAX_SEGMENT_SECONDS * 30 - 15);
+    const end = frameNumber(item.source_end_frame, start + 15, MAX_SEGMENT_SECONDS * 30);
+    last = end;
+    total += end - start;
+    const scene = {source_start_frame: start, source_end_frame: end};
+    if (item.label === undefined) return scene;
+    const caption = object(item.label, ['text', 'start_frame', 'end_frame', 'position']);
+    const label = text(caption.text, '', 80);
+    const labelStart = frameNumber(caption.start_frame, 0, end - start - 15);
+    const labelEnd = frameNumber(caption.end_frame, labelStart + 15, Math.min(end - start, labelStart + 180));
+    if (!label.trim() || (caption.position !== 'top' && caption.position !== 'bottom')) {
+      invalid('El rótulo requiere texto y posición.');
+    }
+    labels += 1;
+    return {...scene, label: {text: label, start_frame: labelStart, end_frame: labelEnd, position: caption.position}};
+  });
+  if (!labels || total !== count) invalid('Los cortes deben sumar la duración del reel y contener al menos un rótulo.');
+  return scenes;
+}
 export function mediaPath(value: unknown, project: string): string {
   if (typeof value !== 'string' || value.length > 500 || /[\\<>:"|?*]/.test(value) || hasControl(value)) invalid('La ruta de medios no es válida.');
   const parts = value.split('/');
@@ -78,8 +112,9 @@ function base(value: unknown, stills: boolean): RenderRequest {
   if (resolution !== '1080p' && resolution !== '4k') invalid('La resolución no está permitida.');
   if (resolution === '4k' && plan !== 'Ultra' && plan !== 'Ilimitado') invalid('4K requiere Ultra o Ilimitado.');
   if (format === 'prores4444' && plan !== 'Ilimitado') invalid('ProRes4444 alfa requiere Ilimitado.');
-  const input = object(data.props, ['title', 'subtitle', 'subtitle_size', 'duration_seconds', 'background', 'accent', 'video_path', 'audio_path']);
+  const input = object(data.props, ['title', 'subtitle', 'subtitle_size', 'duration_seconds', 'background', 'accent', 'video_path', 'audio_path', 'scenes']);
   const duration_seconds = numeric(input.duration_seconds, 0.1, durations[plan]);
+  const durationInFrames = Math.max(1, Math.round(duration_seconds * 30));
   const props: CompositionProps = {
     title: text(input.title, '', 120), subtitle: text(input.subtitle, '', 240), duration_seconds,
     background: text(input.background, '#102032', 7), accent: text(input.accent, '#8fe3c5', 7),
@@ -89,8 +124,12 @@ function base(value: unknown, stills: boolean): RenderRequest {
   else if (input.subtitle_size !== undefined) invalid('El tamaño del subtítulo no está permitido.');
   if (input.video_path !== undefined) props.video_path = mediaPath(input.video_path, project_id);
   if (input.audio_path !== undefined) props.audio_path = mediaPath(input.audio_path, project_id);
+  if (input.scenes !== undefined) {
+    if (Boolean(props.video_path) !== (format === 'mp4')) invalid('El MP4 por escenas requiere vídeo y el ProRes solo contiene la gráfica.');
+    props.scenes = editScenes(input.scenes, durationInFrames);
+  }
   if (!stills && !props.audio_path) invalid('El render final requiere una pista de audio verificable.');
-  return {project_id, job_id, composition: 'AgencyVertical', plan, format, resolution, transparent: format === 'prores4444', props, watermark: plan === 'Free', ...outputDimensions(resolution), fps: 30, durationInFrames: Math.max(1, Math.round(duration_seconds * 30))};
+  return {project_id, job_id, composition: 'AgencyVertical', plan, format, resolution, transparent: format === 'prores4444', props, watermark: plan === 'Free', ...outputDimensions(resolution), fps: 30, durationInFrames};
 }
 export function parseRender(value: unknown): RenderRequest {return base(value, false);}
 export function parseStills(value: unknown): StillsRequest {

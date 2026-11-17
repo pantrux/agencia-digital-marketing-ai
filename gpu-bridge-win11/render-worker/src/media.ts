@@ -1,4 +1,4 @@
-import {MAX_SEGMENT_SECONDS, outputDimensions, TITLE_FADE_FRAMES, WorkerError, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
+import {MAX_SEGMENT_SECONDS, outputDimensions, TITLE_FADE_FRAMES, WorkerError, type EditScene, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
 
 export interface Loudness {integrated_lufs: number; true_peak_dbtp: number; range_lu: number; threshold_lufs: number; offset_lu: number}
 export interface MediaInfo {duration_seconds: number; width: number; height: number; fps: number; video_codec: string | null; video_profile: string | null; codec_tag: string | null; audio_codec: string | null; has_audio: boolean; sample_rate: number | null; color_space: string | null; color_transfer: string | null; color_primaries: string | null; pixel_format: string | null}
@@ -145,23 +145,47 @@ function normalizeAudio(count: number, duration: number, measured: Loudness, pea
 }
 const aacAudio = ['-c:a','aac','-b:a','256k','-ar','48000','-ac','2'];
 
-export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false): string[] {
+export function cutSceneAudio(input: string, output: string, scenes: readonly EditScene[]): string[] {
+  const channels = scenes.map((_, index) => `[a${index}]`).join('');
+  const pieces = scenes.map((scene, index) => `[a${index}]atrim=start_sample=${scene.source_start_frame * 1600}:end_sample=${scene.source_end_frame * 1600},asetpts=PTS-STARTPTS[p${index}]`);
+  const concat = scenes.map((_, index) => `[p${index}]`).join('');
+  const filter = [`[0:a:0]aformat=sample_rates=48000:channel_layouts=stereo,asplit=${scenes.length}${channels}`,
+    ...pieces, `${concat}concat=n=${scenes.length}:v=0:a=1[audio]`].join(';');
+  return ['-hide_banner','-nostdin','-nostats','-n','-i',input,'-filter_complex',filter,'-map','[audio]','-c:a','pcm_s24le',output];
+}
+
+export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false, scenes?: readonly EditScene[]): string[] {
+  if (scenes && !sourceVideo) return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);
   const {width,height} = outputDimensions(resolution);
   const high = resolution === '4k';
   const images = ['-framerate','30','-start_number','0','-i',frames];
   const tail = normalize ? `tpad=stop_mode=clone:stop_duration=${exactTimeToleranceSeconds},` : '';
-  const scale = `[0:v]fps=fps=30:start_time=0,${tail}scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=bilinear:in_color_matrix=bt709`;
+  const videoInputs: string[] = [];
+  const cuts = scenes?.map((scene, index) => {
+    // Buscar en segundos enteros deja un margen de fotogramas antes de cada corte.
+    const seek = Math.max(0, Math.floor(scene.source_start_frame / 30) - 1);
+    videoInputs.push('-threads','2','-ss',String(seek),'-i',sourceVideo!);
+    return `[${index}:v]fps=30:start_time=0,trim=start_frame=${scene.source_start_frame - seek * 30}:end_frame=${scene.source_end_frame - seek * 30},setpts=PTS-STARTPTS[plano${index}]`;
+  }) ?? [];
+  if (scenes) {
+    const links = scenes.map((_, index) => `[plano${index}]`).join('');
+    cuts.push(`${links}concat=n=${scenes.length}:v=1:a=0,settb=1/30,setpts=N[montaje]`);
+  } else if (sourceVideo) videoInputs.push('-i',sourceVideo);
+  const videoFilter = scenes ? '[montaje]' : `[0:v]fps=fps=30:start_time=0,${tail}`;
+  const scale = `${videoFilter}scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=bilinear`;
   const crop = `crop=${width}:${height},setsar=1`;
+  const graphicsInput = scenes?.length ?? 1;
   const overlay = 'alpha=straight:eof_action=repeat:repeatlast=1';
   // El crudo admitido ya está en YUV BT.709. Solo se convierte la capa RGBA.
   const filter = [
-    `${scale}:out_color_matrix=bt709:in_range=tv:out_range=tv,${crop},format=yuv420p[video]`,
-    '[1:v]scale=in_range=pc:out_range=tv:out_color_matrix=bt709,format=yuva420p[capa]',
+    ...cuts,
+    `${scale}:${scenes ? 'out_color_matrix=bt709:out_range=tv' : 'in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=tv'},${crop},format=yuv420p[video]`,
+    `[${graphicsInput}:v]scale=in_range=pc:out_range=tv:out_color_matrix=bt709,format=yuva420p[capa]`,
     `[video][capa]overlay=format=yuv420:${overlay},${limitedBt709}[comp]`,
   ].join(';');
   const inputs = sourceVideo
-    ? ['-xerror','-filter_complex_threads','4','-i',sourceVideo,...images,'-i',audio,'-filter_complex',filter,'-map','[comp]','-map','2:a:0']
+    ? ['-xerror','-filter_complex_threads','4',...videoInputs,...images,'-i',audio,'-filter_complex',filter,'-map','[comp]','-map',`${graphicsInput + 1}:a:0`]
     : [...images,'-i',audio,'-map','0:v:0','-map','1:a:0','-vf',sdrVideoFilter('yuv420p', frames.endsWith('.jpeg'))];
   return ['-hide_banner','-nostdin','-nostats','-n',...inputs,'-frames:v',String(count),'-t',String(duration),'-c:v','h264_nvenc','-preset','p5','-profile:v','high','-level:v',high ? '5.1' : '4.2','-b:v',high ? '24M' : '6M','-maxrate',high ? '32M' : '8M','-bufsize',high ? '48M' : '12M','-colorspace','bt709','-color_primaries','bt709','-color_trc','bt709','-color_range','tv','-af',audioFilter,...aacAudio,'-movflags','+faststart',output];
 }
@@ -193,8 +217,8 @@ export function muxProresFragments(list: string, audio: string, output: string, 
     '-video_track_timescale',String(proresTimescale),'-af',audioFilter,...pcmAudio,'-f','mov',output];
 }
 
-export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string, normalize = false): string[] {
-  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo, normalize);
+export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string, normalize = false, scenes?: readonly EditScene[]): string[] {
+  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo, normalize, scenes);
   outputDimensions(resolution);
   if (format !== 'prores4444') return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);
