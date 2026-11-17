@@ -42,6 +42,7 @@ flowchart TB
     GPU["Cierre GPU: CUDA, formatos 1080p y 4K con alfa, salud LAN, dos slots y YuNet/AuraFace"] -->|"Evidencia operativa"| LIMITE
     LIMITE --> FASE4["Fase 4: aplicaciones, observabilidad y restauración desde NAS y R2"]
     LIMITE --> FASE5["Fase 5: cinco agentes, skills y cuatro MCP en OpenClaw"]
+    FASE5 --> DAVINCI["Lucas verifica el MCP privado de DaVinci Resolve y entrega el render a Elena"]
     LIMITE -. "Aceptación operativa pendiente" .-> FASE6["Fase 6: portal, Worker, D1, ingress y Sofía"]
     LIMITE -. "Aceptación operativa pendiente" .-> FASE7["Fase 7: producción, entrega, reversión y auditoría de la bóveda"]
     PG4["PostgreSQL en la VM: PGDATA, Kitsu, n8n, SupoClip e Immich; perfil del respaldo diario"] -->|"Evidencia operativa"| FASE4

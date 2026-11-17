@@ -171,6 +171,12 @@
         "sha256": "3e7a1fcfaec9a0291b6c5eaf1cd4ba75743dd0223a9a3dd4badc146d0199cb30"
       }
     },
+    "resolve-audio-lucas": {
+      "SKILL.md": {
+        "size": 2423,
+        "sha256": "568809aca4fb39425c2c6b58df1e7ed8d15b986f749072e417304300307b0226"
+      }
+    },
     "rubrica-qa-audiovisual": {
       "SKILL.md": {
         "size": 3911,

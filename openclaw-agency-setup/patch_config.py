@@ -55,6 +55,7 @@ ROSTER = {
             "ai-image-generation",
             "ai-video-generation",
             "operacion-worker-remotion-gpu",
+            "resolve-audio-lucas",
         ),
     ),
     "agency-critic": (

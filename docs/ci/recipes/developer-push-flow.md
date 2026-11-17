@@ -210,3 +210,7 @@ Los contratos Node del renderer comprueban también compilación estática únic
 Para la primera actualización de un repositorio nuevo, el control 7 obtiene el commit y su árbol completo por API de solo lectura: exige identidad coincidente, respuesta sin truncar y presencia del workflow, esta receta y el diagrama. No necesita historial local ni ejecutar comandos Git.
 
 Si falla la calidad, consultar el registro del trabajo y corregir la causa. Si falla una entrega futura, usar la [receta SRE](sre-rollback.md) y el [índice de incidentes](../README.md).
+
+Para cambios en `resolve-audio-lucas`, coteja la huella del manifiesto de
+skills. La conexión real de OpenClaw con Resolve Studio y la revisión del
+vídeo exportado se comprueban en el entorno del proyecto.
