@@ -101,6 +101,22 @@ describe("Historial de Sofía", () => {
     expect(context.mensaje_actual).toBe("¿Qué sigue?");
     expect(await prepareConversation(env, user, order, next, "¿Qué sigue?", { marca: "Cambió" })).toBe(wire);
   });
+  it("reserva espacio para el diálogo reciente ante una referencia y un brief extensos", async () => {
+    const {env} = fixture();
+    const next = "33a8a5da-cff2-4d02-99e8-0e8ec20d0049";
+    await prepareConversation(env,user,order,requestId,"Prefiero una edición cálida y cercana");
+    await saveConversation(env,user,order,requestId,"Prefiero una edición cálida y cercana","Usaré música suave y rótulos discretos.");
+    const wire = await prepareConversation(env,user,order,next,"¿Y el cierre?",{
+      referencia_estado:"available",referencia_titulo_publico:"Vivero".repeat(30),
+      referencia_descripcion_publica:"Plantas".repeat(50),referencia_texto_publico:"Estilo cercano ".repeat(100),
+      referencia_url:"https://vivero.cl/",marca:"Mi marca",objetivo_confirmado:"Mostrar plantas".repeat(30),
+      audiencia_confirmada:"Amantes de las plantas".repeat(20),tono_confirmado:"Cercano".repeat(40),
+    });
+    const context = JSON.parse(wire);
+    expect(new TextEncoder().encode(wire).length).toBeLessThanOrEqual(2048);
+    expect(context.historial).toEqual([{usuario:"Prefiero una edición cálida y cercana",sofia:"Usaré música suave y rótulos discretos."}]);
+    expect(context.mensaje_actual).toBe("¿Y el cierre?");
+  });
 });
 
 describe("Materiales de la producción", () => {

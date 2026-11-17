@@ -425,8 +425,12 @@ export async function expireAbandonedReservations(env: IngestEnv): Promise<void>
     AND NOT EXISTS (SELECT 1 FROM upload_sessions s WHERE s.order_id = o.id
       AND (s.status NOT IN ('creating', 'open', 'aborting') OR s.expires_at > ? OR s.lease_until > ?))
     AND NOT EXISTS (SELECT 1 FROM production_sources source JOIN production_source_uploads upload ON upload.source_id=source.id
-      WHERE source.order_id=o.id AND (upload.status NOT IN ('creating', 'open', 'aborting')
-        OR upload.expires_at > ? OR upload.lease_until > ?))`;
+      WHERE source.order_id=o.id AND upload.status <> 'completed'
+        AND (upload.status NOT IN ('creating', 'open', 'aborting', 'aborted')
+          OR upload.expires_at > ? OR upload.lease_until > ?))
+    AND (NOT EXISTS (SELECT 1 FROM production_sources source WHERE source.order_id=o.id)
+      OR EXISTS (SELECT 1 FROM production_sources source LEFT JOIN production_source_uploads upload ON upload.source_id=source.id
+        WHERE source.order_id=o.id AND (upload.status IS NULL OR upload.status <> 'completed')))`;
   const scope = [env.BILLING_MODE, now - sessionTtl, now, now, now, now] as const;
   const due = await env.DB.withSession("first-primary").prepare(`
     SELECT o.id FROM orders o JOIN usage_ledger u ON u.order_id = o.id AND u.user_id = o.user_id

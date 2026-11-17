@@ -1391,6 +1391,41 @@ describe("Ingesta R2 multipart", () => {
     } finally { db.close(); }
   });
 
+  it("libera un conjunto incompleto vencido sin cancelar uno completamente cargado", async () => {
+    const db = databaseForIngest();
+    try {
+      db.prepare("UPDATE orders SET created_at=unixepoch()-90000 WHERE id=?").run(order);
+      const items = ["uno", "dos"].map(name => ({name:`${name}.mp4`,bytes:7,sha256:digest,extension:"mp4"}));
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order,JSON.stringify(items),digest);
+      const sources = db.prepare("SELECT id FROM production_sources WHERE order_id=? ORDER BY position").all(order) as {id:string}[];
+      db.prepare(`INSERT INTO production_source_uploads(source_id,object_key,upload_id,status,object_etag,created_at,expires_at)
+        VALUES (?,'objeto1','multipart1','completed','etag',unixepoch()-90000,unixepoch()-1)`).run(sources[0]!.id);
+      db.prepare(`INSERT INTO production_source_uploads(source_id,object_key,upload_id,status,created_at,expires_at)
+        VALUES (?,'objeto2','multipart2','open',unixepoch()-100,unixepoch()+100)`).run(sources[1]!.id);
+      const env = {DB:sqliteAdapter(db),BILLING_MODE:"production"} as IngestEnv;
+      await expireAbandonedReservations(env);
+      expect(db.prepare("SELECT status FROM orders WHERE id=?").get(order)).toEqual({status:"queued"});
+      db.prepare("UPDATE production_source_uploads SET expires_at=unixepoch()-1 WHERE source_id=?").run(sources[1]!.id);
+      await expireAbandonedReservations(env);
+      expect(db.prepare("SELECT status FROM orders WHERE id=?").get(order)).toEqual({status:"cancelled"});
+      expect(db.prepare("SELECT status FROM usage_ledger WHERE order_id=?").get(order)).toEqual({status:"released"});
+    } finally { db.close(); }
+
+    const complete = databaseForIngest();
+    try {
+      complete.prepare("UPDATE orders SET created_at=unixepoch()-90000 WHERE id=?").run(order);
+      const item = [{name:"completo.mp4",bytes:7,sha256:digest,extension:"mp4"}];
+      complete.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order,JSON.stringify(item),digest);
+      const source = complete.prepare("SELECT id FROM production_sources WHERE order_id=?").get(order) as {id:string};
+      complete.prepare(`INSERT INTO production_source_uploads(source_id,object_key,upload_id,status,object_etag,created_at,expires_at)
+        VALUES (?,'objeto','multipart','completed','etag',unixepoch()-90000,unixepoch()-1)`).run(source.id);
+      await expireAbandonedReservations({DB:sqliteAdapter(complete),BILLING_MODE:"production"} as IngestEnv);
+      expect(complete.prepare("SELECT status FROM orders WHERE id=?").get(order)).toEqual({status:"queued"});
+    } finally { complete.close(); }
+  });
+
   it("rechaza y elimina una fuente cuyo contenido no coincide con el hash declarado", async () => {
     const db = databaseForIngest();
     const bytes = new TextEncoder().encode("falsaso");

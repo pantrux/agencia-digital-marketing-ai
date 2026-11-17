@@ -49,10 +49,13 @@ export async function prepareConversation(
     ...(Object.keys(context).length ? { contexto_proyecto: context } : {}),
     historial: turns, mensaje_actual: message,
   });
+  // Reservar espacio para el diálogo cuando ya hay turnos, incluso si el
+  // proyecto contiene una referencia extensa. El mensaje actual no se recorta.
+  const projectBudget = rows.results.length ? Math.max(1536, encoder.encode(format([])).length) : 2048;
   for (const [key, value] of Object.entries(project)) {
     if (typeof value !== "string" || !value.trim()) continue;
     context[key] = Array.from(value.trim()).slice(0, key === "referencia_texto_publico" ? 600 : 200).join("");
-    if (encoder.encode(format([])).length > 2048) delete context[key];
+    if (encoder.encode(format([])).length > projectBudget) delete context[key];
   }
   if (Object.keys(context).length) wire = format([]);
   for (const row of rows.results) {

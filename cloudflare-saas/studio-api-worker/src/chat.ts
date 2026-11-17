@@ -175,12 +175,12 @@ export async function handleSofiaChat(
   if (!row || row.id !== order_id) throw new HttpError(404, "ORDEN_NO_ENCONTRADA");
   if (!["free", "pro", "ultra", "ilimitado"].includes(row.plan_id)) throw new HttpError(403, "CHAT_NO_AUTORIZADO");
   const wireMessage = await prepareConversation(env, userId, order_id, requestId, message.trim(), {
-    referencia_estado: row.reference_status, referencia_titulo_publico: row.reference_title,
-    referencia_descripcion_publica: row.reference_description, referencia_texto_publico: row.reference_excerpt,
-    referencia_url: row.reference_url,
     marca: row.brand_name, objetivo_confirmado: row.objective, audiencia_confirmada: row.audience,
     tono_confirmado: row.tone, resolucion: row.output_resolution, entrega: row.output_format,
     tipo_edicion: row.output_edit,
+    referencia_estado: row.reference_status, referencia_titulo_publico: row.reference_title,
+    referencia_descripcion_publica: row.reference_description, referencia_texto_publico: row.reference_excerpt,
+    referencia_url: row.reference_url,
   });
   const actor = hex(await crypto.subtle.sign("HMAC", key, encoder.encode(`${protocol}\nactor\n${userId}`)));
   const outbound: BrokerRequest = {
