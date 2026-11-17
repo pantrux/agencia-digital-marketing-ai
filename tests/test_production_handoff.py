@@ -2195,3 +2195,24 @@ def test_publicador_reintenta_por_pedido_sin_bloquear_otras_entregas(monkeypatch
     assert publisher.run_pending(profile, assignments, None, None, output) == 0
     assert calls == [first, second, first]
     assert (output / f"{first}.json").is_file()
+
+
+def test_anuncio_verifica_voz_mezclada_y_alineacion(handoff):
+    from production_elena import compare_mix_speech
+
+    captions = [
+        {"start_frame": 0, "end_frame": 30, "text": "Sí, la planta."},
+        {"start_frame": 60, "end_frame": 87, "text": "Mira el macetero."},
+    ]
+    vocabulary = ("Sí", "la", "planta", "Mira", "el", "macetero")
+    start = (0.05, 0.25, 0.5, 2.05, 2.2, 2.45)
+    words = [
+        {"word": word, "start": at, "end": at + 0.15}
+        for word, at in zip(vocabulary, start, strict=True)
+    ]
+    assert compare_mix_speech(captions, words)["aprobado"]
+    assert not compare_mix_speech(captions, [])["aprobado"]
+    for word in words:
+        word["start"] += 4
+        word["end"] += 4
+    assert not compare_mix_speech(captions, words)["aprobado"]

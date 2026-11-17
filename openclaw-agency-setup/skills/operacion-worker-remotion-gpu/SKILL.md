@@ -23,4 +23,8 @@ El MP4 vertical usa `h264_nvenc`, 30 fps, BT.709 y AAC estéreo a 48 kHz. ProRes
 
 El worker admite 600 segundos por pieza y hasta 20 minutos de procesamiento. Las tres operaciones comparten dos puestos. Un `429` informa saturación. Un `409` informa que ya existe el área del trabajo. Ante un timeout o un `409`, concilia primero la identidad y el estado del artefacto de esa operación. Si el backend da 503 o el artefacto incumple el contrato, conserva la evidencia y devuelve el fallo al flujo de revisión.
 
+## Montaje de anuncio corto
+
+Monta las escenas en el orden de la escaleta y comprueba su correspondencia con la voz original. Proyecta los subtítulos en el reloj de salida y valida el MP4 final a 30 segundos. Mantén la música por debajo de la voz y mide la mezcla terminada. Verifica gancho, subtítulos y CTA en la vista previa antes de generar el máster.
+
 [Fase 5](../../../docs/specs/FASE-5-OPENCLAW-Y-MCP.md) · [Plan de implementación](../../../docs/PLAN-DE-IMPLEMENTACION.md) · [Arquitectura, sección 4.1](../../../docs/ARQUITECTURA-PLATAFORMA-AUDIOVISUAL.md) · [API del renderer](../../../gpu-bridge-win11/render-worker/README.md#api-interna)

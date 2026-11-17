@@ -28,4 +28,10 @@ Los tres archivos `.json` contienen datos JSON. Usa el esquema aprobado si acomp
 
 Si se agotan las rondas, conserva el último dictamen y señala qué impide la entrega. La comprobación de las cuotas comerciales corresponde a Fase 6. El contrato del renderer ya fija 600 segundos por pieza y hasta 20 minutos de procesamiento.
 
+## Encargo de anuncio corto
+
+- **Sofía** confirma acción final, público, producto y fuentes autorizadas. Registra la CTA literal. Confirma con el cliente los contactos que se mostrarán.
+- **Mateo** propone ganchos que una toma real pueda demostrar. Proporciona una progresión con apertura, prueba del producto y cierre, más el texto publicable. Conserva la CTA del cliente.
+- **Valeria** asigna una función a cada plano. Usa frases completas de la transcripción temporizada, conserva su sentido y deja cuatro segundos de producto despejado para el cierre.
+
 [Fase 5](../../../docs/specs/FASE-5-OPENCLAW-Y-MCP.md) · [Plan de implementación](../../../docs/PLAN-DE-IMPLEMENTACION.md) · [Arquitectura, secciones 3.2 y 4.1](../../../docs/ARQUITECTURA-PLATAFORMA-AUDIOVISUAL.md) · [Contrato del renderer](../../../gpu-bridge-win11/render-worker/README.md)

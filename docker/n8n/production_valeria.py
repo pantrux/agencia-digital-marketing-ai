@@ -58,14 +58,14 @@ def source_paths(receipt):
     return raw, audio_path
 
 
-def reel_scenes(items, duration):
+def reel_scenes(items, duration, *, ad=False):
     def boundary(value, maximum):
         if type(value) not in (int, float) or not 0 <= value <= maximum:
             raise VisualResponseFormatError("Tiempo de escena fuera del intervalo")
         return round(value * 30)
 
-    if type(items) is not list or not 2 <= len(items) <= 6:
-        raise VisualResponseFormatError("El reel requiere entre dos y seis escenas")
+    if type(items) is not list or not 2 <= len(items) <= (12 if ad else 6):
+        raise VisualResponseFormatError("Cantidad de escenas fuera del contrato")
     scenes, cursor, total = [], 0, 0
     for item in items:
         if type(item) is not dict or item.keys() - {"rotulo"} != {"desde", "hasta"}:
@@ -73,7 +73,7 @@ def reel_scenes(items, duration):
         start = boundary(item["desde"], duration)
         end = boundary(item["hasta"], duration)
         length = end - start
-        if start < cursor or end > math.floor(duration * 30) or length < 15:
+        if (not ad and start < cursor) or end > math.floor(duration * 30) or length < 15:
             raise VisualResponseFormatError("Los cortes deben avanzar sin superponerse")
         scene = {"source_start_frame": start, "source_end_frame": end}
         if "rotulo" in item:
@@ -110,10 +110,86 @@ def reel_scenes(items, duration):
         total += length
     if not 900 <= total <= 1350 or not any("label" in scene for scene in scenes):
         raise VisualResponseFormatError("El reel requiere 30 a 45 segundos y al menos un rótulo")
+    if ad:
+        ordered = sorted(scenes, key=lambda scene: scene["source_start_frame"])
+        hook = scenes[0].get("label")
+        if total != 900 or not hook or hook["start_frame"] > 15 or hook["end_frame"] < 60:
+            raise VisualResponseFormatError(
+                "El anuncio necesita 30 segundos y un gancho desde la apertura"
+            )
+        if any(
+            a["source_end_frame"] > b["source_start_frame"]
+            for a, b in zip(ordered, ordered[1:], strict=False)
+        ):
+            raise VisualResponseFormatError("Los tramos del anuncio se superponen")
     return scenes, total
 
 
-def make_edl(receipt, angles, answer):
+def ad_captions(scenes, words):
+    cues, offset = [], 0
+    for scene in scenes:
+        start, end = scene["source_start_frame"], scene["source_end_frame"]
+        group = []
+        for word in words:
+            first, last = round(word["start"] * 30), round(word["end"] * 30)
+            text = word["word"].strip()
+            if (
+                not text
+                or first < start
+                or last > end
+                or last <= first
+                or offset + last - start > 780
+            ):
+                continue
+            first, last = offset + first - start, offset + last - start
+            if group and (
+                len(group) >= 6
+                or first - group[-1][1] >= 15
+                or last - group[0][0] > 75
+                or len(" ".join([part[2] for part in group] + [text]).encode("utf-16-le")) // 2 > 68
+            ):
+                cues.append((group[0][0], group[-1][1], " ".join(part[2] for part in group)))
+                group = []
+            group.append((first, last, text))
+            if text.endswith((".", "?", "!")):
+                cues.append((group[0][0], group[-1][1], " ".join(part[2] for part in group)))
+                group = []
+        if group:
+            cues.append((group[0][0], group[-1][1], " ".join(part[2] for part in group)))
+        offset += end - start
+    result = []
+    i = 0
+    while i < len(cues):
+        start, end, text = cues[i]
+        start = max(start, result[-1]["end_frame"] if result else 0)
+        # Una pausa muy corta pertenece a la tarjeta siguiente para conservar las palabras.
+        while i + 1 < len(cues) and cues[i + 1][0] - start < 9:
+            i += 1
+            end = cues[i][1]
+            text += " " + cues[i][2]
+        following = cues[i + 1][0] if i + 1 < len(cues) else 780
+        end = min(max(end, start + 15), following, 780)
+        if end - start < 9 and result:
+            last = result[-1]
+            last["end_frame"] = max(last["end_frame"], end)
+            last["text"] += " " + text
+        elif end - start >= 9:
+            result.append({"start_frame": start, "end_frame": end, "text": text})
+        else:
+            raise VisualResponseFormatError("No se pudo conservar el subtítulo breve")
+        i += 1
+    if any(len(cue["text"].encode("utf-16-le")) // 2 > 68 for cue in result):
+        raise VisualResponseFormatError(
+            "Los subtítulos necesitan pausas para mantener la legibilidad"
+        )
+    if not 1 <= len(result) <= 60:
+        raise VisualResponseFormatError(
+            "El anuncio requiere subtítulos respaldados por la voz original"
+        )
+    return result
+
+
+def make_edl(receipt, angles, answer, *, brief=None, transcript=None):
     order = receipt["order"]
     plan = render_plan(order)
     resolution = render_resolution(order)
@@ -145,10 +221,20 @@ def make_edl(receipt, angles, answer):
         reasons.append("La revisión indica que deben ajustarse cortes, encuadre u ocultaciones.")
     if audio is None:
         reasons.append("El render final requiere una pista de audio verificable.")
+    ad = brief.get("ad_cta") if brief and reel else None
     scenes = None
+    ad_props = {}
     frames = min(18000, int(duration * 30 + 0.5))
     if reel and not reasons:
-        scenes, frames = reel_scenes(answer.get("escenas"), duration)
+        scenes, frames = reel_scenes(answer.get("escenas"), duration, ad=bool(ad))
+        if ad:
+            ad_props = {
+                "ad": {
+                    "cta": ad,
+                    "brand": brief["ad_brand"],
+                    "captions": ad_captions(scenes, transcript["words"] if transcript else []),
+                }
+            }
     if frames < 3:
         reasons.append("La fuente dura menos de tres fotogramas a 30 fps.")
     render = (
@@ -168,6 +254,7 @@ def make_edl(receipt, angles, answer):
                 "video_path": raw,
                 "audio_path": audio,
                 **({"scenes": scenes} if scenes else {}),
+                **ad_props,
                 **({"subtitle_size": "large"} if answer.get("subtitulo_ampliado") else {}),
             },
         }
@@ -182,7 +269,7 @@ def make_edl(receipt, angles, answer):
     }
 
 
-def sample_images(receipt):
+def sample_images(receipt, *, ad=False, transcript=None):
     job = receipt["order"]["media"]
     path = MEDIA / source_paths(receipt)[0]
     if path.resolve(strict=True) != path:
@@ -201,8 +288,22 @@ def sample_images(receipt):
         reel = receipt["order"].get("output_edit") == "reel"
         fractions = (0.01, 0.25, 0.5, 0.75, 0.98) if reel else (0.15, 0.5, 0.85)
         limit = 12000 if reel else MAX_JPEG
-        for fraction in fractions:
-            stamp = round(duration * fraction, 5)
+        stamps = [round(duration * fraction, 5) for fraction in fractions]
+        if ad:
+            words = transcript["words"] if transcript else []
+            anchors = [
+                word["start"]
+                for word in words
+                if re.search(r"[.?!]$", word["word"]) and 0 <= word["start"] < duration
+            ]
+            targets = [duration * (i + 0.5) / 8 for i in range(8)]
+            step = duration / len(targets)
+            stamps = []
+            for target in targets:
+                nearby = [stamp for stamp in anchors if abs(stamp - target) < step / 2]
+                stamps.append(min(nearby, key=lambda stamp: abs(stamp - target), default=target))
+            limit = 7000
+        for stamp in stamps:
             args = [
                 "/usr/bin/ffmpeg",
                 "-v",
@@ -337,6 +438,28 @@ def plan_request(
             " Si el encargo exige recursos ausentes o la fuente no llega a 30 segundos,"
             " devuelve apto_sin_cambios=false. Usa español."
         )
+    if reel and brief.get("ad_cta"):
+        facts["cta_confirmada"] = brief["ad_cta"]
+        facts["marca_confirmada"] = brief["ad_brand"]
+        facts.pop("transcripcion_temporizada")
+        facts["palabras_por_fotograma"] = [
+            [round(word["start"] * 30), round(word["end"] * 30), word["word"].strip()]
+            for word in words
+        ]
+        instructions += (
+            " ANUNCIO GUIADO POR GUION: este encargo sustituye los límites de 2 a 6 cortes por 2 a 12; "
+            "la suma exacta debe ser 30 segundos y puedes reordenar intervalos de origen no solapados. "
+            "Los primeros 3 segundos demuestran un gancho específico. En la primera escena el rótulo "
+            "comienza entre 0 y 0.5 s y dura al menos hasta 2 s. Desarrolla el argumento mediante "
+            "frases completas y tomas pertinentes. palabras_por_fotograma contiene [inicio, fin, "
+            "palabra] a 30 fps. Divide entre 30 para ubicar las frases. Registra las duraciones "
+            "en segundos con al menos dos decimales. Devuelve una escaleta lista para vista previa "
+            "cuando el crudo tenga evidencia del producto y voz usable. La sincronía se valida "
+            "sobre esa vista previa. Los últimos cuatro segundos "
+            "usan una imagen de producto despejada para la marca y el CTA confirmado; el renderer "
+            "coloca la marca y la CTA confirmadas y silencia la voz en ese intervalo. "
+            "subtitulo sintetiza el argumento y observacion explica el guion."
+        )
     if synthetic:
         instructions += (
             "El crudo está identificado como patrón de aceptación sintético de la agencia. "
@@ -387,7 +510,32 @@ def plan_request(
         images,
         request_id,
     )
-    if reel:
+    if reel and brief.get("ad_cta"):
+        request["message"] = (
+            instructions + "\n" + json.dumps(facts, ensure_ascii=False, separators=(",", ":"))
+        )
+        if len(visual_payload(request)) > MAX_VISUAL_BYTES - 1000:
+            words_by_frame = facts["palabras_por_fotograma"]
+            centers = [round(timestamp * 30) for timestamp, _ in images]
+            facts["cobertura_transcripcion"] = (
+                "Marcas exactas de la voz en ventanas alrededor de las muestras visuales"
+            )
+            for radius in (450, 225, 120, 60, 0):
+                facts["palabras_por_fotograma"] = [
+                    item
+                    for item in words_by_frame
+                    if any(abs(item[0] - center) <= radius for center in centers)
+                ]
+                request["message"] = (
+                    instructions
+                    + "\n"
+                    + json.dumps(facts, ensure_ascii=False, separators=(",", ":"))
+                )
+                if len(visual_payload(request)) <= MAX_VISUAL_BYTES - 1000:
+                    break
+            else:
+                raise ValueError("Las muestras y el brief exceden la capacidad de análisis visual")
+    elif reel:
         # Reservar espacio para la corrección de formato y muestrear toda la grabación.
         budget = MAX_VISUAL_BYTES - 1000
         groups = facts["transcripcion_temporizada"]
@@ -462,7 +610,11 @@ def process(
     angles = strategy_reply(json.dumps({"angulos": strategy["angulos"]}))
     reel = order.get("output_edit") == "reel"
     transcript = transcript_for(receipt, SOFIA / (order["order_id"] + ".json")) if reel else None
-    images = sample_images(receipt)
+    images = (
+        sample_images(receipt, ad=True, transcript=transcript)
+        if reel and brief.get("ad_cta")
+        else sample_images(receipt)
+    )
     request = plan_request(
         angles,
         brief,
@@ -484,7 +636,7 @@ def process(
                 and prior["render"]["props"].get("subtitle_size") == "large"
             ):
                 answer.setdefault("subtitulo_ampliado", True)
-            edl = make_edl(receipt, angles, answer)
+            edl = make_edl(receipt, angles, answer, brief=brief, transcript=transcript)
             break
         except VisualResponseFormatError:
             # Reservar tiempo para la llamada visual y el acuse de Studio dentro del turno.
@@ -506,7 +658,7 @@ def process(
     if prior is not None and edl["render"] is not None:
         previous = prior["render"]["props"]
         props = edl["render"]["props"]
-        changes = ("scenes",) if reel else ("title", "subtitle", "subtitle_size")
+        changes = ("scenes", "ad") if reel else ("title", "subtitle", "subtitle_size")
         if edl["angulo"] != prior["angulo"] or all(
             props.get(key) == previous.get(key) for key in changes
         ):

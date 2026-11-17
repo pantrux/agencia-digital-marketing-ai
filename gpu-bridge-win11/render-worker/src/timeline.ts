@@ -1,10 +1,10 @@
-import type {EditScene, SceneLabel} from './contracts.ts';
+import {AD_ENDCARD_FRAME, type EditScene, type SceneLabel, type ScriptedAd} from './contracts.ts';
 
 export function sceneLength(scene: EditScene): number {
   return scene.source_end_frame - scene.source_start_frame;
 }
 
-export function graphicFrames(scenes: readonly EditScene[]): number[] {
+export function graphicFrames(scenes: readonly EditScene[], ad?: ScriptedAd): number[] {
   const changes = new Set([0]);
   let origin = 0;
   for (const scene of scenes) {
@@ -13,6 +13,13 @@ export function graphicFrames(scenes: readonly EditScene[]): number[] {
       changes.add(origin + scene.label.end_frame);
     }
     origin += sceneLength(scene);
+  }
+  if (ad) {
+    changes.add(AD_ENDCARD_FRAME);
+    for (const cue of ad.captions) {
+      changes.add(cue.start_frame);
+      changes.add(cue.end_frame);
+    }
   }
   return [...changes].filter(frame => frame < origin).sort((left, right) => left - right);
 }

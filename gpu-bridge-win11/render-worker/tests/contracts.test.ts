@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {outputDimensions, parseInspect, parseRender, parseStills, WorkerError} from '../src/contracts.ts';
 import {compositionInput} from '../src/remotion.ts';
+import {graphicFrames} from '../src/timeline.ts';
 
 const request = () => ({
   project_id: 'sansevieras', job_id: 'trabajo-01', composition: 'AgencyVertical',
@@ -33,6 +34,22 @@ test('un reel conserva cortes y rótulos con extremos exclusivos en fotogramas',
   assert.throws(() => parseRender({...request(), props: {...props, scenes: [
     {...scenes[0], label: {...scenes[0]!.label, end_frame: 361}}, scenes[1],
   ]}}), WorkerError);
+});
+
+test('el anuncio reordena la fuente y programa los cambios de subtítulo y CTA', () => {
+  const scenes = [
+    {source_start_frame: 2000, source_end_frame: 2300, label: {text:'Gancho', start_frame: 0, end_frame: 90, position:'top'}},
+    {source_start_frame: 400, source_end_frame: 1000},
+  ];
+  const ad = {cta:'Escríbenos',brand:'Vivero',captions:[{start_frame:20,end_frame:60,text:'Nuestra colección'}]};
+  const props = {...request().props,duration_seconds:30,video_path:'proyectos/sansevieras/01_raw/crudo.mp4',scenes,ad};
+  const adRequest = parseRender({...request(),props});
+  assert.deepEqual(adRequest.props.scenes, scenes);
+  assert.deepEqual(compositionInput(adRequest,null).ad,ad);
+  assert.deepEqual(graphicFrames(adRequest.props.scenes!,adRequest.props.ad),[0,20,60,90,780]);
+  assert.throws(() => parseRender({...request(),props:{...props,ad:undefined}}),WorkerError);
+  assert.throws(() => parseRender({...request(),props:{...props,ad:{...ad,captions:[{...ad.captions[0],end_frame:781}]}}}),WorkerError);
+  assert.throws(() => parseRender({...request(),props:{...props,scenes:[scenes[0],{source_start_frame:2299,source_end_frame:2899}]}}),WorkerError);
 });
 
 test('rechaza composición remota, propiedades desconocidas y duración fuera del plan', () => {

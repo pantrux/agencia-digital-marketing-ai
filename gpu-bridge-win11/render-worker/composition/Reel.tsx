@@ -1,9 +1,9 @@
 import React from 'react';
 import {AbsoluteFill, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {TITLE_FADE_FRAMES, type EditScene, type Resolution} from '../src/contracts.ts';
+import {AD_ENDCARD_FRAME, TITLE_FADE_FRAMES, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
 import {graphicLabel, sceneLength} from '../src/timeline.ts';
 
-export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; scenes?: EditScene[]}
+export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; scenes?: EditScene[]; ad?: ScriptedAd}
 const videoStyle = {width: '100%', height: '100%', objectFit: 'cover'} as const;
 
 function cutVideo(file: string, scenes: EditScene[]) {
@@ -22,7 +22,9 @@ export const Reel: React.FC<ReelProps> = (props) => {
   const frame = useCurrentFrame();
   const scale = useVideoConfig().width / 1080;
   const opacity = interpolate(frame, [0, TITLE_FADE_FRAMES], [0, 1], {extrapolateRight: 'clamp'});
-  const label = props.scenes && graphicLabel(props.scenes, frame);
+  const endCard = props.ad && frame >= AD_ENDCARD_FRAME;
+  const caption = props.ad?.captions.find(cue => cue.start_frame <= frame && frame < cue.end_frame);
+  const label = !endCard && props.scenes && graphicLabel(props.scenes, frame);
   // Todo movimiento depende del fotograma; no se utiliza reloj ni azar.
   return <AbsoluteFill style={{backgroundColor: props.transparent ? undefined : props.background, color: '#fff', fontFamily: 'Arial, sans-serif'}}>
     {props.video_file && (props.scenes
@@ -36,10 +38,20 @@ export const Reel: React.FC<ReelProps> = (props) => {
       {props.subtitle && <p style={{fontSize: props.subtitle_size === 'large' ? 64 : 50, lineHeight: 1.25, margin: '20px 0 0', overflowWrap: 'anywhere'}}>{props.subtitle}</p>}
     </div>}
     {label && <div style={{position: 'absolute', left: 60, maxWidth: 900, width: 'max-content', boxSizing: 'border-box',
-      ...(label.position === 'top' ? {top: 200} : {bottom: 480}),
+      ...(label.position === 'top' ? {top: 200} : {bottom: props.ad ? 520 : 480}),
       backgroundColor: '#141714', borderLeft: `8px solid ${props.accent}`, padding: '24px 28px', borderRadius: 12,
       fontSize: label.size === 'large' ? 84 : 58, lineHeight: 1.15, fontWeight: 700, overflowWrap: 'anywhere'}}>{label.text}</div>}
-    {props.watermark ? <div style={{position: 'absolute', bottom: 340, left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
+    {props.ad && <div style={{position:'absolute',left:0,right:0,top:1438,bottom:0,
+      background:'#17221b',borderTop:`6px solid ${props.accent}`}} />}
+    {caption && <div style={{position:'absolute',left:84,right:165,top:1474,textAlign:'center',fontSize:59,
+      fontWeight:700,lineHeight:1.16,overflowWrap:'anywhere'}}>{caption.text}</div>}
+    {endCard && <div style={{position:'absolute',left:84,right:165,top:1470,color:'#f5f3e8',
+      overflowWrap:'anywhere'}}>
+      <div style={{fontSize:58,fontWeight:750,lineHeight:1.04,marginBottom:18}}>{props.ad!.brand}</div>
+      <div style={{display:'inline-block',fontSize:45,fontWeight:650,lineHeight:1.12,background:'#b8e1c0',
+        color:'#163323',padding:'13px 22px',borderRadius:14}}>{props.ad!.cta}</div>
+    </div>}
+    {props.watermark ? <div style={{position: 'absolute', ...(props.ad ? {top: 100} : {bottom: 340}), left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
     </AbsoluteFill>
   </AbsoluteFill>;
 };

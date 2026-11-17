@@ -161,20 +161,20 @@
   "internal": {
     "operacion-worker-remotion-gpu": {
       "SKILL.md": {
-        "size": 3058,
-        "sha256": "890b4f32ddca1058c1d920f2b849c8f04dbe478cdf879cd7f17f066bc5cb53cc"
+        "size": 3420,
+        "sha256": "faf5d0ceeb334970820b0c73421dc4b186eacc63ecc227c101d3d66ebe8adc15"
       }
     },
     "protocolo-agencia-audiovisual": {
       "SKILL.md": {
-        "size": 3333,
-        "sha256": "06083af3caaae0e046771f3dc98e64681d1692e0a90b1d42bea7505345cb7c17"
+        "size": 3898,
+        "sha256": "0b0b6fdcedaec5bfc2ae60feb5a16dbbe916973bea34b5cb302f50443dac9b16"
       }
     },
     "rubrica-qa-audiovisual": {
       "SKILL.md": {
-        "size": 2982,
-        "sha256": "8dab50f188b2f08f91f4a449f9cb0fb591fee2aa50d0985905834a3662e9312d"
+        "size": 3374,
+        "sha256": "db9e97edf7e935601b09bfdc7a0d6719e88efcbe7f181473b61011a84d01635e"
       }
     }
   }

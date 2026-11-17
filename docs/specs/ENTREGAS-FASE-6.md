@@ -108,3 +108,9 @@ El tablero de Grafana muestra la antigüedad del informe, el volumen, los p95 y 
 systemctl list-timers agency-studio-delivery-metrics.timer
 journalctl -u agency-studio-delivery-metrics.service --since today
 ```
+
+## Anuncio guiado por guion
+
+En una orden **Reel por escenas** con salida MP4, confirma el brief con una llamada a la acción de hasta 70 caracteres y el nombre de marca que aparecerá al cierre. Studio activa un anuncio de 30 segundos con planos del original, subtítulos de la voz y una placa de marca y CTA entre los segundos 26 y 30. El motivo musical instrumental se produce dentro del renderer y baja de nivel durante la voz. La revisión transcribe la mezcla final y mide la coincidencia temporal con los subtítulos antes de aprobar.
+
+Aplica primero la migración D1 `0019_brief_ad_cta.sql`. Despliega el Worker, las recetas de los agentes y el renderer antes de publicar la interfaz. Las órdenes con el campo vacío siguen la ruta habitual. El máster sólo se genera tras el dictamen de vista previa y conserva los controles técnicos del perfil de la orden.

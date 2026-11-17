@@ -9,7 +9,10 @@ import os
 import re
 import stat
 import subprocess
+import tempfile
+import unicodedata
 import uuid
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from production_handoff import (
@@ -28,7 +31,7 @@ from production_handoff import (
 from production_inbox import MEDIA, render_resolution
 from production_intake import identity
 from production_mateo import dispatch_request, lookup
-from production_sofia import JOURNAL, LIMIT
+from production_sofia import JOURNAL, LIMIT, MAX_TRANSCRIPT, MCP, validate_transcript
 from production_valeria import MAX_JPEG, run_visual, visual_request
 
 VALERIA = Path("/var/lib/agency-production-valeria")
@@ -95,7 +98,7 @@ def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", 
     }
 
 
-def decode(path, expected, duration, *, stamps=None):
+def decode(path, expected, duration, *, stamps=None, speech=None):
     if path.resolve(strict=True) != path:
         raise ValueError("Ruta del máster inválida")
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -146,6 +149,26 @@ def decode(path, expected, duration, *, stamps=None):
             "lufs": float(loudness[1]),
             "peak": float(peak[1]),
         }
+        if speech is not None:
+            ff(
+                "ffmpeg",
+                ["-v", "error", "-nostdin", "-n"],
+                [
+                    "-map",
+                    "0:a:0",
+                    "-vn",
+                    "-t",
+                    "30",
+                    "-ar",
+                    "16000",
+                    "-ac",
+                    "1",
+                    "-c:a",
+                    "pcm_s16le",
+                    str(speech),
+                ],
+                40,
+            )
         images = []
         checkpoints = stamps or [
             round(min(duration, metrics["duration"]) * fraction, 5) for fraction in (0.2, 0.5, 0.8)
@@ -192,8 +215,68 @@ def decode(path, expected, duration, *, stamps=None):
     return metrics, images
 
 
-def scene_checks(scenes):
-    intervals, choices, rest = [], {0}, []
+MCP_MIX_TRANSCRIPT = """
+import json,sys
+from pathlib import Path
+root = Path(sys.executable).parent.parent.parent
+sys.path.insert(0, str(root / "mcp_servers"))
+from call_stdio import runtime_settings
+from speaches_client import transcribe_audio
+token = Path(runtime_settings()["GPU_BRIDGE_TOKEN_FILE"])
+reply = transcribe_audio(Path(sys.argv[1]), token, language="es", total_seconds=70)
+result = {field: reply[field] for field in ("language", "duration", "text")}
+result["words"] = [{field: word[field] for field in ("word", "start", "end")} for word in reply["words"]]
+print(json.dumps(result))
+"""
+
+
+def verify_mix_speech(speech, captions):
+    reply = subprocess.run(
+        [str(MCP / "venv/bin/python"), "-I", "-B", "-c", MCP_MIX_TRANSCRIPT, str(speech)],
+        capture_output=True,
+        check=True,
+        timeout=82,
+    )
+    if not 0 < len(reply.stdout) <= MAX_TRANSCRIPT:
+        raise ValueError("El resultado de voz del anuncio es inválido")
+    transcript = validate_transcript(json.loads(reply.stdout))
+    return compare_mix_speech(captions, transcript["words"])
+
+
+def compare_mix_speech(captions, words):
+    def tokens(text):
+        clean = unicodedata.normalize("NFKD", text.casefold())
+        clean = "".join(letter for letter in clean if not unicodedata.combining(letter))
+        return re.findall(r"[^\W_]+", clean, re.UNICODE)
+
+    expected = [
+        (part, cue["start_frame"] / 30, cue["end_frame"] / 30)
+        for cue in captions
+        for part in tokens(cue["text"])
+    ]
+    actual = [
+        (part, (word["start"] + word["end"]) / 2) for word in words for part in tokens(word["word"])
+    ]
+    aligned = 0
+    matcher = SequenceMatcher(
+        None, [item[0] for item in expected], [item[0] for item in actual], autojunk=False
+    )
+    for left, right, count in matcher.get_matching_blocks():
+        for offset in range(count):
+            _, begin, end = expected[left + offset]
+            if begin - 0.8 <= actual[right + offset][1] <= end + 0.8:
+                aligned += 1
+    coverage = aligned / len(expected) if expected else 0
+    return {
+        "palabras_esperadas": len(expected),
+        "palabras_alineadas": aligned,
+        "cobertura": round(coverage, 3),
+        "aprobado": coverage >= 0.72,
+    }
+
+
+def scene_checks(scenes, *, required=()):
+    intervals, choices, rest = [], {0, *required}, []
     offset = 0
     for scene in scenes:
         length = scene["source_end_frame"] - scene["source_start_frame"]
@@ -224,13 +307,29 @@ def scene_checks(scenes):
 def review_video(path, digest, props, angle, plan, resolution, request_id, *, synthetic=False):
     scenes = props.get("scenes")
     checks = scene_checks(scenes) if scenes else []
+    ad = props.get("ad")
+    if ad:
+        cue = max(ad["captions"], key=lambda row: row["end_frame"] - row["start_frame"])
+        frame = (cue["start_frame"] + cue["end_frame"]) // 2
+        stamp = (frame * 1000 // 30) / 1000
+        candidates = scene_checks(scenes, required=(frame,))
+        mandatory = (0, stamp)
+        checks = [item for item in candidates if item["segundo"] in mandatory]
+        checks += [
+            item for item in candidates if item["segundo"] not in mandatory and item["segundo"] < 26
+        ][: 7 - len(checks)]
+        checks.sort(key=lambda item: item["segundo"])
+        checks.append({"segundo": 28, "rotulo_esperado": None})
     duration = props["duration_seconds"]
-    metrics, images = decode(
-        path,
-        digest,
-        duration,
-        **({"stamps": [check["segundo"] for check in checks]} if checks else {}),
-    )
+    decode_options = {"stamps": [check["segundo"] for check in checks]} if checks else {}
+    audio_check = None
+    if ad:
+        with tempfile.TemporaryDirectory(prefix="studio-qa-mezcla-") as workspace:
+            speech = Path(workspace) / "mezcla.wav"
+            metrics, images = decode(path, digest, duration, speech=speech, **decode_options)
+            audio_check = verify_mix_speech(speech, ad["captions"])
+    else:
+        metrics, images = decode(path, digest, duration, **decode_options)
     evidence = {
         "titulo_esperado": props["title"],
         "subtitulo_esperado": props["subtitle"],
@@ -266,6 +365,27 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
             " marca_free, observaciones (objetos con muestra y detalle) y defectos"
             f" (objetos con muestra y correccion). muestra es un entero de 1 a {len(images)}."
         )
+    if ad:
+        for sample in checks:
+            frame = round(sample["segundo"] * 30)
+            sample["subtitulo_esperado"] = next(
+                (
+                    cue["text"]
+                    for cue in ad["captions"]
+                    if cue["start_frame"] <= frame < cue["end_frame"]
+                ),
+                None,
+            )
+        evidence["muestras_anuncio"] = checks
+        evidence["auditoria_voz"] = audio_check
+        evidence["cta_final"] = ad["cta"]
+        evidence["marca_final"] = ad["brand"]
+        instructions += (
+            " En este anuncio hay subtítulos separados del rótulo. Revisa el gancho al comienzo "
+            "y al menos un subtítulo visible en móvil cuando coincida con la muestra. "
+            "En el cierre se exige marca y CTA completos en lugar del rótulo de escena. "
+            "Rechaza si el CTA falta, no coincide o invade una zona ilegible."
+        )
     if synthetic:
         instructions += "Considera que el crudo es una demostración técnica con barras de color. "
     review = run_visual(
@@ -279,8 +399,20 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
     qa = make_verdict(
         review, metrics, duration, plan=plan, resolution=resolution, samples=len(images)
     )
+    if audio_check is not None and not audio_check["aprobado"]:
+        qa["decision"] = "rechazado"
+        qa["reglas_duras_incumplidas"].append("La voz de la mezcla no coincide con los subtítulos")
+        sample = next(i for i, check in enumerate(checks, 1) if check["subtitulo_esperado"])
+        qa["defectos"].append(
+            {
+                "muestra": sample,
+                "correccion": "Selecciona frases originales claras, conserva su voz y ajusta sus cortes "
+                "para que los subtítulos puedan verificarse en el nuevo render.",
+            }
+        )
     return {
         "mediciones": metrics,
+        **({"revision_voz": audio_check} if audio_check is not None else {}),
         "dictamen": qa,
         "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
     }

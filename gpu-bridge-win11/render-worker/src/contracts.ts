@@ -10,12 +10,16 @@ export type Plan = 'Free' | 'Pro' | 'Ultra' | 'Ilimitado';
 export type Resolution = '1080p' | '4k';
 export type OutputFormat = 'mp4' | 'prores4444';
 export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom'; size?: 'large'}
+export interface AdCaption {start_frame: number; end_frame: number; text: string}
+export interface ScriptedAd {cta: string; brand: string; captions: AdCaption[]}
+export const AD_ENDCARD_FRAME = 780;
 export interface EditScene {source_start_frame: number; source_end_frame: number; label?: SceneLabel}
 export interface CompositionProps {
   title: string; subtitle: string; duration_seconds: number;
   subtitle_size?: 'large';
   background: string; accent: string; video_path?: string; audio_path?: string;
   scenes?: EditScene[];
+  ad?: ScriptedAd;
 }
 export interface RenderRequest {
   project_id: string; job_id: string; composition: 'AgencyVertical'; plan: Plan;
@@ -65,14 +69,14 @@ function frameNumber(value: unknown, minimum: number, maximum: number): number {
   if (!Number.isInteger(frame)) invalid('Los límites de escena deben ser fotogramas enteros.');
   return frame;
 }
-function editScenes(value: unknown, count: number): EditScene[] {
-  if (!Array.isArray(value) || value.length < 2 || value.length > 6 || count < 900 || count > 1350) {
-    invalid('Un reel requiere entre dos y seis escenas y entre 30 y 45 segundos.');
+function editScenes(value: unknown, count: number, ad: boolean): EditScene[] {
+  if (!Array.isArray(value) || value.length < 2 || value.length > (ad ? 12 : 6) || count < 900 || count > 1350) {
+    invalid('La cantidad de escenas o la duración no corresponde al montaje.');
   }
   let last = 0, total = 0, labels = 0;
   const scenes = value.map((entry: unknown): EditScene => {
     const item = object(entry, ['source_start_frame', 'source_end_frame', 'label']);
-    const start = frameNumber(item.source_start_frame, last, MAX_SEGMENT_SECONDS * 30 - 15);
+    const start = frameNumber(item.source_start_frame, ad ? 0 : last, MAX_SEGMENT_SECONDS * 30 - 15);
     const end = frameNumber(item.source_end_frame, start + 15, MAX_SEGMENT_SECONDS * 30);
     last = end;
     total += end - start;
@@ -90,9 +94,34 @@ function editScenes(value: unknown, count: number): EditScene[] {
     return {...scene, label: {text: label, start_frame: labelStart, end_frame: labelEnd, position: caption.position,
       ...(caption.size === 'large' ? {size: caption.size} : {})}};
   });
+  if (ad) {
+    const sorted = [...scenes].sort((a,b) => a.source_start_frame - b.source_start_frame);
+    if (sorted.some((scene,i) => i > 0 && scene.source_start_frame < sorted[i-1]!.source_end_frame)
+      || !scenes[0]?.label || scenes[0].label.start_frame > 15 || scenes[0].label.end_frame < 60) {
+      invalid('El anuncio requiere un gancho al inicio y tramos de origen sin solapamiento.');
+    }
+  }
   if (!labels || total !== count) invalid('Los cortes deben sumar la duración del reel y contener al menos un rótulo.');
   return scenes;
 }
+function scriptedAd(value: unknown): ScriptedAd {
+  const input = object(value, ['cta', 'brand', 'captions']);
+  const cta = text(input.cta, '', 70), brand = text(input.brand, '', 80);
+  if (!cta.trim() || !brand.trim() || !Array.isArray(input.captions)
+    || !input.captions.length || input.captions.length > 60) invalid('Falta CTA, marca o subtítulos.');
+  let previousEnd = 0;
+  const captions = input.captions.map(entry => {
+    const cue = object(entry, ['start_frame', 'end_frame', 'text']);
+    const start_frame = frameNumber(cue.start_frame, previousEnd, AD_ENDCARD_FRAME - 9);
+    const end_frame = frameNumber(cue.end_frame, start_frame + 9, AD_ENDCARD_FRAME);
+    const caption = text(cue.text, '', 68);
+    if (!caption.trim()) invalid('Falta el texto del subtítulo.');
+    previousEnd = end_frame;
+    return {start_frame,end_frame,text:caption};
+  });
+  return {cta,brand,captions};
+}
+
 export function mediaPath(value: unknown, project: string): string {
   if (typeof value !== 'string' || value.length > 500 || /[\\<>:"|?*]/.test(value) || hasControl(value)) invalid('La ruta de medios no es válida.');
   const parts = value.split('/');
@@ -114,7 +143,7 @@ function base(value: unknown, stills: boolean): RenderRequest {
   if (resolution !== '1080p' && resolution !== '4k') invalid('La resolución no está permitida.');
   if (resolution === '4k' && plan !== 'Ultra' && plan !== 'Ilimitado') invalid('4K requiere Ultra o Ilimitado.');
   if (format === 'prores4444' && plan !== 'Ilimitado') invalid('ProRes4444 alfa requiere Ilimitado.');
-  const input = object(data.props, ['title', 'subtitle', 'subtitle_size', 'duration_seconds', 'background', 'accent', 'video_path', 'audio_path', 'scenes']);
+  const input = object(data.props, ['title', 'subtitle', 'subtitle_size', 'duration_seconds', 'background', 'accent', 'video_path', 'audio_path', 'scenes', 'ad']);
   const duration_seconds = numeric(input.duration_seconds, 0.1, durations[plan]);
   const durationInFrames = Math.max(1, Math.round(duration_seconds * 30));
   const props: CompositionProps = {
@@ -126,9 +155,13 @@ function base(value: unknown, stills: boolean): RenderRequest {
   else if (input.subtitle_size !== undefined) invalid('El tamaño del subtítulo no está permitido.');
   if (input.video_path !== undefined) props.video_path = mediaPath(input.video_path, project_id);
   if (input.audio_path !== undefined) props.audio_path = mediaPath(input.audio_path, project_id);
+  if (input.ad !== undefined) {
+    if (format !== 'mp4' || durationInFrames !== 900 || !input.scenes) invalid('El anuncio requiere 30 segundos, escenas y salida MP4.');
+    props.ad = scriptedAd(input.ad);
+  }
   if (input.scenes !== undefined) {
     if (Boolean(props.video_path) !== (format === 'mp4')) invalid('El MP4 por escenas requiere vídeo y el ProRes solo contiene la gráfica.');
-    props.scenes = editScenes(input.scenes, durationInFrames);
+    props.scenes = editScenes(input.scenes, durationInFrames, Boolean(props.ad));
   }
   if (!stills && !props.audio_path) invalid('El render final requiere una pista de audio verificable.');
   return {project_id, job_id, composition: 'AgencyVertical', plan, format, resolution, transparent: format === 'prores4444', props, watermark: plan === 'Free', ...outputDimensions(resolution), fps: 30, durationInFrames};
