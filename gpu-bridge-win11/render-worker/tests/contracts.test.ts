@@ -136,6 +136,12 @@ test('el CTA social conserva sólo el destino elegido y agenda cada fotograma an
   const props = {...request().props,duration_seconds:30,video_path:'proyectos/sansevieras/01_raw/crudo.mp4',scenes,ad};
   const value = parseRender({...request(),props});
   assert.deepEqual(value.props.ad?.destination,destination);
+  const alternateAudio = [{...scenes[0],audio_source_start_frame:120},scenes[1]];
+  assert.equal(parseRender({...request(),props:{...props,scenes:alternateAudio}}).props.scenes?.[0]?.audio_source_start_frame,120);
+  assert.throws(() => parseRender({...request(),props:{...props,scenes:alternateAudio,ad:undefined}}),
+    /audio alternativo/u);
+  assert.throws(() => parseRender({...request(),props:{...props,
+    scenes:[{...scenes[0],audio_source_start_frame:17999},scenes[1]]}}),WorkerError);
   const frames = graphicFrames(value.props.scenes!,value.props.ad);
   assert.ok(frames.includes(1) && frames.includes(751) && frames.includes(899));
   for (const bad of ['https://instagram.com/rinconsansevieras','https://www.facebook.com.ejemplo.invalid/perfil','https://www.facebook.com/perfil?track=1']) {

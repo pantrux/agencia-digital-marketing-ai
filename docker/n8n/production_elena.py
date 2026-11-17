@@ -478,7 +478,7 @@ def review_video(
             instructions += (
                 " Comprueba en el cierre el icono del canal seleccionado y la URL del destino "
                 " confirmado, visible a los 28 s. Se admite mostrarla sin https:// ni www. "
-                "En el fotograma cero la planta debe ser visible y el gancho puede estar entrando. "
+                "En el fotograma cero debe verse el sujeto del gancho, aunque su rótulo todavía esté entrando. "
                 "A los 29.966 s se espera un fundido a negro, sin texto legible. Rechaza un destino "
                 "distinto, una URL ilegible o un icono de otro canal."
             )

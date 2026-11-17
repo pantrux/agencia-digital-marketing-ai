@@ -25,6 +25,15 @@ test('los cortes mantienen la sincronía de audio y los rótulos desaparecen en 
   assert.match(audio[audio.indexOf('-filter_complex') + 1]!, /atrim=start_sample=48000:end_sample=624000/);
   assert.match(audio[audio.indexOf('-filter_complex') + 1]!, /atrim=start_sample=960000:end_sample=2112000/);
 });
+test('el audio alternativo conserva la duración del corte de imagen', () => {
+  const args = cutSceneAudio('fuente.wav','cortes.wav',[
+    {source_start_frame:200,source_end_frame:260,audio_source_start_frame:40},
+    {source_start_frame:360,source_end_frame:420},
+  ]);
+  const filter = args[args.indexOf('-filter_complex') + 1]!;
+  assert.match(filter, /atrim=start_sample=64000:end_sample=160000/);
+  assert.match(filter, /atrim=start_sample=576000:end_sample=672000/);
+});
 test('la medición usa entrada real, no valores previstos de salida', () => {
   const result = parseLoudness('aviso\n' + JSON.stringify({input_i: '-14.20', input_tp: '-1.30', input_lra: '1.10', input_thresh: '-24.20', target_offset: '0.10', output_i: '-2.00'}));
   assert.equal(result.integrated_lufs, -14.2);
