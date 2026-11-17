@@ -388,6 +388,7 @@ def review_video(
     checks = scene_checks(scenes) if scenes else []
     ad = props.get("ad")
     destination = ad.get("destination") if ad else None
+    animated_endcard = bool(ad and (destination or ad.get("engine") == "hyperframes"))
     if ad:
         cue = max(ad["captions"], key=lambda row: row["end_frame"] - row["start_frame"])
         frame = (cue["start_frame"] + cue["end_frame"]) // 2
@@ -397,12 +398,15 @@ def review_video(
         checks = [item for item in candidates if item["segundo"] in mandatory]
         checks += [
             item for item in candidates if item["segundo"] not in mandatory and item["segundo"] < 26
-        ][: (6 if destination else 7) - len(checks)]
+        ][: (6 if animated_endcard else 7) - len(checks)]
         checks.sort(key=lambda item: item["segundo"])
         checks.append({"segundo": 28, "rotulo_esperado": None})
-        if destination:
+        if animated_endcard:
             checks[0] = {"segundo": 0, "rotulo_esperado": None}
             checks.append({"segundo": 29.966, "rotulo_esperado": None})
+            for check in checks:
+                if check["segundo"] >= 25:
+                    check["rotulo_esperado"] = None
     duration = props["duration_seconds"]
     decode_options = {"stamps": [check["segundo"] for check in checks]} if checks else {}
     audio_check = None
@@ -439,7 +443,7 @@ def review_video(
             " el orden suministrado. La primera es la apertura."
             + (
                 " Revisa el CTA en la penúltima muestra; la última enseña el fin del fundido."
-                if destination
+                if animated_endcard
                 else " La última es el cierre."
             )
             + " Usa los segundos y rótulos esperados del JSON. En un intervalo sin rótulo"
@@ -473,13 +477,17 @@ def review_video(
         )
         evidence["cta_final"] = ad["cta"]
         evidence["marca_final"] = ad["brand"]
+        if animated_endcard:
+            instructions += (
+                " En el fotograma cero debe verse el sujeto del gancho, aunque su rótulo todavía esté entrando. "
+                "A los 29.966 s se espera un fundido a negro, sin texto legible."
+            )
         if destination:
             evidence["destino_confirmado"] = destination
             instructions += (
                 " Comprueba en el cierre el icono del canal seleccionado y la URL del destino "
                 " confirmado, visible a los 28 s. Se admite mostrarla sin https:// ni www. "
-                "En el fotograma cero debe verse el sujeto del gancho, aunque su rótulo todavía esté entrando. "
-                "A los 29.966 s se espera un fundido a negro, sin texto legible. Rechaza un destino "
+                "Rechaza un destino "
                 "distinto, una URL ilegible o un icono de otro canal."
             )
         instructions += (

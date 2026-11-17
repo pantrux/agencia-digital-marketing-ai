@@ -94,3 +94,5 @@ se omite `ad_cta`, se genera el texto para el canal elegido. El titular puede
 consultar todos los datos guardados. El despacho envía un único
 `ad_destination` con `channel` y `url`. Los briefs anteriores siguen
 respondiendo con su texto de CTA. [Migración 0020](../migrations/0020_brief_ad_contacts.sql)
+
+El brief de un anuncio acepta `ad_engine: "hyperframes"` cuando incluye un CTA. El despacho lo transmite como `render.props.ad.engine` y la vista previa y el máster usan el mismo motor. Los anuncios existentes conservan el motor predeterminado. El Worker solo recibe los datos estructurados del brief. El renderer crea el HTML localmente y compone los fotogramas con el montaje y la mezcla del anuncio. Aplica la migración antes de actualizar el Worker. [Migración 0021](../migrations/0021_brief_ad_engine.sql)

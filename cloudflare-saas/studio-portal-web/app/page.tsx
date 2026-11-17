@@ -16,7 +16,7 @@ type Order = { id: string; project_slug: string; status: string; created_at: num
 const socialLabels = { facebook: "Facebook", instagram: "Instagram", whatsapp: "WhatsApp" } as const;
 type SocialChannel = keyof typeof socialLabels;
 type SocialLinks = Partial<Record<SocialChannel, string>>;
-type BriefFields = { ad_contacts?: SocialLinks & { channel: SocialChannel }; ad_cta?: string; ad_brand?: string; objective: string; audience: string; tone: string };
+type BriefFields = { ad_engine?: "hyperframes"; ad_contacts?: SocialLinks & { channel: SocialChannel }; ad_cta?: string; ad_brand?: string; objective: string; audience: string; tone: string };
 type BriefStatus = { ad_available?: boolean; brief: (BriefFields & { confirmed_at: number }) | null; ready: boolean; brand?: Brand };
 const emptyBrand: BrandFields = { display_name: "", audience: "", tone: "" };
 type Kit = { id: string; title: string; url: string; prores?: { bytes: number; url: string } };
@@ -109,6 +109,7 @@ function ConfirmBrief({ order }: { order: string }) {
   const waitingForVideo = !current?.ready && !current?.brief;
   const [links, setLinks] = useState<SocialLinks>({});
   const [channel, setChannel] = useState<SocialChannel | "">("");
+  const [hyperframes, setHyperframes] = useState(false);
   const enteredLinks = Object.fromEntries(
     Object.entries(links).filter(([, url]) => url.trim()).map(([name, url]) => [name, url.trim()]),
   );
@@ -155,6 +156,7 @@ function ConfirmBrief({ order }: { order: string }) {
       const ad = current?.ad_available && cta ? {
         ad_cta: cta,
         ad_brand: adBrand.trim(),
+        ...(hyperframes ? { ad_engine: "hyperframes" } : {}),
         ...(channel ? { ad_contacts: { ...enteredLinks, channel } } : {}),
       } : {};
       setCurrent(await api<BriefStatus>(path, {
@@ -172,7 +174,8 @@ function ConfirmBrief({ order }: { order: string }) {
       <dl><dt>Objetivo</dt><dd>{confirmed.objective}</dd><dt>Audiencia</dt><dd>{confirmed.audience}</dd>
         {confirmed.tone && <><dt>Tono</dt><dd>{confirmed.tone}</dd></>}
         {confirmed.ad_cta && <><dt>Marca del anuncio</dt><dd>{confirmed.ad_brand}</dd><dt>Llamada a la acción</dt><dd>{confirmed.ad_cta}</dd></>}
-        {confirmed.ad_contacts && <><dt>Destino del CTA</dt><dd>{confirmed.ad_contacts[confirmed.ad_contacts.channel]}</dd></>}</dl></div>
+        {confirmed.ad_contacts && <><dt>Destino del CTA</dt><dd>{confirmed.ad_contacts[confirmed.ad_contacts.channel]}</dd></>}
+        {confirmed.ad_engine && <><dt>Motion graphics</dt><dd>HyperFrames</dd></>}</dl></div>
       : <form onSubmit={submit}>
         <label htmlFor="brief-objective">Objetivo</label>
         <textarea id="brief-objective" rows={2} required maxLength={800} value={fields.objective} disabled={pending}
@@ -213,6 +216,10 @@ function ConfirmBrief({ order }: { order: string }) {
             <label htmlFor="brief-ad-brand">Marca que se verá al cierre</label>
             <input id="brief-ad-brand" maxLength={80} value={adBrand} required disabled={pending}
               onChange={(event) => setDraft({ ...draft, ad_brand: event.currentTarget.value })} />
+            <label htmlFor="brief-hyperframes">
+              <input id="brief-hyperframes" type="checkbox" checked={hyperframes} disabled={pending}
+                onChange={(event) => setHyperframes(event.currentTarget.checked)} /> Motion graphics con HyperFrames
+            </label>
           </>}
         </>}
         {current?.ready ? <button className="button" type="submit" disabled={pending || !fields.objective.trim() || !fields.audience.trim() || Boolean(cta && !adBrand.trim()) || Boolean(current?.ad_available && needsChannel)}>Confirmar brief</button>

@@ -136,9 +136,11 @@ def test_frozen_manifest_matches_the_phase_five_skill_catalogue():
     value = json.loads((BASE / "manifest.json").read_text(encoding="utf-8"))
     sources = review.validate(value)
     names = {Path(entry).parent.name for source in sources for entry in source["skills"]}
-    assert len(sources) == 6 and names == set(
+    assert len(sources) == 7 and names == set(
         "ig-audit ig-caption ig-carousel ig-dm ig-human ig-plan ig-reel ig-story ig-viral "
         "ab-testing ad-creative copywriting cro marketing-psychology onboarding product-marketing "
-        "social video meta-ads remotion-best-practices ai-image-generation ai-video-generation".split()
+        "social video meta-ads remotion-best-practices ai-image-generation ai-video-generation "
+        "hyperframes hyperframes-cli hyperframes-registry media-use remotion-to-hyperframes "
+        "captions-overlay cut-the-curve motion-doctrine reverse-any-video seam-craft".split()
     )
-    assert sum("LICENSE" in source["files"] for source in sources) == 4
+    assert sum("LICENSE" in source["files"] for source in sources) == 5

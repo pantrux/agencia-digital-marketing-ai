@@ -64,7 +64,7 @@ def confirmed(payload, order):
         return None
     if (
         type(brief) is not dict
-        or brief.keys() - {"ad_cta", "ad_brand", "ad_destination"}
+        or brief.keys() - {"ad_cta", "ad_brand", "ad_destination", "ad_engine"}
         != set(BRIEF) | {"order_id", "user_id", "confirmed_at"}
         or brief["order_id"] != order["order_id"]
         or brief["user_id"] != order["user_id"]
@@ -73,6 +73,7 @@ def confirmed(payload, order):
         or not text_fields(brief, BRIEF, ("tone",))
         or (("ad_cta" in brief) != ("ad_brand" in brief))
         or ("ad_cta" in brief and not text_fields(brief, {"ad_cta": 70, "ad_brand": 80}))
+        or ("ad_engine" in brief and (brief["ad_engine"] != "hyperframes" or "ad_cta" not in brief))
         or (
             "ad_destination" in brief
             and ("ad_cta" not in brief or not valid_ad_destination(brief["ad_destination"]))

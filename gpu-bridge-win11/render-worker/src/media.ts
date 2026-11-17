@@ -171,6 +171,29 @@ export function cutSceneAudio(input: string, output: string, scenes: readonly Ed
   return ['-hide_banner','-nostdin','-nostats','-n','-i',input,'-filter_complex',filter,'-map','[audio]','-c:a','pcm_s24le',output];
 }
 
+function sceneVideo(sourceVideo: string, scenes: readonly EditScene[]) {
+  const videoInputs: string[] = [];
+  const cuts = scenes.map((scene, index) => {
+    // Buscar en segundos enteros deja un margen de fotogramas antes de cada corte.
+    const seek = Math.max(0, Math.floor(scene.source_start_frame / 30) - 1);
+    videoInputs.push('-threads','2','-ss',String(seek),'-i',sourceVideo);
+    return `[${index}:v]fps=30:start_time=0,trim=start_frame=${scene.source_start_frame - seek * 30}:end_frame=${scene.source_end_frame - seek * 30},setpts=PTS-STARTPTS[plano${index}]`;
+  });
+  const links = scenes.map((_, index) => `[plano${index}]`).join('');
+  cuts.push(`${links}concat=n=${scenes.length}:v=1:a=0,settb=1/30,setpts=N[montaje]`);
+  return {videoInputs,cuts};
+}
+
+export function stageHyperframesPicture(source: string, scenes: readonly EditScene[], resolution: Resolution, output: string): string[] {
+  const {width,height} = outputDimensions(resolution);
+  const {videoInputs,cuts} = sceneVideo(source,scenes);
+  const fit = `[montaje]scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=bilinear:out_color_matrix=bt709:out_range=tv,crop=${width}:${height},setsar=1,format=yuv420p,${limitedBt709}[v]`;
+  return ['-hide_banner','-nostdin','-v','error','-n','-filter_complex_threads','3',...videoInputs,
+    '-filter_complex',[...cuts,fit].join(';'),'-map','[v]','-an','-c:v','h264_nvenc','-preset','p5',
+    '-rc','vbr','-cq','16','-b:v','0','-maxrate',resolution === '4k' ? '60M' : '24M',
+    '-g','30','-movflags','+faststart',output];
+}
+
 export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string, social = false): string[] {
   if (scenes && !sourceVideo) return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);
@@ -178,17 +201,9 @@ export function encodeNvenc(frames: string, audio: string, output: string, count
   const high = resolution === '4k';
   const images = ['-framerate','30','-start_number','0','-i',frames];
   const tail = normalize ? `tpad=stop_mode=clone:stop_duration=${exactTimeToleranceSeconds},` : '';
-  const videoInputs: string[] = [];
-  const cuts = scenes?.map((scene, index) => {
-    // Buscar en segundos enteros deja un margen de fotogramas antes de cada corte.
-    const seek = Math.max(0, Math.floor(scene.source_start_frame / 30) - 1);
-    videoInputs.push('-threads','2','-ss',String(seek),'-i',sourceVideo!);
-    return `[${index}:v]fps=30:start_time=0,trim=start_frame=${scene.source_start_frame - seek * 30}:end_frame=${scene.source_end_frame - seek * 30},setpts=PTS-STARTPTS[plano${index}]`;
-  }) ?? [];
-  if (scenes) {
-    const links = scenes.map((_, index) => `[plano${index}]`).join('');
-    cuts.push(`${links}concat=n=${scenes.length}:v=1:a=0,settb=1/30,setpts=N[montaje]`);
-  } else if (sourceVideo) videoInputs.push('-i',sourceVideo);
+  const {videoInputs,cuts} = scenes
+    ? sceneVideo(sourceVideo!,scenes)
+    : {videoInputs: sourceVideo ? ['-i',sourceVideo] : [], cuts: []};
   const videoFilter = scenes ? '[montaje]' : `[0:v]fps=fps=30:start_time=0,${tail}`;
   const scale = `${videoFilter}scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=bilinear`;
   const crop = `crop=${width}:${height},setsar=1`;

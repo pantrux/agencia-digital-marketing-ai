@@ -98,7 +98,7 @@ function databaseForIngest(output: "1080p" | "4k" = "1080p", format: "mp4" | "pr
 it("aísla los perfiles de marca y conserva la versión que tomó cada pedido", async () => {
   const db = databaseForIngest();
   try {
-    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
+    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql", "0021_brief_ad_engine.sql"]) {
       db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
     }
     db.exec(`INSERT INTO users (id,google_sub,email) VALUES
@@ -187,14 +187,14 @@ it("aísla los perfiles de marca y conserva la versión que tomó cada pedido", 
 it.each(["full", "reel"] as const)("confirma el brief de una orden %s sin duplicarlo ni editarlo después", async (edit) => {
   const db = databaseForIngest("1080p", "mp4", edit);
   try {
-    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
+    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql", "0021_brief_ad_engine.sql"]) {
       db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
     }
     db.prepare("UPDATE orders SET provider_mode='sandbox' WHERE id=?").run(order);
     const env = { DB: sqliteAdapter(db), BILLING_MODE: "sandbox" as const };
     const brief = { objective: "Invitar a reservar una demo", audience: "Dueños de negocios", tone: "Directo",
       ...(edit === "reel" ? { ad_cta: "Escríbenos para reservar", ad_brand: "Vivero de prueba" } : {}) };
-    const send = (who: string, data?: typeof brief & { ad_contacts?: unknown }) => handleProductionBrief(
+    const send = (who: string, data?: typeof brief & { ad_contacts?: unknown; ad_engine?: string }) => handleProductionBrief(
       request(`/api/orders/${order}/brief`, data ? "POST" : "GET", data), env, who, order,
     );
     const owned = async () => (await (await listOrders("user", env)).json()).orders[0];
@@ -215,8 +215,9 @@ it.each(["full", "reel"] as const)("confirma el brief de una orden %s sin duplic
     }
     const contacts = { channel: "instagram", facebook: "https://facebook.com/viverodeprueba",
       instagram: "https://instagram.com/vivero.prueba/", whatsapp: "https://wa.me/56911112222" };
-    const valid = edit === "reel" ? { ...brief, ad_contacts: contacts } : brief;
+    const valid = edit === "reel" ? { ...brief, ad_contacts: contacts, ad_engine: "hyperframes" } : brief;
     if (edit === "reel") {
+      await expect(send("user", { ...brief, ad_engine: "otro" })).rejects.toMatchObject({ status: 422 });
       for (const ad_contacts of [
         { ...contacts, channel: "otro" },
         { channel: "facebook", instagram: contacts.instagram },
@@ -299,7 +300,7 @@ it.each([["1080p", "mp4", "free", "full"], ["4k", "mp4", "ultra", "full"], ["4k"
 it.each([false, true])("registra el dictamen y expone el motivo al titular sin la huella (manual: %s)", async (manual) => {
   const db = databaseForIngest();
   try {
-    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
+    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql", "0021_brief_ad_engine.sql"]) {
       db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
     }
     const id = "c4eec711-eb76-4bd2-a6a3-d2bb3a0aae61";
@@ -385,7 +386,7 @@ it.each([
 ])("aplica el cupo del ajuste y espera el resultado autenticado en $plan", async ({ plan, priority, limit, outcome }) => {
   const db = databaseForIngest();
   try {
-    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
+    for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql", "0021_brief_ad_engine.sql"]) {
       db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
     }
     const userId = "9b7eb194-c462-40de-b44c-f37a100601b1";
@@ -834,7 +835,7 @@ describe("Ingesta R2 multipart", () => {
   it.each([1, 2])("carga el panel con sesión de formato %s y una sola llamada a D1", async (version) => {
     const db = databaseForIngest();
     try {
-      for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0007_delivery_duration.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql"]) {
+      for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0007_delivery_duration.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql", "0021_brief_ad_engine.sql"]) {
         db.exec(readFileSync(new URL(`../cloudflare-saas/migrations/${file}`, import.meta.url), "utf8"));
       }
       db.exec("INSERT INTO users(id,google_sub,email) VALUES('otro','google-otro','otro@example.invalid')");

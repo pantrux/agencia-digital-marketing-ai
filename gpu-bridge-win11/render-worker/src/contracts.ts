@@ -14,7 +14,7 @@ export interface AdCaption {start_frame: number; end_frame: number; text: string
 export const AD_MUSIC_ID = 'carefree-usuan1400037' as const;
 export type SocialChannel = 'facebook' | 'instagram' | 'whatsapp';
 export interface AdDestination {channel: SocialChannel; url: string}
-export interface ScriptedAd {destination?: AdDestination; cta: string; brand: string; captions: AdCaption[]; soundtrack?: typeof AD_MUSIC_ID}
+export interface ScriptedAd {engine?: 'hyperframes'; destination?: AdDestination; cta: string; brand: string; captions: AdCaption[]; soundtrack?: typeof AD_MUSIC_ID}
 export const AD_ENDCARD_FRAME = 780;
 export const SOCIAL_ENDCARD_FRAME = 750;
 export const SOCIAL_FADE_FRAME = 864;
@@ -133,7 +133,8 @@ function socialDestination(value: unknown): AdDestination {
 }
 
 function scriptedAd(value: unknown): ScriptedAd {
-  const input = object(value, ['cta', 'brand', 'captions', 'soundtrack', 'destination']);
+  const input = object(value, ['cta', 'brand', 'captions', 'soundtrack', 'destination', 'engine']);
+  if (input.engine !== undefined && input.engine !== 'hyperframes') invalid('El motor de animación no está disponible.');
   if (input.soundtrack !== undefined && input.soundtrack !== AD_MUSIC_ID) invalid('La pista no pertenece al catálogo del anuncio.');
   const cta = text(input.cta, '', 70), brand = text(input.brand, '', 80);
   if (!cta.trim() || !brand.trim() || !Array.isArray(input.captions)
@@ -152,7 +153,7 @@ function scriptedAd(value: unknown): ScriptedAd {
     }
     return {start_frame,end_frame,text:caption,...(position === undefined ? {} : {position})};
   });
-  return {cta,brand,captions,...(input.destination === undefined ? {} : {destination: socialDestination(input.destination)}),...(input.soundtrack === AD_MUSIC_ID && {soundtrack:AD_MUSIC_ID})};
+  return {cta,brand,captions,...(input.engine === 'hyperframes' ? {engine: input.engine} : {}),...(input.destination === undefined ? {} : {destination: socialDestination(input.destination)}),...(input.soundtrack === AD_MUSIC_ID && {soundtrack:AD_MUSIC_ID})};
 }
 
 export function mediaPath(value: unknown, project: string): string {

@@ -246,6 +246,7 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None):
                 "ad": {
                     "cta": ad,
                     "brand": brief["ad_brand"],
+                    **({"engine": brief["ad_engine"]} if "ad_engine" in brief else {}),
                     **(
                         {"destination": brief["ad_destination"]}
                         if "ad_destination" in brief

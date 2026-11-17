@@ -53,9 +53,9 @@ export function contactCta(contacts: Contacts): string {
   return "Escríbenos por " + names[contacts.channel];
 }
 
-export function adDispatchFields(cta: string | null, brand: string | null, raw: string | null) {
+export function adDispatchFields(cta: string | null, brand: string | null, raw: string | null, engine: string | null) {
   if (!cta) return {};
   const contacts = storedAdContacts(raw);
-  return { ad_cta: cta, ad_brand: brand ?? "", ...(contacts
+  return { ad_cta: cta, ad_brand: brand ?? "", ...(engine === "hyperframes" ? { ad_engine: engine } : {}), ...(contacts
     ? { ad_destination: { channel: contacts.channel, url: contacts[contacts.channel]! } } : {}) };
 }
