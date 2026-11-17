@@ -515,7 +515,26 @@ def plan_request(
             instructions + "\n" + json.dumps(facts, ensure_ascii=False, separators=(",", ":"))
         )
         if len(visual_payload(request)) > MAX_VISUAL_BYTES - 1000:
-            raise ValueError("El encargo de anuncio excede la capacidad de análisis visual")
+            words_by_frame = facts["palabras_por_fotograma"]
+            centers = [round(timestamp * 30) for timestamp, _ in images]
+            facts["cobertura_transcripcion"] = (
+                "Marcas exactas de la voz en ventanas alrededor de las muestras visuales"
+            )
+            for radius in (450, 225, 120, 60, 0):
+                facts["palabras_por_fotograma"] = [
+                    item
+                    for item in words_by_frame
+                    if any(abs(item[0] - center) <= radius for center in centers)
+                ]
+                request["message"] = (
+                    instructions
+                    + "\n"
+                    + json.dumps(facts, ensure_ascii=False, separators=(",", ":"))
+                )
+                if len(visual_payload(request)) <= MAX_VISUAL_BYTES - 1000:
+                    break
+            else:
+                raise ValueError("Las muestras y el brief exceden la capacidad de análisis visual")
     elif reel:
         # Reservar espacio para la corrección de formato y muestrear toda la grabación.
         budget = MAX_VISUAL_BYTES - 1000
