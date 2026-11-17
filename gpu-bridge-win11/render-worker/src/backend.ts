@@ -202,13 +202,28 @@ export class RenderBackend implements Backend {
     const run = (args: string[]) => this.deps.run(this.config.ffmpeg, args, {timeoutMs: 1200000, signal});
     await run(encodeProresFragment(framePattern, fade, TITLE_FADE_FRAMES));
     await run(encodeProresFragment(lastFrame, tail, 1));
-    const copies = count - TITLE_FADE_FRAMES;
-    const [opening, still] = await Promise.all([stat(fade), stat(tail)]);
+    return this.#writeProresList(work, [
+      {file: fade, repeat: 1}, {file: tail, repeat: count - TITLE_FADE_FRAMES},
+    ], count, signal);
+  }
+
+  async #prepareSceneProres(work: string, frames: number[], files: string[], count: number, signal: AbortSignal) {
+    const fragments = [];
+    for (const [index, start] of frames.entries()) {
+      const file = path.join(work, `prores-escena-${index}.mov`);
+      await this.deps.run(this.config.ffmpeg, encodeProresFragment(files[index]!, file, 1), {timeoutMs: 120000, signal});
+      fragments.push({file, repeat: (frames[index + 1] ?? count) - start});
+    }
+    return this.#writeProresList(work, fragments, count, signal);
+  }
+
+  async #writeProresList(work: string, fragments: {file: string; repeat: number}[], count: number, signal: AbortSignal) {
+    const sizes = await Promise.all(fragments.map(async ({file, repeat}) => (await stat(file)).size * repeat));
     // El PCM estéreo de 24 bits ocupa 288 000 bytes/s. Reservar ambos resultados del ajuste de pico.
-    const estimated = opening.size + copies * still.size + Math.ceil(count / 30) * 288000 + 16 * 1024 ** 2;
+    const estimated = sizes.reduce((total, size) => total + size, 0) + Math.ceil(count / 30) * 288000 + 16 * 1024 ** 2;
     await this.scratch.ensureSpace(2 * estimated);
     const list = path.join(work, 'prores-lista.txt');
-    const entries = `file ${path.basename(fade)}\n` + `file ${path.basename(tail)}\n`.repeat(copies);
+    const entries = fragments.map(({file, repeat}) => `file ${path.basename(file)}\n`.repeat(repeat)).join('');
     await writeFile(list, entries, {flag: 'wx', signal});
     return list;
   }
@@ -222,6 +237,7 @@ export class RenderBackend implements Backend {
       const frameBytes = pixels * 4 + 1024 ** 2;
       const outputs = request.format === 'prores4444' ? request.durationInFrames * pixels * 16 : 4 * 1024 ** 3;
       const scenes = request.props.scenes;
+      const sceneProres = Boolean(scenes && request.transparent);
       if (!request.props.audio_path) throw new WorkerError(422, 'AUDIO_AUSENTE', 'El render final requiere una pista de audio.');
       const sourceAudio = await this.nas.input(request.props.audio_path, request.project_id);
       const audio = path.join(work, 'audio' + (scenes ? '.wav' : path.extname(sourceAudio)));
@@ -261,7 +277,8 @@ export class RenderBackend implements Backend {
       const layerFrames = scenes ? graphicFrames(scenes)
         : sourceVideo || staticProres ? Array.from({length: TITLE_FADE_FRAMES + 1}, (_, index) => index) : null;
       // La gráfica sin crudo solo renderiza el fundido. El margen del MOV se calcula tras codificar sus fragmentos.
-      if (scenes) {
+      if (sceneProres) await this.scratch.ensureSpace((layerFrames?.length ?? 0) * frameBytes * 2);
+      else if (scenes) {
         const clones = Math.floor(request.durationInFrames / linksPerImage);
         await this.scratch.ensureSpace(((layerFrames?.length ?? 0) + clones) * frameBytes + outputs);
       }
@@ -271,10 +288,12 @@ export class RenderBackend implements Backend {
       const encodeStarted = performance.now();
       if (scene.frameCount !== (layerFrames?.length ?? request.durationInFrames)
         || scene.files.length !== (layerFrames?.length ?? 1)) throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'La composición no produjo todos los fotogramas.');
-      const framePattern = scenes && layerFrames
+      const framePattern = scenes && layerFrames && !sceneProres
         ? await timelineImages(work, layerFrames, scene.files, request.durationInFrames, bounded)
         : layerFrames ? path.join(work, 'frames', 'still-%d.png') : scene.files[0]!;
-      const proresList = staticProres
+      const proresList = sceneProres && layerFrames
+        ? await this.#prepareSceneProres(work, layerFrames, scene.files, request.durationInFrames, bounded)
+        : staticProres
         ? await this.#prepareStaticProres(work, framePattern, scene.files.at(-1)!, request.durationInFrames, bounded)
         : null;
       let output = '', info: MediaInfo | undefined, finalAudio = measured;
