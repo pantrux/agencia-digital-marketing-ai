@@ -50,7 +50,7 @@ export const Reel: React.FC<ReelProps> = (props) => {
     </div>}
     {label && <div style={{position: 'absolute', ...(hook ? {right:122,maxWidth:380} : {left:60,maxWidth:900}),
       width: 'max-content', boxSizing: 'border-box',
-      ...(label.position === 'top' ? {top: social ? 205 : 200} : {bottom: props.ad ? 520 : 480}),
+      ...(label.position === 'top' ? {top: hook ? 120 : social ? 205 : 200} : {bottom: props.ad ? 520 : 480}),
       backgroundColor: social ? 'rgba(16,32,24,.88)' : '#141714', borderLeft: `8px solid ${props.accent}`,
       padding: social ? '16px 22px' : '24px 28px', borderRadius: social ? 23 : 12,
       opacity:entrance,transform:social ? `translateY(${(1-entrance)*-18}px)` : undefined,
