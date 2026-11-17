@@ -192,8 +192,8 @@ def decode(path, expected, duration, *, stamps=None):
     return metrics, images
 
 
-def scene_checks(scenes):
-    intervals, choices, rest = [], {0}, []
+def scene_checks(scenes, *, required=()):
+    intervals, choices, rest = [], {0, *required}, []
     offset = 0
     for scene in scenes:
         length = scene["source_end_frame"] - scene["source_start_frame"]
@@ -226,9 +226,17 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
     checks = scene_checks(scenes) if scenes else []
     ad = props.get("ad")
     if ad:
-        checks = [sample for sample in checks if sample["segundo"] < 26][:7] + [
-            {"segundo": 28, "rotulo_esperado": None}
-        ]
+        cue = max(ad["captions"], key=lambda row: row["end_frame"] - row["start_frame"])
+        frame = (cue["start_frame"] + cue["end_frame"]) // 2
+        stamp = (frame * 1000 // 30) / 1000
+        candidates = scene_checks(scenes, required=(frame,))
+        mandatory = (0, stamp)
+        checks = [item for item in candidates if item["segundo"] in mandatory]
+        checks += [
+            item for item in candidates if item["segundo"] not in mandatory and item["segundo"] < 26
+        ][: 7 - len(checks)]
+        checks.sort(key=lambda item: item["segundo"])
+        checks.append({"segundo": 28, "rotulo_esperado": None})
     duration = props["duration_seconds"]
     metrics, images = decode(
         path,

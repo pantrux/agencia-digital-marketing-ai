@@ -193,7 +193,7 @@ it.each(["full", "reel"] as const)("confirma el brief de una orden %s sin duplic
     db.prepare("UPDATE orders SET provider_mode='sandbox' WHERE id=?").run(order);
     const env = { DB: sqliteAdapter(db), BILLING_MODE: "sandbox" as const };
     const brief = { objective: "Invitar a reservar una demo", audience: "Dueños de negocios", tone: "Directo",
-      ...(edit === "reel" ? { ad_cta: "Escríbenos para reservar" } : {}) };
+      ...(edit === "reel" ? { ad_cta: "Escríbenos para reservar", ad_brand: "Vivero de prueba" } : {}) };
     const send = (who: string, data?: typeof brief) => handleProductionBrief(
       request(`/api/orders/${order}/brief`, data ? "POST" : "GET", data), env, who, order,
     );

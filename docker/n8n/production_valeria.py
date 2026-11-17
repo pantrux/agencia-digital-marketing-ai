@@ -158,12 +158,30 @@ def ad_captions(scenes, words):
             cues.append((group[0][0], group[-1][1], " ".join(part[2] for part in group)))
         offset += end - start
     result = []
-    for i, (start, end, text) in enumerate(cues):
+    i = 0
+    while i < len(cues):
+        start, end, text = cues[i]
         start = max(start, result[-1]["end_frame"] if result else 0)
+        # Una pausa muy corta pertenece a la tarjeta siguiente para conservar las palabras.
+        while i + 1 < len(cues) and cues[i + 1][0] - start < 9:
+            i += 1
+            end = cues[i][1]
+            text += " " + cues[i][2]
         following = cues[i + 1][0] if i + 1 < len(cues) else 780
         end = min(max(end, start + 15), following, 780)
-        if end - start >= 9 and len(text.encode("utf-16-le")) // 2 <= 68:
+        if end - start < 9 and result:
+            last = result[-1]
+            last["end_frame"] = max(last["end_frame"], end)
+            last["text"] += " " + text
+        elif end - start >= 9:
             result.append({"start_frame": start, "end_frame": end, "text": text})
+        else:
+            raise VisualResponseFormatError("No se pudo conservar el subtítulo breve")
+        i += 1
+    if any(len(cue["text"].encode("utf-16-le")) // 2 > 68 for cue in result):
+        raise VisualResponseFormatError(
+            "Los subtítulos necesitan pausas para mantener la legibilidad"
+        )
     if not 1 <= len(result) <= 60:
         raise VisualResponseFormatError(
             "El anuncio requiere subtítulos respaldados por la voz original"
@@ -213,9 +231,7 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None):
             ad_props = {
                 "ad": {
                     "cta": ad,
-                    "brand": ((order.get("brand") or {}).get("display_name") or answer["titulo"])[
-                        :80
-                    ],
+                    "brand": brief["ad_brand"],
                     "captions": ad_captions(scenes, transcript["words"] if transcript else []),
                 }
             }
@@ -425,6 +441,7 @@ def plan_request(
         )
     if reel and brief.get("ad_cta"):
         facts["cta_confirmada"] = brief["ad_cta"]
+        facts["marca_confirmada"] = brief["ad_brand"]
         instructions += (
             " ANUNCIO GUIADO POR GUION: este encargo sustituye los límites de 2 a 6 cortes por 2 a 12; "
             "la suma exacta debe ser 30 segundos y puedes reordenar intervalos de origen no solapados. "
@@ -432,8 +449,8 @@ def plan_request(
             "comienza entre 0 y 0.5 s y dura al menos hasta 2 s. Desarrolla el argumento mediante "
             "frases completas del material original y tomas pertinentes. Los últimos cuatro segundos "
             "usan una imagen de producto despejada para la marca y el CTA confirmado; el renderer "
-            "coloca ese texto y silencia la voz en ese intervalo. titulo identifica la marca si no "
-            "hay marca guardada. subtitulo sintetiza el argumento y observacion explica el guion."
+            "coloca la marca y la CTA confirmadas y silencia la voz en ese intervalo. "
+            "subtitulo sintetiza el argumento y observacion explica el guion."
         )
     if synthetic:
         instructions += (

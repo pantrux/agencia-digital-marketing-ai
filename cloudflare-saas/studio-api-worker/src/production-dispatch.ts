@@ -110,13 +110,13 @@ async function recordQualityOutcome(body: Record<string, unknown>, env: Producti
   return response({ recorded: true });
 }
 
-type ManualContext = { ad_cta: string;
+type ManualContext = { ad_cta: string; ad_brand: string;
   order_id: string; user_id: string; objective: string; audience: string; tone: string; confirmed_at: number;
   number: number; revision: number; review_sha256: string; instructions: string;
 };
 
 async function manualContext(orderId: string, env: ProductionDispatchEnv): Promise<Response> {
-  const row = await env.DB.withSession("first-primary").prepare(`SELECT b.order_id,b.user_id,b.objective,b.audience,b.tone,b.confirmed_at,b.ad_cta,
+  const row = await env.DB.withSession("first-primary").prepare(`SELECT b.order_id,b.user_id,b.objective,b.audience,b.tone,b.confirmed_at,b.ad_cta,b.ad_brand,
     a.number,a.revision,a.review_sha256,a.instructions
     FROM production_manual_adjustments a JOIN orders o ON o.id=a.order_id
     JOIN production_manual_reviews r ON r.order_id=o.id AND r.revision=a.revision AND r.direction_sha256=a.review_sha256
@@ -125,8 +125,8 @@ async function manualContext(orderId: string, env: ProductionDispatchEnv): Promi
     WHERE o.id=? AND o.kind='production' AND o.status='processing' AND COALESCE(o.provider_mode,'production')=?
       AND a.status='pending'`).bind(orderId, env.BILLING_MODE).first<ManualContext>();
   if (!row) return response({ brief: null, adjustment: null });
-  const { number, revision, review_sha256, instructions, ad_cta, ...brief } = row;
-  return response({ brief: { ...brief, ...(ad_cta ? { ad_cta } : {}) }, adjustment: { number, revision, review_sha256, instructions } });
+  const { number, revision, review_sha256, instructions, ad_cta, ad_brand, ...brief } = row;
+  return response({ brief: { ...brief, ...(ad_cta ? { ad_cta, ad_brand } : {}) }, adjustment: { number, revision, review_sha256, instructions } });
 }
 
 async function recordManualAdjustment(body: Record<string, unknown>, env: ProductionDispatchEnv, now: number): Promise<Response> {
@@ -179,15 +179,15 @@ export async function handleProductionDispatch(request: Request, env: Production
   }
   if (body.action === "brief" && Object.keys(body).length === 2 && typeof body.order_id === "string"
     && body.order_id.length === 36 && uuid.test(body.order_id)) {
-    const brief = await env.DB.withSession("first-primary").prepare(`SELECT b.order_id,b.user_id,b.objective,b.audience,b.tone,b.confirmed_at,b.ad_cta
+    const brief = await env.DB.withSession("first-primary").prepare(`SELECT b.order_id,b.user_id,b.objective,b.audience,b.tone,b.confirmed_at,b.ad_cta,b.ad_brand
       FROM production_briefs b JOIN orders o ON o.id=b.order_id AND o.user_id=b.user_id
       JOIN production_dispatch d ON d.order_id=o.id AND d.received_at IS NOT NULL
       WHERE o.id=? AND o.kind='production' AND o.status='processing' AND COALESCE(o.provider_mode,'production')=?
         AND NOT EXISTS (SELECT 1 FROM production_manual_reviews r WHERE r.order_id=o.id)`)
-      .bind(body.order_id, env.BILLING_MODE).first<{ ad_cta: string }>();
+      .bind(body.order_id, env.BILLING_MODE).first<{ ad_cta: string; ad_brand: string }>();
     if (!brief) return response({ brief: null });
-    const { ad_cta, ...confirmed } = brief;
-    return response({ brief: { ...confirmed, ...(ad_cta ? { ad_cta } : {}) } });
+    const { ad_cta, ad_brand, ...confirmed } = brief;
+    return response({ brief: { ...confirmed, ...(ad_cta ? { ad_cta, ad_brand } : {}) } });
   }
   if (body.action !== "ack" || Object.keys(body).length !== 3 || typeof body.order_id !== "string"
     || typeof body.lease !== "string" || body.order_id.length !== 36 || body.lease.length !== 36

@@ -38,7 +38,7 @@ export const Reel: React.FC<ReelProps> = (props) => {
       {props.subtitle && <p style={{fontSize: props.subtitle_size === 'large' ? 64 : 50, lineHeight: 1.25, margin: '20px 0 0', overflowWrap: 'anywhere'}}>{props.subtitle}</p>}
     </div>}
     {label && <div style={{position: 'absolute', left: 60, maxWidth: 900, width: 'max-content', boxSizing: 'border-box',
-      ...(label.position === 'top' ? {top: 200} : {bottom: 480}),
+      ...(label.position === 'top' ? {top: 200} : {bottom: props.ad ? 520 : 480}),
       backgroundColor: '#141714', borderLeft: `8px solid ${props.accent}`, padding: '24px 28px', borderRadius: 12,
       fontSize: label.size === 'large' ? 84 : 58, lineHeight: 1.15, fontWeight: 700, overflowWrap: 'anywhere'}}>{label.text}</div>}
     {props.ad && <div style={{position:'absolute',left:0,right:0,top:1438,bottom:0,
@@ -51,7 +51,7 @@ export const Reel: React.FC<ReelProps> = (props) => {
       <div style={{display:'inline-block',fontSize:45,fontWeight:650,lineHeight:1.12,background:'#b8e1c0',
         color:'#163323',padding:'13px 22px',borderRadius:14}}>{props.ad!.cta}</div>
     </div>}
-    {props.watermark ? <div style={{position: 'absolute', bottom: 340, left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
+    {props.watermark ? <div style={{position: 'absolute', bottom: props.ad ? 100 : 340, left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
     </AbsoluteFill>
   </AbsoluteFill>;
 };
