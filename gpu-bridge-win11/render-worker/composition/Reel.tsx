@@ -51,7 +51,7 @@ export const Reel: React.FC<ReelProps> = (props) => {
       <div style={{display:'inline-block',fontSize:45,fontWeight:650,lineHeight:1.12,background:'#b8e1c0',
         color:'#163323',padding:'13px 22px',borderRadius:14}}>{props.ad!.cta}</div>
     </div>}
-    {props.watermark ? <div style={{position: 'absolute', bottom: props.ad ? 100 : 340, left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
+    {props.watermark ? <div style={{position: 'absolute', ...(props.ad ? {top: 100} : {bottom: 340}), left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
     </AbsoluteFill>
   </AbsoluteFill>;
 };

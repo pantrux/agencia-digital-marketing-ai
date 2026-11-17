@@ -402,6 +402,14 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
     if audio_check is not None and not audio_check["aprobado"]:
         qa["decision"] = "rechazado"
         qa["reglas_duras_incumplidas"].append("La voz de la mezcla no coincide con los subtítulos")
+        sample = next(i for i, check in enumerate(checks, 1) if check["subtitulo_esperado"])
+        qa["defectos"].append(
+            {
+                "muestra": sample,
+                "correccion": "Selecciona frases originales claras, conserva su voz y ajusta sus cortes "
+                "para que los subtítulos puedan verificarse en el nuevo render.",
+            }
+        )
     return {
         "mediciones": metrics,
         **({"revision_voz": audio_check} if audio_check is not None else {}),
