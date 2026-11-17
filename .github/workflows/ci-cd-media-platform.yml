@@ -123,6 +123,8 @@ jobs:
           cache: npm
       - name: Instalar dependencias declaradas
         run: npm ci --ignore-scripts
+      - name: Instalar dependencias del portal para los contratos compartidos
+        run: npm ci --ignore-scripts --no-audit --prefix cloudflare-saas/studio-portal-web
       - name: Comprobar tipos sin emitir archivos
         run: npm run typecheck
       - name: Instalar el renderizador aislado sin scripts de paquetes
@@ -135,7 +137,6 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
         run: |
-          npm ci --ignore-scripts --no-audit
           ./node_modules/.bin/next typegen
           ./node_modules/.bin/tsc --noEmit
           npm --ignore-scripts run build
@@ -161,6 +162,8 @@ jobs:
           python-version: "3.12"
       - name: Instalar dependencias declaradas
         run: npm ci --ignore-scripts
+      - name: Instalar dependencias del portal para las pruebas de carga
+        run: npm ci --ignore-scripts --no-audit --prefix cloudflare-saas/studio-portal-web
       - name: Ejecutar pruebas TypeScript
         run: npm run test
       - name: Ejecutar contrato local del socket privado de Sofía
