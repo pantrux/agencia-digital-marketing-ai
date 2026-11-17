@@ -77,6 +77,7 @@ flowchart TB
     LIMITE -. "Verificación operativa del anuncio" .-> D1AD["D1 0019, Worker y agentes"]
     D1AD --> GUION["Brief con CTA y escaleta verificable"]
     GUION --> QAAD["Vista previa con subtítulos y mezcla"]
+    MUSICAD["Catálogo musical con huella y licencia"] --> QAAD
     QAAD -->|"Dictamen aprobado"| MP4AD["Publicar máster de 30 segundos"]
     LIMITE -. "Solicitud de cambio futura" .-> PREVIEW
     LIMITE -. "Entrega futura a main" .-> SALVA

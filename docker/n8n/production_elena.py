@@ -32,7 +32,12 @@ from production_inbox import MEDIA, render_resolution
 from production_intake import identity
 from production_mateo import dispatch_request, lookup
 from production_sofia import JOURNAL, LIMIT, MAX_TRANSCRIPT, MCP, validate_transcript
-from production_valeria import MAX_JPEG, run_visual, visual_request
+from production_valeria import AD_MUSIC_ID, MAX_JPEG, run_visual, visual_request
+
+AD_MUSIC_CREDIT = (
+    "Carefree — Kevin MacLeod (incompetech.com), CC BY 4.0. Fragmento editado y mezclado. "
+    "https://creativecommons.org/licenses/by/4.0/"
+)
 
 VALERIA = Path("/var/lib/agency-production-valeria")
 LUCAS = Path("/var/lib/agency-production-lucas")
@@ -150,6 +155,17 @@ def decode(path, expected, duration, *, stamps=None, speech=None):
             "peak": float(peak[1]),
         }
         if speech is not None:
+            bed = ff(
+                "ffmpeg",
+                ["-hide_banner", "-nostdin"],
+                ["-vn", "-af", "atrim=start=26.5:end=28.5,volumedetect", "-f", "null", "-"],
+                30,
+            ).stderr.decode(errors="replace")
+            volume = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB", bed)
+            metrics["musica_cierre_dbfs"] = float(volume[1]) if volume else None
+            metrics["musica_catalogo"] = (
+                probe["format"].get("tags", {}).get("comment") == AD_MUSIC_ID
+            )
             ff(
                 "ffmpeg",
                 ["-v", "error", "-nostdin", "-n"],
@@ -312,8 +328,8 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
         cue = max(ad["captions"], key=lambda row: row["end_frame"] - row["start_frame"])
         frame = (cue["start_frame"] + cue["end_frame"]) // 2
         stamp = (frame * 1000 // 30) / 1000
-        candidates = scene_checks(scenes, required=(frame,))
-        mandatory = (0, stamp)
+        candidates = scene_checks(scenes, required=(frame, 30, 75))
+        mandatory = (0, 1, 2.5, stamp)
         checks = [item for item in candidates if item["segundo"] in mandatory]
         checks += [
             item for item in candidates if item["segundo"] not in mandatory and item["segundo"] < 26
@@ -378,11 +394,18 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
             )
         evidence["muestras_anuncio"] = checks
         evidence["auditoria_voz"] = audio_check
+        evidence["criterio_musical"] = (
+            "Fuente de catálogo y medición del cierre del MP4; la escucha es una revisión aparte."
+        )
         evidence["cta_final"] = ad["cta"]
         evidence["marca_final"] = ad["brand"]
         instructions += (
             " En este anuncio hay subtítulos separados del rótulo. Revisa el gancho al comienzo "
             "y al menos un subtítulo visible en móvil cuando coincida con la muestra. "
+            "Contrasta el objeto prometido por el gancho con el fotograma inicial y el de un "
+            "segundo: si sólo se ve parcialmente al comenzar o el encuadre tarda en "
+            "mostrarlo, registra un defecto en apertura. Comprueba si la caja de subtítulos "
+            "oculta el elemento destacado o si queda legible sin ocupar una franja vacía. "
             "En el cierre se exige marca y CTA completos en lugar del rótulo de escena. "
             "Rechaza si el CTA falta, no coincide o invade una zona ilegible."
         )
@@ -410,9 +433,33 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
                 "para que los subtítulos puedan verificarse en el nuevo render.",
             }
         )
+    if (
+        ad
+        and not -42
+        <= (metrics["musica_cierre_dbfs"] if metrics["musica_cierre_dbfs"] is not None else -100)
+        <= -10
+    ):
+        qa["decision"] = "rechazado"
+        qa["reglas_duras_incumplidas"].append("Música ausente o con nivel incorrecto al cierre")
+        qa["defectos"].append(
+            {
+                "muestra": len(checks),
+                "correccion": "Comprueba la pista de catálogo y corrige el nivel audible durante la placa final.",
+            }
+        )
+    if ad and not metrics["musica_catalogo"]:
+        qa["decision"] = "rechazado"
+        qa["reglas_duras_incumplidas"].append("La exportación no acredita la pista de catálogo")
+        qa["defectos"].append(
+            {
+                "muestra": len(checks),
+                "correccion": "Vuelve a exportar esta escaleta con la pista del catálogo aprobada.",
+            }
+        )
     return {
         "mediciones": metrics,
-        **({"revision_voz": audio_check} if audio_check is not None else {}),
+        **({"revision_voz": audio_check} if ad else {}),
+        **({"creditos_musica": AD_MUSIC_CREDIT} if metrics.get("musica_catalogo") else {}),
         "dictamen": qa,
         "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
     }

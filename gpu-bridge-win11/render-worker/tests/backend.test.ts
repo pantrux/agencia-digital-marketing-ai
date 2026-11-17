@@ -1,12 +1,14 @@
 import {after, mock, test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {mkdtemp, mkdir, writeFile, rm, access, readFile, stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {RenderBackend, timelineImages} from '../src/backend.ts';
+import {RenderBackend, stageAdMusic, timelineImages} from '../src/backend.ts';
 import {outputDimensions, parseRender, parseStills, TITLE_FADE_FRAMES, type OutputFormat, type Resolution} from '../src/contracts.ts';
 import type {RuntimeConfig} from '../src/config.ts';
 import {ScratchSpace} from '../src/scratch.ts';
+import {NasPaths} from '../src/nas.ts';
 
 // Los medios de este archivo son sintéticos y ocupan sólo unos bytes.
 mock.method(ScratchSpace.prototype, 'ensureSpace', async (bytes: number) => {
@@ -29,6 +31,34 @@ test('el reel de 45 segundos mantiene los fotogramas transparentes sin superar e
   } finally {
     await rm(root, {recursive: true, force: true});
   }
+});
+
+test('copia la pista aprobada por huella y rechaza una pista ausente o cambiada', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'musica-catalogo-'));
+  try {
+    const media = path.join(root,'nas'), work = path.join(root,'work');
+    const library = path.join(media,'_biblioteca_global','musica-stock');
+    await mkdir(library,{recursive:true}); await mkdir(work);
+    const nas = await NasPaths.create(media);
+    const source = path.join(library,'pista.mp3');
+    const fixture = Buffer.alloc(2048, 75);
+    const asset = {relative:'_biblioteca_global/musica-stock/pista.mp3',
+      sha256:createHash('sha256').update(fixture).digest('hex')};
+    const reserve = mock.fn(async (bytes: number) => {
+      assert.equal(bytes, fixture.length);
+    });
+    const scratch = {ensureSpace:reserve};
+    const signal = new AbortController().signal;
+    await assert.rejects(stageAdMusic(nas,scratch,'sansevieras',work,signal,asset), {code:'MUSICA_NO_VERIFICADA'});
+    await writeFile(source,fixture);
+    const stamped = await stageAdMusic(nas,scratch,'sansevieras',work,signal,asset);
+    assert.deepEqual(await readFile(stamped),fixture);
+    assert.equal(reserve.mock.callCount(), 1);
+    const secondWork = path.join(root,'segundo-trabajo');
+    await mkdir(secondWork);
+    await writeFile(source,Buffer.alloc(fixture.length,88));
+    await assert.rejects(stageAdMusic(nas,scratch,'sansevieras',secondWork,signal,asset), {code:'MUSICA_NO_VERIFICADA'});
+  } finally {await rm(root,{recursive:true,force:true});}
 });
 
 const request = parseRender({project_id: 'sansevieras', job_id: 'prueba', composition: 'AgencyVertical', plan: 'Free', props: {title: 'Prueba sintética', duration_seconds: 3, audio_path: 'proyectos/sansevieras/03_assets/voz.wav'}});

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {alphaMaskArgs, alphaMaskSummary, audioPass, cutSceneAudio, encodeNvenc, encodeOutput, measureAudio, overlayInputSupported, overlayPacketTimingSupported, parseLoudness, parseProbe, audioAccepted, outputAccepted, outputViolations} from '../src/media.ts';
+import {alphaMaskArgs, alphaMaskSummary, audioPass, cutSceneAudio, correctMp4Audio, encodeNvenc, encodeOutput, measureAudio, overlayInputSupported, overlayPacketTimingSupported, parseLoudness, parseProbe, audioAccepted, outputAccepted, outputViolations} from '../src/media.ts';
 import {parseRender} from '../src/contracts.ts';
 import {graphicFrames, graphicLabel} from '../src/timeline.ts';
 
@@ -219,4 +219,16 @@ test('los dos pases miden y normalizan estéreo48k antes del limitador, en MP4 y
       assert.equal(encoded[encoded.indexOf('-ac')+1],'2');
     }
   }
+});
+
+test('el anuncio añade el crédito de catálogo y la corrección de picos hereda sus metadatos', () => {
+  const id = 'carefree-usuan1400037';
+  const master = encodeNvenc('frames.png','mix.wav','master.mp4',900,30,measured,-1.5,'1080p',undefined,false,undefined,id);
+  const metadata = master.indexOf('-metadata');
+  assert.notEqual(metadata,-1);
+  assert.equal(master[metadata + 1],'comment=' + id);
+  const secondPass = correctMp4Audio('master.mp4','mix.wav','master-corrected.mp4',900,30,measured);
+  const source = secondPass.indexOf('-map_metadata');
+  assert.notEqual(source,-1);
+  assert.equal(secondPass[source + 1],'0');
 });

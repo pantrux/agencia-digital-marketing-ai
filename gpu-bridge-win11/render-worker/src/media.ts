@@ -145,16 +145,13 @@ function normalizeAudio(count: number, duration: number, measured: Loudness, pea
 }
 const aacAudio = ['-c:a','aac','-b:a','256k','-ar','48000','-ac','2'];
 
-// Motivo instrumental original, cuatro notas con envolvente de cuerda pulsada.
-const adScore = "0.15*(sin(2*PI*(220+27.5*mod(floor(t/0.6),4))*mod(t,0.6))+0.19*sin(2*PI*440*mod(t,0.6)))*exp(-6*mod(t,0.6))*min(1,mod(t,0.6)*80)";
-
-export function mixAdAudio(speech: string, output: string): string[] {
+// El archivo de catálogo se verifica y se copia al directorio privado antes de mezclar.
+export function mixAdAudio(speech: string, music: string, output: string): string[] {
   const filter = '[0:a]aformat=channel_layouts=stereo,afade=t=out:st=25.85:d=0.15,asplit=2[voice][key];'
-    + '[1:a]aformat=channel_layouts=stereo,volume=0.30,afade=d=0.45,afade=t=out:st=28.9:d=1.1[music];'
+    + '[1:a]aformat=channel_layouts=stereo,aresample=48000,atrim=duration=30,asetpts=PTS-STARTPTS,volume=0.25,afade=d=0.35,afade=t=out:st=28.8:d=1.2[music];'
     + '[music][key]sidechaincompress=threshold=0.025:ratio=6:attack=14:release=260[bed];'
     + '[voice][bed]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.94:level=0[audio]';
-  return ['-hide_banner','-nostdin','-v','error','-n','-i',speech,'-f','lavfi','-i',
-    'aevalsrc=' + adScore.replaceAll(',', '\\,') + ':s=48000:d=30',
+  return ['-hide_banner','-nostdin','-v','error','-n','-i',speech,'-ss','5','-i',music,
     '-filter_complex',filter,'-map','[audio]','-ar','48000','-c:a','pcm_s24le',output];
 }
 
@@ -167,7 +164,7 @@ export function cutSceneAudio(input: string, output: string, scenes: readonly Ed
   return ['-hide_banner','-nostdin','-nostats','-n','-i',input,'-filter_complex',filter,'-map','[audio]','-c:a','pcm_s24le',output];
 }
 
-export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false, scenes?: readonly EditScene[]): string[] {
+export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string): string[] {
   if (scenes && !sourceVideo) return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);
   const {width,height} = outputDimensions(resolution);
@@ -200,13 +197,13 @@ export function encodeNvenc(frames: string, audio: string, output: string, count
   const inputs = sourceVideo
     ? ['-xerror','-filter_complex_threads','4',...videoInputs,...images,'-i',audio,'-filter_complex',filter,'-map','[comp]','-map',`${graphicsInput + 1}:a:0`]
     : [...images,'-i',audio,'-map','0:v:0','-map','1:a:0','-vf',sdrVideoFilter('yuv420p', frames.endsWith('.jpeg'))];
-  return ['-hide_banner','-nostdin','-nostats','-n',...inputs,'-frames:v',String(count),'-t',String(duration),'-c:v','h264_nvenc','-preset','p5','-profile:v','high','-level:v',high ? '5.1' : '4.2','-b:v',high ? '24M' : '6M','-maxrate',high ? '32M' : '8M','-bufsize',high ? '48M' : '12M','-colorspace','bt709','-color_primaries','bt709','-color_trc','bt709','-color_range','tv','-af',audioFilter,...aacAudio,'-movflags','+faststart',output];
+  return ['-hide_banner','-nostdin','-nostats','-n',...inputs,'-frames:v',String(count),'-t',String(duration),'-c:v','h264_nvenc','-preset','p5','-profile:v','high','-level:v',high ? '5.1' : '4.2','-b:v',high ? '24M' : '6M','-maxrate',high ? '32M' : '8M','-bufsize',high ? '48M' : '12M','-colorspace','bt709','-color_primaries','bt709','-color_trc','bt709','-color_range','tv','-af',audioFilter,...aacAudio,...(musicId ? ['-metadata','comment=' + musicId] : []),'-movflags','+faststart',output];
 }
 
 export function correctMp4Audio(video: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -2): string[] {
   const filter = normalizeAudio(count, duration, measured, peak);
   return ['-hide_banner','-nostdin','-nostats','-n','-i',video,'-i',audio,'-map','0:v:0','-map','1:a:0',
-    '-c:v','copy','-af',filter,...aacAudio,'-movflags','+faststart',output];
+    '-c:v','copy','-map_metadata','0','-af',filter,...aacAudio,'-movflags','+faststart',output];
 }
 
 const proresVideo = ['-vf',sdrVideoFilter('yuva444p10le'),'-c:v','prores_ks','-profile:v','4444','-alpha_bits','16',
@@ -230,8 +227,8 @@ export function muxProresFragments(list: string, audio: string, output: string, 
     '-video_track_timescale',String(proresTimescale),'-af',audioFilter,...pcmAudio,'-f','mov',output];
 }
 
-export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string, normalize = false, scenes?: readonly EditScene[]): string[] {
-  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo, normalize, scenes);
+export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string): string[] {
+  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo, normalize, scenes, musicId);
   outputDimensions(resolution);
   if (format !== 'prores4444') return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);

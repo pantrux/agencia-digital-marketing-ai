@@ -2216,3 +2216,24 @@ def test_anuncio_verifica_voz_mezclada_y_alineacion(handoff):
         word["start"] += 4
         word["end"] += 4
     assert not compare_mix_speech(captions, words)["aprobado"]
+
+
+def test_subtitulos_anuncio_conservan_frases_y_posesivos(handoff):
+    from production_valeria import ad_captions
+
+    words = [
+        {"word": "Algunos", "start": 0, "end": 0.5},
+        {"word": "maceteros", "start": 0.5, "end": 1},
+        {"word": "los", "start": 1, "end": 1.3},
+        {"word": "hace", "start": 1.3, "end": 1.7},
+        {"word": "mi", "start": 1.7, "end": 1.9},
+        {"word": "marido.", "start": 2.5, "end": 2.9},
+        {"word": "Son", "start": 3.05, "end": 3.4},
+        {"word": "artesanales.", "start": 3.4, "end": 4},
+    ]
+    cues = ad_captions([{"source_start_frame": 0, "source_end_frame": 135}], words)
+    assert [cue["text"] for cue in cues] == [
+        "Algunos maceteros los hace",
+        "mi marido.",
+        "Son artesanales.",
+    ]

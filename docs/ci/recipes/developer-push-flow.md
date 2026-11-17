@@ -157,7 +157,7 @@ El control de infraestructura ejecuta la misma comprobación de D1 desde una car
 
 Para habilitar el montaje por escenas, comprobar el despacho de `output_edit` y el rechazo de vista previa antes del máster. Aplicar la migración `0018_production_edit.sql` y verificar el receptor, los agentes y el puente antes de publicar el selector del portal.
 
-Para el anuncio por guion, aplicar primero `0019_brief_ad_cta.sql`, verificar que los briefs anteriores siguen respondiendo y probar el CTA, el reordenamiento de tomas y la aprobación de vista previa con una orden MP4 de ensayo. Publicar la interfaz después del Worker, los agentes y el renderer.
+Para el anuncio por guion, aplicar primero `0019_brief_ad_cta.sql`, verificar que los briefs anteriores siguen respondiendo y probar el CTA, el reordenamiento de tomas y la aprobación de vista previa con una orden MP4 de ensayo. Publicar la interfaz después del Worker, los agentes y el renderer. Antes de habilitar anuncios, provisionar `_biblioteca_global/musica-stock/carefree-usuan1400037.mp3` desde la ficha oficial de [Carefree](https://www.incompetech.com/music/royalty-free/index.html?isrc=USUAN1400037) y cotejar la huella definida por el renderer. Verificar con una orden de ensayo el nivel de música al cierre y el crédito en el ZIP.
 
 ```bash
 ./node_modules/.bin/eslint cloudflare-saas/studio-api-worker/src
