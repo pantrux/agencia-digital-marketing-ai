@@ -40,6 +40,7 @@ SOFIA = Path("/var/lib/agency-production-sofia")
 PROFILE = {"angulo", "titulo", "subtitulo", "observacion", "apto_sin_cambios"}
 OPTIONAL = {"subtitulo_ampliado"}
 MAX_JPEG = 25000
+MAX_VISUAL_BYTES = 110000
 
 
 class VisualResponseFormatError(ValueError):
@@ -306,7 +307,7 @@ def plan_request(
         "Usa español, sin saltos de línea dentro de los campos. "
     )
     if reel:
-        words = transcript["words"][:2500] if transcript else []
+        words = transcript["words"] if transcript else []
         groups = [words[index : index + 12] for index in range(0, len(words), 12)]
         facts["transcripcion_temporizada"] = [
             [group[0]["start"], group[-1]["end"], " ".join(word["word"] for word in group)]
@@ -372,8 +373,21 @@ def plan_request(
                 "indica subtitulo_ampliado=false. Si el defecto requiere editar el vídeo o cambiar "
                 "otros elementos de la plantilla, indica apto_sin_cambios=false. "
             )
-    message = instructions + "\n" + json.dumps(facts, ensure_ascii=False)
-    return visual_request("agency-director", message, images, request_id)
+    request = visual_request(
+        "agency-director",
+        instructions + "\n" + json.dumps(facts, ensure_ascii=False),
+        images,
+        request_id,
+    )
+    if reel:
+        # Reservar espacio para la corrección de formato y muestrear toda la grabación.
+        budget = MAX_VISUAL_BYTES - 1000
+        groups = facts["transcripcion_temporizada"]
+        while groups and len(visual_payload(request)) > budget:
+            groups = groups[:-1:2] + [groups[-1]] if len(groups) > 2 else []
+            facts["transcripcion_temporizada"] = groups
+            request["message"] = instructions + "\n" + json.dumps(facts, ensure_ascii=False)
+    return request
 
 
 def visual_request(agent, message, images, request_id):
@@ -398,9 +412,13 @@ def visual_request(agent, message, images, request_id):
     }
 
 
+def visual_payload(request):
+    return json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode()
+
+
 def run_visual(request):
-    raw = json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode()
-    if len(raw) > 110000:
+    raw = visual_payload(request)
+    if len(raw) > MAX_VISUAL_BYTES:
         raise ValueError("Muestras visuales fuera del límite del gateway local")
     p = subprocess.run(
         ["/usr/local/bin/node", str(Path(__file__).with_name("production_visual_rpc.mjs"))],

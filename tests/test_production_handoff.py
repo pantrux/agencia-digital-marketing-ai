@@ -370,6 +370,30 @@ def test_valeria_convierte_escenas_a_fotogramas_y_acota_los_rotulos(monkeypatch,
             make_edl(receipt, angles, {**answer, "escenas": [answer["escenas"][0], bad]})
 
 
+def test_valeria_preserva_inicio_y_cierre_dentro_del_presupuesto_visual(monkeypatch):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    from production_valeria import plan_request
+
+    words = [
+        {"start": index / 4, "end": (index + 1) / 4, "word": "descripción" * 6}
+        for index in range(2200)
+    ]
+    words[0]["word"] = "inicio-del-clip"
+    words[-1]["word"] = "cierre-del-clip"
+    brief = {"objective": "Presentar tres productos", "audience": "Catálogo", "tone": ""}
+    request = plan_request(
+        [],
+        brief,
+        [(index, b"x" * 12000) for index in range(5)],
+        550,
+        str(uuid.uuid4()),
+        reel=True,
+        transcript={"words": words},
+    )
+    assert len(json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode()) <= 109000
+    assert "inicio-del-clip" in request["message"] and "cierre-del-clip" in request["message"]
+
+
 @pytest.mark.parametrize(
     "first_size,qualities,mutate_original",
     [(100, [4], False), (26_000, [4, 8], False), (100, [4], True)],
