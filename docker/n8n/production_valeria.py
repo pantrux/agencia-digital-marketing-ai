@@ -424,6 +424,7 @@ def plan_request(
             " devuelve apto_sin_cambios=false. Usa español."
         )
     if reel and brief.get("ad_cta"):
+        facts["cta_confirmada"] = brief["ad_cta"]
         instructions += (
             " ANUNCIO GUIADO POR GUION: este encargo sustituye los límites de 2 a 6 cortes por 2 a 12; "
             "la suma exacta debe ser 30 segundos y puedes reordenar intervalos de origen no solapados. "
