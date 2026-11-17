@@ -20,8 +20,27 @@ const receiptName = '.recibo-puente-v1.json';
 const hashPattern = /^[a-f0-9]{64}$/;
 type RenderStage = 'render' | 'stills';
 const linksPerImage = 512;
-const adMusicPath = '_biblioteca_global/musica-stock/' + AD_MUSIC_ID + '.mp3';
-const adMusicDigest = '8433b770a630d9b1594fd484442c677907ece899a4d149954cd2e74fd733e311';
+const approvedAdMusic = {
+  relative: '_biblioteca_global/musica-stock/' + AD_MUSIC_ID + '.mp3',
+  sha256: '8433b770a630d9b1594fd484442c677907ece899a4d149954cd2e74fd733e311',
+};
+
+export async function stageAdMusic(nas: NasPaths, scratch: Pick<ScratchSpace, 'ensureSpace'>, project: string, work: string,
+  signal: AbortSignal, asset = approvedAdMusic): Promise<string> {
+  const track = path.join(work, 'soundtrack.mp3');
+  try {
+    const source = await nas.input(asset.relative, project);
+    const bytes = (await stat(source)).size;
+    if (bytes < 1024 || bytes > 10 * 1024 ** 2) throw Error('Tamaño de pista inválido');
+    await scratch.ensureSpace(bytes);
+    await copyFile(source, track, constants.COPYFILE_EXCL);
+    if (await sha256File(track, signal) !== asset.sha256) throw Error('Huella de pista inválida');
+    return track;
+  } catch {
+    signal.throwIfAborted();
+    throw new WorkerError(503, 'MUSICA_NO_VERIFICADA', 'La pista de catálogo no está disponible o cambió.');
+  }
+}
 
 export async function timelineImages(work: string, frames: number[], files: string[], count: number, signal: AbortSignal) {
   const dir = path.join(work, 'rotulos');
@@ -254,18 +273,7 @@ export class RenderBackend implements Backend {
         throw new WorkerError(422, 'ESCENAS_FUERA_DEL_AUDIO', 'Los cortes deben conservar audio en todos los intervalos.');
       }
       if (ad) {
-        const track = path.join(work, 'soundtrack.mp3');
-        try {
-          const source = await this.nas.input(adMusicPath, request.project_id);
-          const bytes = (await stat(source)).size;
-          if (bytes < 1024 || bytes > 10 * 1024 ** 2) throw Error('Tamaño de pista inválido');
-          await this.scratch.ensureSpace(bytes);
-          await copyFile(source, track, constants.COPYFILE_EXCL);
-          if (await sha256File(track, bounded) !== adMusicDigest) throw Error('Huella de pista inválida');
-        } catch {
-          bounded.throwIfAborted();
-          throw new WorkerError(503, 'MUSICA_NO_VERIFICADA', 'La pista de catálogo no está disponible o cambió.');
-        }
+        const track = await stageAdMusic(this.nas, this.scratch, request.project_id, work, bounded);
         await this.deps.run(this.config.ffmpeg, mixAdAudio(speech, track, audio), {timeoutMs: 120000, signal: bounded});
       }
       const measured = parseLoudness((await this.deps.run(this.config.ffmpeg, measureAudio(audio, duration), {timeoutMs: 1200000, signal: bounded})).stderr);
