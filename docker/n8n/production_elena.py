@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import unicodedata
 import uuid
+from array import array
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -103,7 +104,46 @@ def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", 
     }
 
 
-def decode(path, expected, duration, *, stamps=None, speech=None):
+def close_music_matches(ff, reference):
+    options = [
+        "-vn",
+        "-af",
+        "atrim=start=26.5:end=28.5",
+        "-ac",
+        "1",
+        "-ar",
+        "2000",
+        "-f",
+        "s16le",
+        "-",
+    ]
+    actual = array("h", ff("ffmpeg", ["-v", "error", "-nostdin"], options, 30).stdout)
+    original = array(
+        "h",
+        subprocess.run(
+            ["/usr/bin/ffmpeg", "-v", "error", "-nostdin", "-i", str(reference), *options],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            check=True,
+            timeout=30,
+        ).stdout,
+    )
+    if min(len(actual), len(original)) < 4000:
+        return False
+    window = original[100:3900]
+    power = sum(sample * sample for sample in window)
+    for start in range(201):
+        segment = actual[start : start + len(window)]
+        denominator = math.sqrt(power * sum(sample * sample for sample in segment))
+        if (
+            denominator
+            and sum(a * b for a, b in zip(window, segment, strict=True)) > 0.8 * denominator
+        ):
+            return True
+    return False
+
+
+def decode(path, expected, duration, *, stamps=None, speech=None, music_reference=None):
     if path.resolve(strict=True) != path:
         raise ValueError("Ruta del máster inválida")
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -164,7 +204,9 @@ def decode(path, expected, duration, *, stamps=None, speech=None):
             volume = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB", bed)
             metrics["musica_cierre_dbfs"] = float(volume[1]) if volume else None
             metrics["musica_catalogo"] = (
-                probe["format"].get("tags", {}).get("comment") == AD_MUSIC_ID
+                close_music_matches(ff, music_reference)
+                if music_reference is not None
+                else probe["format"].get("tags", {}).get("comment") == AD_MUSIC_ID
             )
             ff(
                 "ffmpeg",
@@ -320,7 +362,18 @@ def scene_checks(scenes, *, required=()):
     ]
 
 
-def review_video(path, digest, props, angle, plan, resolution, request_id, *, synthetic=False):
+def review_video(
+    path,
+    digest,
+    props,
+    angle,
+    plan,
+    resolution,
+    request_id,
+    *,
+    synthetic=False,
+    music_reference=None,
+):
     scenes = props.get("scenes")
     checks = scene_checks(scenes) if scenes else []
     ad = props.get("ad")
@@ -342,6 +395,8 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
     if ad:
         with tempfile.TemporaryDirectory(prefix="studio-qa-mezcla-") as workspace:
             speech = Path(workspace) / "mezcla.wav"
+            if music_reference is not None:
+                decode_options["music_reference"] = music_reference
             metrics, images = decode(path, digest, duration, speech=speech, **decode_options)
             audio_check = verify_mix_speech(speech, ad["captions"])
     else:

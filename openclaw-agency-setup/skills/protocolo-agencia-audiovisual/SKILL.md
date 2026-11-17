@@ -38,4 +38,6 @@ Si se agotan las rondas, conserva el último dictamen y señala qué impide la e
 
 Valeria abre la vista previa en tamaño móvil y comprueba que el primer fotograma muestre el producto que promete el gancho. Selecciona otro punto de entrada si el encuadre revela el producto tarde. Lucas conserva un rótulo o una placa sólo durante su función editorial. Entrega la vista previa real a Elena antes del máster.
 
+Cuando el encargo incluye acabado en Resolve, Lucas pide al operador del puente el traspaso OTIO de la escaleta acreditada. Edita la línea de tiempo, importa el SRT y mezcla en Fairlight con voz y música en pistas distintas. Confirma la duración, los rótulos y el CTA antes de exportar. Elena usa el MP4 exportado y su huella para el dictamen. Registra cualquier limitación de encuadre y devuelve correcciones a Lucas con sus tiempos.
+
 [Fase 5](../../../docs/specs/FASE-5-OPENCLAW-Y-MCP.md) · [Plan de implementación](../../../docs/PLAN-DE-IMPLEMENTACION.md) · [Arquitectura, secciones 3.2 y 4.1](../../../docs/ARQUITECTURA-PLATAFORMA-AUDIOVISUAL.md) · [Contrato del renderer](../../../gpu-bridge-win11/render-worker/README.md)
