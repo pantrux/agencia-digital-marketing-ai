@@ -9,8 +9,15 @@ export const deliveryRevisionRoute = /^\/api\/orders\/([a-f0-9]{8}-[a-f0-9]{4}-4
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u;
 type Revision = {id:string; base_kit_id:string; instructions:string; status:string; result_kit_id:string | null; failure_stage:string | null; created_at:number; updated_at:number};
 
+function requireRevisionPilot(env: DeliveryRevisionEnv): void {
+  // El consumidor y el publicador aún solo admiten órdenes del piloto.
+  if (env.STUDIO_DELIVERY_REVISION_ENABLED !== 'true' || env.BILLING_MODE !== 'sandbox') {
+    throw new HttpError(404,'RUTA_NO_DISPONIBLE');
+  }
+}
+
 export async function claimDeliveryRevision(env: DeliveryRevisionEnv, now: number): Promise<Response> {
-  if (env.STUDIO_DELIVERY_REVISION_ENABLED !== 'true') throw new HttpError(404,'RUTA_NO_DISPONIBLE');
+  requireRevisionPilot(env);
   const lease = crypto.randomUUID();
   const claimed = await env.DB.prepare(`UPDATE delivery_revision_requests SET status='processing',lease=?,lease_until=?,
     updated_at=?,attempts=attempts+1 WHERE id=(SELECT r.id FROM delivery_revision_requests r
@@ -25,7 +32,7 @@ export async function claimDeliveryRevision(env: DeliveryRevisionEnv, now: numbe
 }
 
 export async function renewDeliveryRevision(env: DeliveryRevisionEnv, id: unknown, lease: unknown, now: number): Promise<Response> {
-  if (env.STUDIO_DELIVERY_REVISION_ENABLED !== 'true') throw new HttpError(404,'RUTA_NO_DISPONIBLE');
+  requireRevisionPilot(env);
   if (typeof id !== 'string' || !uuid.test(id) || typeof lease !== 'string' || !uuid.test(lease)) {
     throw new HttpError(422,'AJUSTE_INVALIDO');
   }
@@ -46,7 +53,7 @@ export async function renewDeliveryRevision(env: DeliveryRevisionEnv, id: unknow
 }
 
 export async function failDeliveryRevision(env: DeliveryRevisionEnv, id: unknown, lease: unknown, stage: unknown, now: number): Promise<Response> {
-  if (env.STUDIO_DELIVERY_REVISION_ENABLED !== 'true') throw new HttpError(404,'RUTA_NO_DISPONIBLE');
+  requireRevisionPilot(env);
   if (typeof id !== 'string' || !uuid.test(id) || typeof lease !== 'string' || !uuid.test(lease)
     || (stage !== 'direction' && stage !== 'quality')) throw new HttpError(422,'AJUSTE_INVALIDO');
   const saved = await env.DB.prepare(`UPDATE delivery_revision_requests SET status='failed',failure_stage=?,
@@ -61,7 +68,7 @@ export async function failDeliveryRevision(env: DeliveryRevisionEnv, id: unknown
 
 /** En pruebas aisladas; el interruptor debe permanecer cerrado hasta activar el consumidor. */
 export async function handleDeliveryRevisions(request: Request, env: DeliveryRevisionEnv, user: string, order: string): Promise<Response> {
-  if (env.STUDIO_DELIVERY_REVISION_ENABLED !== 'true') throw new HttpError(404,'RUTA_NO_DISPONIBLE');
+  requireRevisionPilot(env);
   if (request.method !== 'GET' && request.method !== 'POST') throw new HttpError(405,'METODO_NO_PERMITIDO');
   const db = env.DB.withSession('first-primary');
   const owner = await db.prepare(`SELECT id FROM orders WHERE id=? AND user_id=? AND kind='production'

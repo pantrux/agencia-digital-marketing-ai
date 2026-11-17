@@ -112,6 +112,11 @@ it("registra una solicitud posterior idempotente únicamente para el titular", a
     body:JSON.stringify({base_kit_id:KIT,instructions}),
   });
   await expect(handleDeliveryRevisions(request(),env,"owner",ORDER)).rejects.toMatchObject({status:404});
+  const production = {...active, BILLING_MODE:"production" as const};
+  await expect(handleDeliveryRevisions(request(),production,"owner",ORDER)).rejects.toMatchObject({status:404});
+  await expect(claimDeliveryRevision(production,1)).rejects.toMatchObject({status:404});
+  await expect(renewDeliveryRevision(production,ORDER,ORDER,1)).rejects.toMatchObject({status:404});
+  await expect(failDeliveryRevision(production,ORDER,ORDER,"quality",1)).rejects.toMatchObject({status:404});
   await expect(handleDeliveryRevisions(request(),active,"other",ORDER)).rejects.toMatchObject({status:404});
   const created = await handleDeliveryRevisions(request(),active,"owner",ORDER);
   expect(created.status).toBe(201);
