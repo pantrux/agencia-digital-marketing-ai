@@ -297,13 +297,12 @@ def sample_images(receipt, *, ad=False, transcript=None):
                 if re.search(r"[.?!]$", word["word"]) and 0 <= word["start"] < duration
             ]
             targets = [duration * (i + 0.5) / 8 for i in range(8)]
-            stamps = sorted(
-                {
-                    min(anchors, key=lambda stamp: abs(stamp - target)) if anchors else target
-                    for target in targets
-                }
-            )
-            limit = 8500
+            step = duration / len(targets)
+            stamps = []
+            for target in targets:
+                nearby = [stamp for stamp in anchors if abs(stamp - target) < step / 2]
+                stamps.append(min(nearby, key=lambda stamp: abs(stamp - target), default=target))
+            limit = 7000
         for stamp in stamps:
             args = [
                 "/usr/bin/ffmpeg",
@@ -442,12 +441,21 @@ def plan_request(
     if reel and brief.get("ad_cta"):
         facts["cta_confirmada"] = brief["ad_cta"]
         facts["marca_confirmada"] = brief["ad_brand"]
+        facts.pop("transcripcion_temporizada")
+        facts["palabras_por_fotograma"] = [
+            [round(word["start"] * 30), round(word["end"] * 30), word["word"].strip()]
+            for word in words
+        ]
         instructions += (
             " ANUNCIO GUIADO POR GUION: este encargo sustituye los límites de 2 a 6 cortes por 2 a 12; "
             "la suma exacta debe ser 30 segundos y puedes reordenar intervalos de origen no solapados. "
             "Los primeros 3 segundos demuestran un gancho específico. En la primera escena el rótulo "
             "comienza entre 0 y 0.5 s y dura al menos hasta 2 s. Desarrolla el argumento mediante "
-            "frases completas del material original y tomas pertinentes. Los últimos cuatro segundos "
+            "frases completas y tomas pertinentes. palabras_por_fotograma contiene [inicio, fin, "
+            "palabra] a 30 fps. Divide entre 30 para ubicar las frases. Registra las duraciones "
+            "en segundos con al menos dos decimales. Devuelve una escaleta lista para vista previa "
+            "cuando el crudo tenga evidencia del producto y voz usable. La sincronía se valida "
+            "sobre esa vista previa. Los últimos cuatro segundos "
             "usan una imagen de producto despejada para la marca y el CTA confirmado; el renderer "
             "coloca la marca y la CTA confirmadas y silencia la voz en ese intervalo. "
             "subtitulo sintetiza el argumento y observacion explica el guion."
@@ -502,7 +510,13 @@ def plan_request(
         images,
         request_id,
     )
-    if reel:
+    if reel and brief.get("ad_cta"):
+        request["message"] = (
+            instructions + "\n" + json.dumps(facts, ensure_ascii=False, separators=(",", ":"))
+        )
+        if len(visual_payload(request)) > MAX_VISUAL_BYTES - 1000:
+            raise ValueError("El encargo de anuncio excede la capacidad de análisis visual")
+    elif reel:
         # Reservar espacio para la corrección de formato y muestrear toda la grabación.
         budget = MAX_VISUAL_BYTES - 1000
         groups = facts["transcripcion_temporizada"]
