@@ -1,5 +1,7 @@
 import json
+from array import array
 from pathlib import Path
+from random import Random
 
 import pytest
 
@@ -102,3 +104,15 @@ def test_rechaza_insumo_modificado_despues_de_preparar(cut, tmp_path):
     (tmp_path / "voz-original.wav").write_bytes(b"voz reemplazada")
     with pytest.raises(ValueError, match="insumos de edición cambiaron"):
         resolve.verify_package(order, direction, tmp_path)
+
+
+def test_reconoce_musica_desplazada_y_rechaza_otra_pista(cut):
+    from production_elena import matching_music_window
+
+    generator = Random(17)
+    reference = array("h", (generator.randint(-20000, 20000) for _ in range(16000)))
+    segment = array("h", (sample // 4 for sample in reference[9000:13000]))
+    assert matching_music_window(segment, reference)
+    assert not matching_music_window(array("h", [0] * 4000), reference)
+    other = array("h", (generator.randint(-20000, 20000) for _ in range(4000)))
+    assert not matching_music_window(other, reference)

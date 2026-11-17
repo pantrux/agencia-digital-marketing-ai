@@ -7,6 +7,7 @@ import os
 import shutil
 import stat
 import subprocess
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -19,6 +20,7 @@ FRAMES = 900
 MUSIC_PATH = f"_biblioteca_global/musica-stock/{AD_MUSIC_ID}.mp3"
 MUSIC_SHA256 = "8433b770a630d9b1594fd484442c677907ece899a4d149954cd2e74fd733e311"
 LIMIT = 131072
+IMAGE_LIMIT = 2 * 1024**3
 PACKAGE_FILES = {
     "imagen-edicion.mov",
     "voz-original.wav",
@@ -174,6 +176,9 @@ def transcode(ffmpeg, source, destination, options):
 
 def prepare(intake, direction, media_root, package, *, ffmpeg="ffmpeg"):
     order, props, source_frames = validated_cut(intake, direction)
+    if package.exists():
+        verify_package(order, direction, package)
+        return json.loads(read_regular(package / "traspaso.json", LIMIT))
     video, audio = (media_root / path for path in source_paths(intake))
     music = media_root / MUSIC_PATH
     expected = {
@@ -186,11 +191,33 @@ def prepare(intake, direction, media_root, package, *, ffmpeg="ffmpeg"):
     ):
         raise ValueError("Los medios no coinciden con la ingesta o el catálogo")
     otio = timeline(props, package, source_frames)
-    package.mkdir()
+    with tempfile.TemporaryDirectory(prefix=".resolve-", dir=package.parent) as staging:
+        work = Path(staging) / "paquete"
+        work.mkdir()
+        receipt = write_package(
+            ffmpeg,
+            video,
+            audio,
+            music,
+            work,
+            otio,
+            source_frames,
+            props,
+            expected,
+            order["order_id"],
+            direction,
+        )
+        work.rename(package)
+    return receipt
+
+
+def write_package(
+    ffmpeg, video, audio, music, work, otio, source_frames, props, expected, order_id, direction
+):
     transcode(
         ffmpeg,
         video,
-        package / "imagen-edicion.mov",
+        work / "imagen-edicion.mov",
         [
             "-map",
             "0:v:0",
@@ -203,11 +230,17 @@ def prepare(intake, direction, media_root, package, *, ffmpeg="ffmpeg"):
             "-c:v",
             "libx264",
             "-preset",
-            "veryfast",
+            "ultrafast",
             "-threads",
             "4",
             "-crf",
             "19",
+            "-maxrate",
+            "16M",
+            "-bufsize",
+            "32M",
+            "-g",
+            "30",
             "-pix_fmt",
             "yuv420p",
             "-colorspace",
@@ -220,11 +253,11 @@ def prepare(intake, direction, media_root, package, *, ffmpeg="ffmpeg"):
             "+faststart",
         ],
     )
-    shutil.copyfile(audio, package / "voz-original.wav")
+    shutil.copyfile(audio, work / "voz-original.wav")
     transcode(
         ffmpeg,
         music,
-        package / "musica-catalogo.wav",
+        work / "musica-catalogo.wav",
         ["-map", "0:a:0", "-t", "30", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s24le"],
     )
     if any(inspect_file(path) != metadata for path, metadata in expected.items()):
@@ -233,16 +266,23 @@ def prepare(intake, direction, media_root, package, *, ffmpeg="ffmpeg"):
         f"{i}\n{srt_time(cue['start_frame'])} --> {srt_time(cue['end_frame'])}\n{cue['text']}\n"
         for i, cue in enumerate(props["ad"]["captions"], 1)
     ]
-    (package / "montaje.otio").write_text(otio, encoding="utf-8")
-    (package / "subtitulos.srt").write_text("\n".join(captions), encoding="utf-8")
+    (work / "montaje.otio").write_text(otio, encoding="utf-8")
+    (work / "subtitulos.srt").write_text("\n".join(captions), encoding="utf-8")
     receipt = {
-        "order_id": order["order_id"],
+        "order_id": order_id,
         "direction_sha256": hashlib.sha256(canonical(direction)).hexdigest(),
         "soundtrack_sha256": MUSIC_SHA256,
-        "files": {path.name: inspect_file(path) for path in sorted(package.iterdir())},
+        "files": package_fingerprints(work),
     }
-    (package / "traspaso.json").write_bytes(canonical(receipt) + b"\n")
+    (work / "traspaso.json").write_bytes(canonical(receipt) + b"\n")
     return receipt
+
+
+def package_fingerprints(package):
+    return {
+        name: inspect_file(package / name, IMAGE_LIMIT if name == "imagen-edicion.mov" else 1024**3)
+        for name in PACKAGE_FILES
+    }
 
 
 def verify_package(order, direction, package):
@@ -255,7 +295,7 @@ def verify_package(order, direction, package):
         or receipt["files"].keys() != PACKAGE_FILES
     ):
         raise ValueError("El traspaso pertenece a otro montaje")
-    if any(inspect_file(package / name) != data for name, data in receipt["files"].items()):
+    if package_fingerprints(package) != receipt["files"]:
         raise ValueError("Los insumos de edición cambiaron")
     return cut_sha
 

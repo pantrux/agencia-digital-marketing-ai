@@ -14,6 +14,7 @@ import unicodedata
 import uuid
 from array import array
 from difflib import SequenceMatcher
+from heapq import nlargest
 from pathlib import Path
 
 from production_handoff import (
@@ -104,43 +105,52 @@ def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", 
     }
 
 
+def matching_music_window(actual, reference):
+    if len(actual) < 3800 or len(reference) < len(actual):
+        return False
+
+    def power(samples):
+        return sum(sample * sample for sample in samples)
+
+    def similarity(a, b, a_power):
+        norm = math.sqrt(a_power * power(b))
+        return sum(x * y for x, y in zip(a, b, strict=True)) / norm if norm else 0.0
+
+    # Preselecciona posiciones con una muestra dispersa y verifica la forma de onda completa.
+    sparse = actual[::128]
+    sparse_power = power(sparse)
+    length = len(actual)
+    offsets = nlargest(
+        32,
+        range(len(reference) - length + 1),
+        key=lambda start: similarity(sparse, reference[start : start + length : 128], sparse_power),
+    )
+    actual_power = power(actual)
+    return any(
+        similarity(actual, reference[start : start + length], actual_power) > 0.8
+        for start in offsets
+    )
+
+
 def close_music_matches(ff, reference):
-    options = [
-        "-vn",
-        "-af",
-        "atrim=start=26.5:end=28.5",
-        "-ac",
-        "1",
-        "-ar",
-        "2000",
-        "-f",
-        "s16le",
-        "-",
-    ]
-    actual = array("h", ff("ffmpeg", ["-v", "error", "-nostdin"], options, 30).stdout)
+    pcm = ["-vn", "-ac", "1", "-ar", "2000", "-f", "s16le", "-"]
+    actual = array(
+        "h",
+        ff(
+            "ffmpeg", ["-v", "error", "-nostdin"], ["-af", "atrim=start=26.5:end=28.5", *pcm], 30
+        ).stdout,
+    )
     original = array(
         "h",
         subprocess.run(
-            ["/usr/bin/ffmpeg", "-v", "error", "-nostdin", "-i", str(reference), *options],
+            ["/usr/bin/ffmpeg", "-v", "error", "-nostdin", "-i", str(reference), "-t", "240", *pcm],
             stdin=subprocess.DEVNULL,
             capture_output=True,
             check=True,
             timeout=30,
         ).stdout,
     )
-    if min(len(actual), len(original)) < 4000:
-        return False
-    window = original[100:3900]
-    power = sum(sample * sample for sample in window)
-    for start in range(201):
-        segment = actual[start : start + len(window)]
-        denominator = math.sqrt(power * sum(sample * sample for sample in segment))
-        if (
-            denominator
-            and sum(a * b for a, b in zip(window, segment, strict=True)) > 0.8 * denominator
-        ):
-            return True
-    return False
+    return matching_music_window(actual, original)
 
 
 def decode(path, expected, duration, *, stamps=None, speech=None, music_reference=None):
