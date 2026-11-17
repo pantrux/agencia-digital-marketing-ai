@@ -41,15 +41,15 @@ export const Reel: React.FC<ReelProps> = (props) => {
       ...(label.position === 'top' ? {top: 200} : {bottom: 480}),
       backgroundColor: '#141714', borderLeft: `8px solid ${props.accent}`, padding: '24px 28px', borderRadius: 12,
       fontSize: label.size === 'large' ? 84 : 58, lineHeight: 1.15, fontWeight: 700, overflowWrap: 'anywhere'}}>{label.text}</div>}
-    {caption && <div style={{position:'absolute',left:96,right:168,bottom:420,textAlign:'center',fontSize:54,
-      fontWeight:700,lineHeight:1.16,overflowWrap:'anywhere'}}>
-      <span style={{background:'#151a15',padding:'8px 18px',boxDecorationBreak:'clone',
-        WebkitBoxDecorationBreak:'clone',borderRadius:10}}>{caption.text}</span></div>}
-    {endCard && <div style={{position:'absolute',left:86,right:164,bottom:404,background:'#f5f3e8',
-      color:'#183d2b',padding:'30px 38px 36px',borderRadius:26,overflowWrap:'anywhere'}}>
-      <div style={{fontSize:60,fontWeight:750,lineHeight:1.05,marginBottom:25}}>{props.ad!.brand}</div>
-      <div style={{display:'inline-block',fontSize:43,fontWeight:650,lineHeight:1.12,background:'#204b36',
-        color:'#fff',padding:'14px 23px',borderRadius:16}}>{props.ad!.cta}</div>
+    {props.ad && <div style={{position:'absolute',left:0,right:0,top:1438,bottom:0,
+      background:'#17221b',borderTop:`6px solid ${props.accent}`}} />}
+    {caption && <div style={{position:'absolute',left:84,right:165,top:1474,textAlign:'center',fontSize:59,
+      fontWeight:700,lineHeight:1.16,overflowWrap:'anywhere'}}>{caption.text}</div>}
+    {endCard && <div style={{position:'absolute',left:84,right:165,top:1470,color:'#f5f3e8',
+      overflowWrap:'anywhere'}}>
+      <div style={{fontSize:58,fontWeight:750,lineHeight:1.04,marginBottom:18}}>{props.ad!.brand}</div>
+      <div style={{display:'inline-block',fontSize:45,fontWeight:650,lineHeight:1.12,background:'#b8e1c0',
+        color:'#163323',padding:'13px 22px',borderRadius:14}}>{props.ad!.cta}</div>
     </div>}
     {props.watermark ? <div style={{position: 'absolute', bottom: 340, left: 60, padding: '14px 22px', backgroundColor: 'rgba(0,0,0,.65)', color: '#fff', border: '2px solid #fff', fontSize: 28}}>Creado con Agencia AI · Free</div> : null}
     </AbsoluteFill>
