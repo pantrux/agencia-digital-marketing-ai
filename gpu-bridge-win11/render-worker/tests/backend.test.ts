@@ -44,14 +44,16 @@ test('copia la pista aprobada por huella y rechaza una pista ausente o cambiada'
     const fixture = Buffer.alloc(2048, 75);
     const asset = {relative:'_biblioteca_global/musica-stock/pista.mp3',
       sha256:createHash('sha256').update(fixture).digest('hex')};
-    const reserve = mock.fn(async (_bytes: number) => {});
+    const reserve = mock.fn(async (bytes: number) => {
+      assert.equal(bytes, fixture.length);
+    });
     const scratch = {ensureSpace:reserve};
     const signal = new AbortController().signal;
     await assert.rejects(stageAdMusic(nas,scratch,'sansevieras',work,signal,asset), {code:'MUSICA_NO_VERIFICADA'});
     await writeFile(source,fixture);
     const stamped = await stageAdMusic(nas,scratch,'sansevieras',work,signal,asset);
     assert.deepEqual(await readFile(stamped),fixture);
-    assert.equal(reserve.mock.calls[0]!.arguments[0],fixture.length);
+    assert.equal(reserve.mock.callCount(), 1);
     const secondWork = path.join(root,'segundo-trabajo');
     await mkdir(secondWork);
     await writeFile(source,Buffer.alloc(fixture.length,88));
