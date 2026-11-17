@@ -6,6 +6,8 @@ Cuando un push alcanza las 300 rutas que devuelve la comparación de GitHub, el 
 
 La Fase 7 añade el ciclo de producción, la entrega y la reversión a los mínimos previos del [portal y el Worker](../../specs/FASE-6-CLOUDFLARE-Y-PORTAL.md). Ejecuta `python -I -B scripts/ci/validate_phase.py --phase 7` para cotejar los mínimos acumulativos. Los resultados reales se registran en el [estado del piloto](../../../ESTADO.md#primera-producción-del-portal).
 
+Para habilitar HyperFrames, instala las dependencias fijadas del renderer y verifica Chrome y FFmpeg en el worker de Windows. Aplica la migración 0021 de D1 antes de actualizar el Worker y habilita el selector del portal después de validar el renderer y los adaptadores de producción. En el ensayo, confirma que la vista previa muestra el vídeo con sus capas y que Elena puede revisar el MP4 antes de entregarlo.
+
 Al cambiar el aprovisionador de DSM, el monitor de D1 o la cola de la bóveda, ejecuta además `python -m pytest tests/test_r2_sync_provision.py tests/test_d1_backup_metrics.py tests/test_vault_changes.py`. Las pruebas por descriptor del aprovisionador se ejecutan en Linux. Para cambiar el manifiesto o el pipeline, valida también la lista del cambio con `python scripts/ci/check_docs.py --changed-files <archivo-json>` e incluye esta receta y el diagrama.
 
 Para sustituir la imagen de PostgreSQL de aplicaciones, coteja el Compose resuelto y los pines de [n8n](../../../docker/n8n/README-private-deploy.md) y del [respaldo diario](../../../sre/README-backup-321-orchestrator.md). La aceptación en la VM exige conservar PGDATA, confirmar las conexiones de Kitsu y n8n y comprobar el perfil actualizado antes de la siguiente copia programada.
@@ -210,6 +212,12 @@ Los contratos Node del renderer comprueban también compilación estática únic
 Para la primera actualización de un repositorio nuevo, el control 7 obtiene el commit y su árbol completo por API de solo lectura: exige identidad coincidente, respuesta sin truncar y presencia del workflow, esta receta y el diagrama. No necesita historial local ni ejecutar comandos Git.
 
 Si falla la calidad, consultar el registro del trabajo y corregir la causa. Si falla una entrega futura, usar la [receta SRE](sre-rollback.md) y el [índice de incidentes](../README.md).
+
+Para el CTA social, aplica `0020_brief_ad_contacts.sql` antes de desplegar
+el Worker. Actualiza la validación de briefs en el despacho y los agentes,
+el renderer y después el portal. Verifica que el brief devuelve al titular
+los tres campos y que el despacho sólo transfiere el canal seleccionado.
+Comprueba los fundidos, el icono y la URL en un MP4 de ensayo.
 
 Para cambios en `resolve-audio-lucas`, coteja la huella del manifiesto de
 skills. La conexión real de OpenClaw con Resolve Studio y la revisión del

@@ -10,9 +10,10 @@ import {NasPaths} from './nas.ts';
 import {ScratchSpace} from './scratch.ts';
 import {runProcess} from './process.ts';
 import {renderScene} from './remotion.ts';
-import {alphaMaskArgs, alphaMaskSummary, audioAccepted, correctMp4Audio, cutSceneAudio, mixAdAudio, encodeOutput, encodeProresFragment, measureAudio, muxProresFragments, outputViolations, overlayInputSupported, overlayPacketTimingSupported, packetProbeArgs, parseLoudness, parseProbe, probeArgs, ebur128Args, parseEbur128, videoFrameCount, type MediaInfo} from './media.ts';
+import {alphaMaskArgs, alphaMaskSummary, audioAccepted, correctMp4Audio, cutSceneAudio, mixAdAudio, encodeOutput, encodeProresFragment, measureAudio, muxProresFragments, outputViolations, overlayInputSupported, overlayPacketTimingSupported, packetProbeArgs, parseLoudness, parseProbe, probeArgs, ebur128Args, parseEbur128, stageHyperframesPicture, videoFrameCount, type MediaInfo} from './media.ts';
 import {contactSheet, normalizedRuler} from './qa.ts';
 import {graphicFrames, graphicLabel} from './timeline.ts';
+import {renderHyperframes} from './hyperframes.ts';
 
 interface Dependencies {run: typeof runProcess; scene: typeof renderScene; verifyTools(config: RuntimeConfig): Promise<void>; verifyMapping(config: RuntimeConfig): Promise<void>}
 interface Artifact {path: string; bytes: number; sha256: string}
@@ -130,6 +131,11 @@ export class RenderBackend implements Backend {
   }
   async #scene(request: RenderRequest, work: string, frames: number[] | null, signal: AbortSignal, videoSource: string | null, overlay?: true) {
     signal.throwIfAborted();
+    if (request.props.ad?.engine === 'hyperframes') {
+      if (!frames) throw new WorkerError(422,'HYPERFRAMES_FOTOGRAMAS_AUSENTES','HyperFrames requiere fotogramas concretos.');
+      return renderHyperframes({request,workspace:work,browser:this.config.browser,ffmpeg:this.config.ffmpeg,
+        videoSource,signal,run:this.deps.run},frames,Boolean(overlay));
+    }
     return this.deps.scene({request, scratch: work, cacheRoot: this.scratch.root, browser: this.config.browser, videoSource, signal, ...(overlay && {overlay})}, frames);
   }
   async #copyArtifacts(output: {absolute: string; relative: string}, files: string[]): Promise<Artifact[]> {
@@ -274,7 +280,7 @@ export class RenderBackend implements Backend {
       }
       if (ad) {
         const track = await stageAdMusic(this.nas, this.scratch, request.project_id, work, bounded);
-        await this.deps.run(this.config.ffmpeg, mixAdAudio(speech, track, audio), {timeoutMs: 120000, signal: bounded});
+        await this.deps.run(this.config.ffmpeg, mixAdAudio(speech, track, audio, Boolean(ad.destination || ad.engine)), {timeoutMs: 120000, signal: bounded});
       }
       const measured = parseLoudness((await this.deps.run(this.config.ffmpeg, measureAudio(audio, duration), {timeoutMs: 1200000, signal: bounded})).stderr);
       const framesStarted = performance.now();
@@ -301,7 +307,20 @@ export class RenderBackend implements Backend {
           normalizeVideo = overlayMode === 'normalized';
         }
       }
-      const layerFrames = scenes ? graphicFrames(scenes, ad)
+      const usesHyperframes = ad?.engine === 'hyperframes';
+      if (usesHyperframes && scenes && sourceVideo) {
+        await this.scratch.ensureSpace(512 * 1024 ** 2);
+        const conform = path.join(work, 'montaje.mp4');
+        await this.deps.run(this.config.ffmpeg, stageHyperframesPicture(sourceVideo, scenes, request.resolution, conform),
+          {timeoutMs: 120000, signal: bounded});
+        if (videoFrameCount(await this.#readProbe(conform, bounded)) !== request.durationInFrames) {
+          throw new WorkerError(502, 'MONTAJE_INCOMPLETO', 'El montaje previo de HyperFrames no conserva todos sus fotogramas.');
+        }
+        sourceVideo = conform;
+        normalizeVideo = true;
+      }
+      const layerFrames = usesHyperframes ? Array.from({length: request.durationInFrames}, (_, index) => index)
+        : scenes ? graphicFrames(scenes, ad)
         : sourceVideo || staticProres ? Array.from({length: TITLE_FADE_FRAMES + 1}, (_, index) => index) : null;
       // La gráfica sin crudo solo renderiza el fundido. El margen del MOV se calcula tras codificar sus fragmentos.
       if (sceneProres) await this.scratch.ensureSpace((layerFrames?.length ?? 0) * frameBytes * 2);
@@ -334,7 +353,7 @@ export class RenderBackend implements Backend {
           ? correctMp4Audio(previousOutput, audio, output, request.durationInFrames, duration, measured, peak)
           : proresList
           ? muxProresFragments(proresList, audio, output, request.durationInFrames, duration, measured, peak)
-          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, scenes, ad ? AD_MUSIC_ID : undefined);
+          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, usesHyperframes ? undefined : scenes, ad ? AD_MUSIC_ID : undefined, Boolean(ad?.destination) && !usesHyperframes);
         await this.deps.run(this.config.ffmpeg, encode, {timeoutMs: 1200000, signal: bounded});
         const outputProbe = await this.#readProbe(output, bounded);
         if ((sourceVideo || proresList || correctingMp4 || scenes) && videoFrameCount(outputProbe) !== request.durationInFrames) {
@@ -366,7 +385,7 @@ export class RenderBackend implements Backend {
         codificacion_y_control: Math.round(publishStarted - encodeStarted),
         publicacion_nas: Math.round(finished - publishStarted),
       };
-      const render_pipeline = scenes ? 'capas_por_escena' : sourceVideo ? 'capas_remotion_nvenc' : staticProres ? 'prores_grafica_estatica' : 'fotogramas_remotion';
+      const render_pipeline = usesHyperframes ? 'capas_hyperframes_nvenc' : scenes ? 'capas_por_escena' : sourceVideo ? 'capas_remotion_nvenc' : staticProres ? 'prores_grafica_estatica' : 'fotogramas_remotion';
       return {files, codec: request.format === 'mp4' ? 'h264_nvenc' : 'prores_ks', hardware_acceleration: request.format === 'mp4', resolution: request.resolution, watermark: request.watermark, audio_verified: true, audio: finalAudio, alpha_verified: request.transparent && alpha?.has_transparency === true, alpha, media: info, elapsed_ms: Math.round(finished - started), stage_ms, render_pipeline};
     }));
   }

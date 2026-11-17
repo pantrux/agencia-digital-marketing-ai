@@ -49,6 +49,8 @@ nav button[aria-current] { color: var(--green); border-color: var(--green); font
 .panel form { display: grid; gap: .65rem; }
 .production-choice { display: grid; gap: .65rem; margin-block: 1rem; }
 .production-brief { border-block: 1px solid #3b4134; padding-block: 1rem; margin-block-end: 1rem; }
+.production-brief fieldset { min-inline-size: 0; border: 1px solid #3b4134; border-radius: .5rem; padding: .75rem; margin-block: .75rem; }
+.production-brief legend { padding-inline: .35rem; }
 .production-brief dt { font-weight: 700; }
 .production-brief dd { margin: .25rem 0 .85rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .panel form .button { justify-self: start; }

@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
+import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {AD_MUSIC_ID, outputDimensions, parseInspect, parseRender, parseStills, WorkerError} from '../src/contracts.ts';
+import {renderHyperframes} from '../src/hyperframes.ts';
 import {compositionInput} from '../src/remotion.ts';
-import {graphicFrames} from '../src/timeline.ts';
+import {graphicFrames, socialFadeProgress} from '../src/timeline.ts';
 
 const request = () => ({
   project_id: 'sansevieras', job_id: 'trabajo-01', composition: 'AgencyVertical',
@@ -124,4 +128,55 @@ test('ProRes4444 alfa es exclusivo de Ilimitado y conserva 1080p o 4K y capturas
   }
   for (const plan of ['Free', 'Pro', 'Ultra']) assert.throws(() => parseRender({...request(), plan, format: 'prores4444'}), WorkerError);
   for (const format of ['mov', 'prores', 'h264', null]) assert.throws(() => parseRender({...request(), plan: 'Ilimitado', format}), WorkerError);
+});
+
+test('el CTA social conserva sólo el destino elegido y agenda cada fotograma animado', () => {
+  const scenes = [
+    {source_start_frame: 2000, source_end_frame: 2300, label: {text:'Gancho', start_frame:0, end_frame:90, position:'top'}},
+    {source_start_frame: 400, source_end_frame:1000},
+  ];
+  const destination = {channel:'facebook',url:'https://www.facebook.com/rinconsansevieras'};
+  const ad = {cta:'Escríbenos',brand:'Vivero',captions:[{start_frame:20,end_frame:60,text:'Nuestra colección'}],destination};
+  const props = {...request().props,duration_seconds:30,video_path:'proyectos/sansevieras/01_raw/crudo.mp4',scenes,ad};
+  const value = parseRender({...request(),props});
+  assert.deepEqual(value.props.ad?.destination,destination);
+  assert.equal(parseRender({...request(),props:{...props,ad:{...ad,engine:'hyperframes'}}}).props.ad?.engine,'hyperframes');
+  assert.throws(() => parseRender({...request(),props:{...props,ad:{...ad,engine:'remote'}}}),WorkerError);
+  const alternateAudio = [{...scenes[0],audio_source_start_frame:120},scenes[1]];
+  assert.equal(parseRender({...request(),props:{...props,scenes:alternateAudio}}).props.scenes?.[0]?.audio_source_start_frame,120);
+  assert.throws(() => parseRender({...request(),props:{...props,scenes:alternateAudio,ad:undefined}}),
+    /audio alternativo/u);
+  assert.throws(() => parseRender({...request(),props:{...props,
+    scenes:[{...scenes[0],audio_source_start_frame:17999},scenes[1]]}}),WorkerError);
+  const frames = graphicFrames(value.props.scenes!,value.props.ad);
+  assert.ok(frames.includes(1) && frames.includes(751) && frames.includes(899));
+  assert.equal(socialFadeProgress(863),0);
+  assert.ok(socialFadeProgress(882) > 0 && socialFadeProgress(882) < 1);
+  assert.equal(socialFadeProgress(899),1);
+  for (const bad of ['https://instagram.com/rinconsansevieras','https://www.facebook.com.ejemplo.invalid/perfil','https://www.facebook.com/perfil?track=1']) {
+    assert.throws(() => parseRender({...request(),props:{...props,ad:{...ad,destination:{...destination,url:bad}}}}),WorkerError);
+  }
+});
+
+test('publica las capturas de HyperFrames con los nombres que verifica Lucas', async () => {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), 'studio-hyperframes-'));
+  try {
+    const props = {...request().props, duration_seconds:30, video_path:'proyectos/sansevieras/01_raw/crudo.mp4',
+      scenes:[{source_start_frame:0,source_end_frame:300,label:{text:'Gancho',start_frame:0,end_frame:90,position:'top'}},
+        {source_start_frame:600,source_end_frame:1200}],
+      ad:{engine:'hyperframes',cta:'Escríbenos',brand:'Vivero',captions:[{start_frame:1,end_frame:30,text:'Una hoja'}]}};
+    const result = await renderHyperframes({
+      request:parseRender({...request(),props}),workspace,videoSource:'local.mp4',browser:'chrome',ffmpeg:'ffmpeg',
+      signal:AbortSignal.timeout(5000),
+      run:async (_tool,args,options) => {
+        if (options.hyperframes) {
+          const output = args.at(-1)!;
+          await mkdir(output);
+          await Promise.all(['at-0s.png','at-15s.png','at-29.967s.png'].map(name => writeFile(path.join(output,name),Buffer.alloc(64))));
+        }
+        return {stdout:'',stderr:''};
+      },
+    },[0,450,899],false);
+    assert.deepEqual(result.files.map(file => path.basename(file)),['still-0.png','still-450.png','still-899.png']);
+  } finally {await rm(workspace,{recursive:true,force:true});}
 });

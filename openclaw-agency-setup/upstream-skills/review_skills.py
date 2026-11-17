@@ -44,6 +44,8 @@ def _path_is_safe(path: object) -> bool:
     if not isinstance(path, str) or not 0 < len(path) <= 240:
         return False
     parts = path.split("/")
+    if parts[:2] == [".agents", "skills"]:
+        parts = parts[1:]
     if any(not PART.fullmatch(part) or part.endswith(".") or DEVICE.match(part) for part in parts):
         return False
     return path == "LICENSE" or Path(path).suffix.lower() in SUFFIXES
