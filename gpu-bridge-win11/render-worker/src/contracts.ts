@@ -10,11 +10,18 @@ export type Plan = 'Free' | 'Pro' | 'Ultra' | 'Ilimitado';
 export type Resolution = '1080p' | '4k';
 export type OutputFormat = 'mp4' | 'prores4444';
 export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom'; size?: 'large'}
-export interface AdCaption {start_frame: number; end_frame: number; text: string}
+export interface AdCaption {start_frame: number; end_frame: number; text: string; position?: 'top' | 'left' | 'right'}
 export const AD_MUSIC_ID = 'carefree-usuan1400037' as const;
-export interface ScriptedAd {cta: string; brand: string; captions: AdCaption[]; soundtrack?: typeof AD_MUSIC_ID}
+export type SocialChannel = 'facebook' | 'instagram' | 'whatsapp';
+export interface AdDestination {channel: SocialChannel; url: string}
+export interface ScriptedAd {engine?: 'hyperframes'; destination?: AdDestination; cta: string; brand: string; captions: AdCaption[]; soundtrack?: typeof AD_MUSIC_ID}
 export const AD_ENDCARD_FRAME = 780;
-export interface EditScene {source_start_frame: number; source_end_frame: number; label?: SceneLabel}
+export const SOCIAL_ENDCARD_FRAME = 750;
+export const SOCIAL_FADE_FRAME = 864;
+export const AD_FRAMES = 900;
+export const LABEL_ENTRANCE_FRAMES = 8;
+export const SOCIAL_ENTRANCE_FRAMES = 12;
+export interface EditScene {source_start_frame: number; source_end_frame: number; audio_source_start_frame?: number; label?: SceneLabel}
 export interface CompositionProps {
   title: string; subtitle: string; duration_seconds: number;
   subtitle_size?: 'large';
@@ -76,12 +83,16 @@ function editScenes(value: unknown, count: number, ad: boolean): EditScene[] {
   }
   let last = 0, total = 0, labels = 0;
   const scenes = value.map((entry: unknown): EditScene => {
-    const item = object(entry, ['source_start_frame', 'source_end_frame', 'label']);
+    const item = object(entry, ['source_start_frame', 'source_end_frame', 'audio_source_start_frame', 'label']);
     const start = frameNumber(item.source_start_frame, ad ? 0 : last, MAX_SEGMENT_SECONDS * 30 - 15);
     const end = frameNumber(item.source_end_frame, start + 15, MAX_SEGMENT_SECONDS * 30);
     last = end;
     total += end - start;
-    const scene = {source_start_frame: start, source_end_frame: end};
+    if (item.audio_source_start_frame !== undefined && !ad) invalid('El audio alternativo requiere un anuncio.');
+    const audioStart = item.audio_source_start_frame === undefined ? undefined
+      : frameNumber(item.audio_source_start_frame, 0, MAX_SEGMENT_SECONDS * 30 - (end - start));
+    const scene = {source_start_frame: start, source_end_frame: end,
+      ...(audioStart === undefined ? {} : {audio_source_start_frame: audioStart})};
     if (item.label === undefined) return scene;
     const caption = object(item.label, ['text', 'start_frame', 'end_frame', 'position', 'size']);
     const label = text(caption.text, '', 80);
@@ -105,23 +116,44 @@ function editScenes(value: unknown, count: number, ad: boolean): EditScene[] {
   if (!labels || total !== count) invalid('Los cortes deben sumar la duración del reel y contener al menos un rótulo.');
   return scenes;
 }
+const socialUrls = {
+  facebook: /^https:\/\/www\.facebook\.com\/(?:[a-zA-Z0-9.]{3,60}|profile\.php\?id=[1-9][0-9]{3,24})$/u,
+  instagram: /^https:\/\/www\.instagram\.com\/[a-zA-Z0-9._]{1,30}$/u,
+  whatsapp: /^https:\/\/wa\.me\/[1-9][0-9]{6,14}$/u,
+};
+
+function socialDestination(value: unknown): AdDestination {
+  const item = object(value, ['channel', 'url']);
+  const {channel, url} = item;
+  if ((channel !== 'facebook' && channel !== 'instagram' && channel !== 'whatsapp')
+    || typeof url !== 'string' || !socialUrls[channel].test(url) || /\s/u.test(url)) {
+    return invalid('El destino del CTA no es válido.');
+  }
+  return {channel, url};
+}
+
 function scriptedAd(value: unknown): ScriptedAd {
-  const input = object(value, ['cta', 'brand', 'captions', 'soundtrack']);
+  const input = object(value, ['cta', 'brand', 'captions', 'soundtrack', 'destination', 'engine']);
+  if (input.engine !== undefined && input.engine !== 'hyperframes') invalid('El motor de animación no está disponible.');
   if (input.soundtrack !== undefined && input.soundtrack !== AD_MUSIC_ID) invalid('La pista no pertenece al catálogo del anuncio.');
   const cta = text(input.cta, '', 70), brand = text(input.brand, '', 80);
   if (!cta.trim() || !brand.trim() || !Array.isArray(input.captions)
     || !input.captions.length || input.captions.length > 60) invalid('Falta CTA, marca o subtítulos.');
   let previousEnd = 0;
-  const captions = input.captions.map(entry => {
-    const cue = object(entry, ['start_frame', 'end_frame', 'text']);
+  const captions = input.captions.map((entry): AdCaption => {
+    const cue = object(entry, ['start_frame', 'end_frame', 'text', 'position']);
     const start_frame = frameNumber(cue.start_frame, previousEnd, AD_ENDCARD_FRAME - 9);
     const end_frame = frameNumber(cue.end_frame, start_frame + 9, AD_ENDCARD_FRAME);
     const caption = text(cue.text, '', 68);
     if (!caption.trim()) invalid('Falta el texto del subtítulo.');
     previousEnd = end_frame;
-    return {start_frame,end_frame,text:caption};
+    const {position} = cue;
+    if (position !== undefined && position !== 'top' && position !== 'left' && position !== 'right') {
+      return invalid('La posición del subtítulo no es válida.');
+    }
+    return {start_frame,end_frame,text:caption,...(position === undefined ? {} : {position})};
   });
-  return {cta,brand,captions,...(input.soundtrack === AD_MUSIC_ID && {soundtrack:AD_MUSIC_ID})};
+  return {cta,brand,captions,...(input.engine === 'hyperframes' ? {engine: input.engine} : {}),...(input.destination === undefined ? {} : {destination: socialDestination(input.destination)}),...(input.soundtrack === AD_MUSIC_ID && {soundtrack:AD_MUSIC_ID})};
 }
 
 export function mediaPath(value: unknown, project: string): string {

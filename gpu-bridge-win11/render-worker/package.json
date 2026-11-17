@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": {"node": ">=24.13.0 <25"},
+  "engines": {
+    "node": ">=24.13.0 <25"
+  },
   "scripts": {
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
@@ -12,6 +14,7 @@
   "dependencies": {
     "@remotion/bundler": "4.0.541",
     "@remotion/renderer": "4.0.541",
+    "hyperframes": "0.9.59",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "remotion": "4.0.541"

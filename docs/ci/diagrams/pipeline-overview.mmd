@@ -14,6 +14,7 @@ flowchart TB
     %% El recibo npm del renderer vincula los hashes de package.json, lock y reporte con umbral high.
     %% Las pruebas Node cubren bundle único concurrente, assets UUID y QA normalizada 0..1920 también en 4K.
     %% Studio comprueba el despacho de reels y el bloqueo del máster si la vista previa se rechaza.
+    %% HyperFrames usa la selección persistida en D1, el renderer Windows y la revisión audiovisual de Elena.
     %% El manifiesto declara Fase 7 con CD deshabilitado. Los siete controles deben pasar.
     %% La plantilla incluye GREPTILE_API_KEY como CHANGE_ME. La revisión local obtiene el valor de la bóveda.
     %% Kitsu acepta medios aprobados de hasta 3 GiB. Su proxy reserva un margen para la estructura multipart.
@@ -76,7 +77,8 @@ flowchart TB
     end
     LIMITE -. "Verificación operativa del anuncio" .-> D1AD["D1 0019, Worker y agentes"]
     D1AD --> GUION["Brief con CTA y escaleta verificable"]
-    GUION --> QAAD["Vista previa con subtítulos y mezcla"]
+    GUION --> CTASOC["CTA opcional: validar tres perfiles y pasar un destino al renderer"]
+    CTASOC --> QAAD["Vista previa con subtítulos y mezcla"]
     MUSICAD["Catálogo musical con huella y licencia"] --> QAAD
     QAAD -->|"Dictamen aprobado"| MP4AD["Publicar máster de 30 segundos"]
     GUION -. "Acabado optativo" .-> PAQUETERESOLVE["OTIO, imagen, voz, música y SRT"]
