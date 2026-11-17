@@ -32,7 +32,7 @@ from production_inbox import MEDIA, render_resolution
 from production_intake import identity
 from production_mateo import dispatch_request, lookup
 from production_sofia import JOURNAL, LIMIT, MAX_TRANSCRIPT, MCP, validate_transcript
-from production_valeria import MAX_JPEG, run_visual, visual_request
+from production_valeria import AD_MUSIC_ID, MAX_JPEG, run_visual, visual_request
 
 AD_MUSIC_CREDIT = (
     "Carefree — Kevin MacLeod (incompetech.com), CC BY 4.0. Fragmento editado y mezclado. "
@@ -158,11 +158,14 @@ def decode(path, expected, duration, *, stamps=None, speech=None):
             bed = ff(
                 "ffmpeg",
                 ["-hide_banner", "-nostdin"],
-                ["-ss", "26.5", "-t", "2", "-vn", "-af", "volumedetect", "-f", "null", "-"],
+                ["-vn", "-af", "atrim=start=26.5:end=28.5,volumedetect", "-f", "null", "-"],
                 30,
             ).stderr.decode(errors="replace")
             volume = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB", bed)
             metrics["musica_cierre_dbfs"] = float(volume[1]) if volume else None
+            metrics["musica_catalogo"] = (
+                probe["format"].get("tags", {}).get("comment") == AD_MUSIC_ID
+            )
             ff(
                 "ffmpeg",
                 ["-v", "error", "-nostdin", "-n"],
@@ -444,9 +447,19 @@ def review_video(path, digest, props, angle, plan, resolution, request_id, *, sy
                 "correccion": "Comprueba la pista de catálogo y corrige el nivel audible durante la placa final.",
             }
         )
+    if ad and not metrics["musica_catalogo"]:
+        qa["decision"] = "rechazado"
+        qa["reglas_duras_incumplidas"].append("La exportación no acredita la pista de catálogo")
+        qa["defectos"].append(
+            {
+                "muestra": len(checks),
+                "correccion": "Vuelve a exportar esta escaleta con la pista del catálogo aprobada.",
+            }
+        )
     return {
         "mediciones": metrics,
-        **({"revision_voz": audio_check, "creditos_musica": AD_MUSIC_CREDIT} if ad else {}),
+        **({"revision_voz": audio_check} if ad else {}),
+        **({"creditos_musica": AD_MUSIC_CREDIT} if metrics.get("musica_catalogo") else {}),
         "dictamen": qa,
         "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
     }

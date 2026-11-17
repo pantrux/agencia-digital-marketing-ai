@@ -125,6 +125,8 @@ def reel_scenes(items, duration, *, ad=False):
     return scenes, total
 
 
+AD_MUSIC_ID = "carefree-usuan1400037"
+
 CAPTION_CONNECTORS = frozenset(
     "a al con de del el en la las los mi mis por que se su sus tu un una y".split()
 )
@@ -244,6 +246,7 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None):
                 "ad": {
                     "cta": ad,
                     "brand": brief["ad_brand"],
+                    "soundtrack": AD_MUSIC_ID,
                     "captions": ad_captions(scenes, transcript["words"] if transcript else []),
                 }
             }

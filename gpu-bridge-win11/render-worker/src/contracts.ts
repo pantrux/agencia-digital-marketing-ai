@@ -12,7 +12,7 @@ export type OutputFormat = 'mp4' | 'prores4444';
 export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom'; size?: 'large'}
 export interface AdCaption {start_frame: number; end_frame: number; text: string}
 export const AD_MUSIC_ID = 'carefree-usuan1400037' as const;
-export interface ScriptedAd {cta: string; brand: string; captions: AdCaption[]; soundtrack: typeof AD_MUSIC_ID}
+export interface ScriptedAd {cta: string; brand: string; captions: AdCaption[]; soundtrack?: typeof AD_MUSIC_ID}
 export const AD_ENDCARD_FRAME = 780;
 export interface EditScene {source_start_frame: number; source_end_frame: number; label?: SceneLabel}
 export interface CompositionProps {
@@ -121,7 +121,7 @@ function scriptedAd(value: unknown): ScriptedAd {
     previousEnd = end_frame;
     return {start_frame,end_frame,text:caption};
   });
-  return {cta,brand,captions,soundtrack:AD_MUSIC_ID};
+  return {cta,brand,captions,...(input.soundtrack === AD_MUSIC_ID && {soundtrack:AD_MUSIC_ID})};
 }
 
 export function mediaPath(value: unknown, project: string): string {
