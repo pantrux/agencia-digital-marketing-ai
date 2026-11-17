@@ -1,9 +1,30 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {alphaMaskArgs, alphaMaskSummary, audioPass, encodeNvenc, encodeOutput, measureAudio, overlayInputSupported, overlayPacketTimingSupported, parseLoudness, parseProbe, audioAccepted, outputAccepted, outputViolations} from '../src/media.ts';
+import {alphaMaskArgs, alphaMaskSummary, audioPass, cutSceneAudio, encodeNvenc, encodeOutput, measureAudio, overlayInputSupported, overlayPacketTimingSupported, parseLoudness, parseProbe, audioAccepted, outputAccepted, outputViolations} from '../src/media.ts';
 import {parseRender} from '../src/contracts.ts';
+import {graphicFrames, graphicLabel} from '../src/timeline.ts';
 
 const measured = {integrated_lufs: -21, true_peak_dbtp: -4, range_lu: 2, threshold_lufs: -31, offset_lu: 0.01};
+
+test('los cortes mantienen la sincronía de audio y los rótulos desaparecen en su límite', () => {
+  const scenes = [
+    {source_start_frame: 30, source_end_frame: 390, label: {text: 'Inicio', start_frame: 0, end_frame: 90, position: 'bottom' as const}},
+    {source_start_frame: 600, source_end_frame: 1320},
+  ];
+  assert.deepEqual(graphicFrames(scenes), [0, 90]);
+  assert.equal(graphicLabel(scenes, 89)?.text, 'Inicio');
+  assert.equal(graphicLabel(scenes, 90), undefined);
+  assert.equal(graphicLabel(scenes, 360), undefined);
+  const edit = encodeNvenc('rotulos%d.png', 'cortes.wav', 'reel.mp4', 1080, 36, measured, -1.5, '1080p', 'fuente.mp4', false, scenes);
+  const filter = edit[edit.indexOf('-filter_complex') + 1]!;
+  assert.match(filter, /trim=start_frame=30:end_frame=390/);
+  assert.match(filter, /trim=start_frame=30:end_frame=750/);
+  assert.match(filter, /\[plano0\]\[plano1\]concat=n=2:v=1:a=0/);
+  assert.deepEqual(edit.filter(arg => arg === 'fuente.mp4').length, 2);
+  const audio = cutSceneAudio('fuente.wav', 'cortes.wav', scenes);
+  assert.match(audio[audio.indexOf('-filter_complex') + 1]!, /atrim=start_sample=48000:end_sample=624000/);
+  assert.match(audio[audio.indexOf('-filter_complex') + 1]!, /atrim=start_sample=960000:end_sample=2112000/);
+});
 test('la medición usa entrada real, no valores previstos de salida', () => {
   const result = parseLoudness('aviso\n' + JSON.stringify({input_i: '-14.20', input_tp: '-1.30', input_lra: '1.10', input_thresh: '-24.20', target_offset: '0.10', output_i: '-2.00'}));
   assert.equal(result.integrated_lufs, -14.2);

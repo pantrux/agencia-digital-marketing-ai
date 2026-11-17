@@ -17,7 +17,7 @@ SHA = re.compile(r"[a-f0-9]{64}")
 MEDIA = Path("/mnt/producciones")
 MAX_BODY = 4096
 ORDER_FIELDS = {"order_id", "user_id", "plan_id", "upload_id", "mode", "media"}
-OPTIONAL_ORDER_FIELDS = {"output_resolution", "output_format"}
+OPTIONAL_ORDER_FIELDS = {"output_resolution", "output_format", "output_edit"}
 
 
 def matches(pattern, value):
@@ -58,6 +58,8 @@ def verify_order(request):
         raise ValueError("Contexto inválido")
     render_resolution(request)
     render_format(request)
+    if request.get("output_edit", "full") not in ("full", "reel"):
+        raise ValueError("Montaje inválido")
     job = request["media"]
     if type(job) is not dict or set(job) != {
         "job_id",

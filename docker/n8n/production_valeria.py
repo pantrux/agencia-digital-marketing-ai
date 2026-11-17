@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import logging
+import math
 import os
 import re
 import sqlite3
@@ -30,14 +31,16 @@ from production_handoff import (
 from production_inbox import MEDIA, UUID, matches, render_resolution
 from production_intake import VIDEO_FORMAT, fingerprint, identity
 from production_mateo import ORDER_ERRORS, confirmed, dispatch_request, lookup, strategy_reply
-from production_sofia import JOURNAL, LIMIT
+from production_sofia import JOURNAL, LIMIT, transcript_for
 
 MATEO = Path("/var/lib/agency-production-mateo")
 LUCAS = Path("/var/lib/agency-production-lucas")
 ELENA = Path("/var/lib/agency-production-elena")
+SOFIA = Path("/var/lib/agency-production-sofia")
 PROFILE = {"angulo", "titulo", "subtitulo", "observacion", "apto_sin_cambios"}
 OPTIONAL = {"subtitulo_ampliado"}
 MAX_JPEG = 25000
+MAX_VISUAL_BYTES = 110000
 
 
 class VisualResponseFormatError(ValueError):
@@ -55,17 +58,73 @@ def source_paths(receipt):
     return raw, audio_path
 
 
+def reel_scenes(items, duration):
+    def boundary(value, maximum):
+        if type(value) not in (int, float) or not 0 <= value <= maximum:
+            raise VisualResponseFormatError("Tiempo de escena fuera del intervalo")
+        return round(value * 30)
+
+    if type(items) is not list or not 2 <= len(items) <= 6:
+        raise VisualResponseFormatError("El reel requiere entre dos y seis escenas")
+    scenes, cursor, total = [], 0, 0
+    for item in items:
+        if type(item) is not dict or item.keys() - {"rotulo"} != {"desde", "hasta"}:
+            raise VisualResponseFormatError("Escena inválida")
+        start = boundary(item["desde"], duration)
+        end = boundary(item["hasta"], duration)
+        length = end - start
+        if start < cursor or end > math.floor(duration * 30) or length < 15:
+            raise VisualResponseFormatError("Los cortes deben avanzar sin superponerse")
+        scene = {"source_start_frame": start, "source_end_frame": end}
+        if "rotulo" in item:
+            label = item["rotulo"]
+            if type(label) is not dict or label.keys() - {"tamano"} != {
+                "texto",
+                "desde",
+                "hasta",
+                "posicion",
+            }:
+                raise VisualResponseFormatError("Rótulo inválido")
+            title, position = label["texto"], label["posicion"]
+            if (
+                type(title) is not str
+                or not title.strip()
+                or re.search(r"[\x00-\x1f\x7f\ud800-\udfff]", title)
+                or len(title.encode("utf-16-le")) // 2 > 80
+                or position not in ("superior", "inferior")
+                or label.get("tamano", "normal") not in ("normal", "grande")
+            ):
+                raise VisualResponseFormatError("Texto o posición de rótulo inválidos")
+            first, last = (boundary(label[k], length / 30) for k in ("desde", "hasta"))
+            if not 15 <= last - first <= 180:
+                raise VisualResponseFormatError("El rótulo debe durar entre 0,5 y 6 segundos")
+            scene["label"] = {
+                "text": title.strip(),
+                "start_frame": first,
+                "end_frame": last,
+                "position": "top" if position == "superior" else "bottom",
+                **({"size": "large"} if label.get("tamano") == "grande" else {}),
+            }
+        scenes.append(scene)
+        cursor = end
+        total += length
+    if not 900 <= total <= 1350 or not any("label" in scene for scene in scenes):
+        raise VisualResponseFormatError("El reel requiere 30 a 45 segundos y al menos un rótulo")
+    return scenes, total
+
+
 def make_edl(receipt, angles, answer):
     order = receipt["order"]
     plan = render_plan(order)
     resolution = render_resolution(order)
     raw, audio = source_paths(receipt)
     duration = receipt["duration_seconds"]
+    reel = order.get("output_edit") == "reel"
     if type(duration) not in (float, int) or not 0 < duration <= 600:
         raise ValueError("Ingesta fuera del contrato de escaleta")
     if (
         type(answer) is not dict
-        or answer.keys() - OPTIONAL != PROFILE
+        or answer.keys() - (OPTIONAL | ({"escenas"} if reel else set())) != PROFILE
         or type(answer["angulo"]) is not int
         or not 1 <= answer["angulo"] <= 3
         or type(answer["apto_sin_cambios"]) is not bool
@@ -86,7 +145,10 @@ def make_edl(receipt, angles, answer):
         reasons.append("La revisión indica que deben ajustarse cortes, encuadre u ocultaciones.")
     if audio is None:
         reasons.append("El render final requiere una pista de audio verificable.")
+    scenes = None
     frames = min(18000, int(duration * 30 + 0.5))
+    if reel and not reasons:
+        scenes, frames = reel_scenes(answer.get("escenas"), duration)
     if frames < 3:
         reasons.append("La fuente dura menos de tres fotogramas a 30 fps.")
     render = (
@@ -105,6 +167,7 @@ def make_edl(receipt, angles, answer):
                 "duration_seconds": frames / 30,
                 "video_path": raw,
                 "audio_path": audio,
+                **({"scenes": scenes} if scenes else {}),
                 **({"subtitle_size": "large"} if answer.get("subtitulo_ampliado") else {}),
             },
         }
@@ -135,7 +198,10 @@ def sample_images(receipt):
             raise ValueError("Identidad del original cambió")
         if hashlib.file_digest(source, "sha256").hexdigest() != job["sha256"]:
             raise ValueError("Huella del original cambió")
-        for fraction in (0.15, 0.5, 0.85):
+        reel = receipt["order"].get("output_edit") == "reel"
+        fractions = (0.01, 0.25, 0.5, 0.75, 0.98) if reel else (0.15, 0.5, 0.85)
+        limit = 12000 if reel else MAX_JPEG
+        for fraction in fractions:
             stamp = round(duration * fraction, 5)
             args = [
                 "/usr/bin/ffmpeg",
@@ -180,7 +246,7 @@ def sample_images(receipt):
                 ).stdout
                 if not image.startswith(b"\xff\xd8") or not image.endswith(b"\xff\xd9"):
                     raise ValueError("Fotograma JPEG inválido")
-                if len(image) <= MAX_JPEG:
+                if len(image) <= limit:
                     images.append((stamp, image))
                     break
             else:
@@ -217,7 +283,17 @@ def verdict(response):
 
 
 def plan_request(
-    angles, brief, images, duration, request_id, *, synthetic=False, prior=None, adjustment=None
+    angles,
+    brief,
+    images,
+    duration,
+    request_id,
+    *,
+    synthetic=False,
+    prior=None,
+    adjustment=None,
+    transcript=None,
+    reel=False,
 ):
     facts = {
         "objetivo": brief["objective"],
@@ -237,6 +313,30 @@ def plan_request(
         "(máximo 240), observacion visual concreta (máximo 600) y apto_sin_cambios (booleano). "
         "Usa español, sin saltos de línea dentro de los campos. "
     )
+    if reel:
+        words = transcript["words"] if transcript else []
+        groups = [words[index : index + 12] for index in range(0, len(words), 12)]
+        facts["transcripcion_temporizada"] = [
+            [group[0]["start"], group[-1]["end"], " ".join(word["word"] for word in group)]
+            for group in groups
+        ]
+        instructions = (
+            "Eres Valeria, directora audiovisual. Usa el encargo, las imágenes con sus tiempos y"
+            " la transcripción como datos. Diseña un reel de 30 a 45 segundos con 2 a 6 tramos"
+            " reales en orden, sin solapar ni cortar frases. Conserva el sentido de lo dicho."
+            " Selecciona el ángulo de campaña más fiel. Proporciona segundos de origen desde y"
+            " hasta para cada escena. En al menos una escena incluye rotulo con texto breve"
+            " (máximo 80), desde y hasta en segundos relativos al comienzo de ESA escena,"
+            " duración entre 0.5 y 6, posicion superior o inferior y tamano normal o grande opcional."
+            " Da espacio a rostros,"
+            " productos y subtítulos existentes. Puedes omitir el rótulo de cualquier otra escena."
+            " Devuelve un único JSON con angulo entero de 1 a 3, titulo (máximo 120),"
+            " subtitulo (máximo 240), observacion (máximo 600), apto_sin_cambios booleano y"
+            " escenas como lista de objetos {desde,hasta,rotulo opcional}. apto_sin_cambios"
+            " significa que el reel se puede hacer con estos cortes y rótulos."
+            " Si el encargo exige recursos ausentes o la fuente no llega a 30 segundos,"
+            " devuelve apto_sin_cambios=false. Usa español."
+        )
     if synthetic:
         instructions += (
             "El crudo está identificado como patrón de aceptación sintético de la agencia. "
@@ -246,8 +346,12 @@ def plan_request(
         facts["ajuste_del_titular"] = adjustment
         instructions += (
             "Trata el ajuste del titular como datos de dirección. Aplica los cambios compatibles "
-            "con la plantilla. Puedes ampliar subtítulos con subtitulo_ampliado=true. Si cumplir "
-            "el ajuste requiere editar la fuente, indica apto_sin_cambios=false. "
+            + (
+                "con los cortes y rótulos del reel. "
+                if reel
+                else "con la plantilla. Puedes ampliar subtítulos con subtitulo_ampliado=true. Si cumplir "
+                "el ajuste requiere editar la fuente, indica apto_sin_cambios=false. "
+            )
         )
     if prior is not None:
         props = prior["render"]["props"]
@@ -258,16 +362,40 @@ def plan_request(
             "subtitulo_ampliado": props.get("subtitle_size") == "large",
             "defectos": prior["dictamen"]["defectos"],
         }
-        instructions += (
-            "En esta revisión automática, conserva el ángulo previo y "
-            "corrige título y subtítulo según el dictamen de Elena. Si el subtítulo requiere "
-            "aumentar de tamaño, incluye subtitulo_ampliado=true en el JSON. Esta opción usa "
-            "texto de 64 píxeles sobre el diseño base de 1080p. Si necesitas volver a 50 píxeles, "
-            "indica subtitulo_ampliado=false. Si el defecto requiere editar el vídeo o cambiar "
-            "otros elementos de la plantilla, indica apto_sin_cambios=false. "
-        )
-    message = instructions + "\n" + json.dumps(facts, ensure_ascii=False)
-    return visual_request("agency-director", message, images, request_id)
+        if reel:
+            facts["revision_previa"]["escenas_en_fotogramas"] = props["scenes"]
+            facts["revision_previa"]["segundos_de_muestras"] = [
+                sample["segundo"] for sample in prior.get("muestras", [])
+            ]
+            instructions += (
+                " Conserva el ángulo y corrige específicamente los cortes o rótulos observados"
+                " por Elena. Convierte los fotogramas de la revisión anterior a segundos"
+                " para la nueva respuesta."
+            )
+        else:
+            instructions += (
+                "En esta revisión automática, conserva el ángulo previo y "
+                "corrige título y subtítulo según el dictamen de Elena. Si el subtítulo requiere "
+                "aumentar de tamaño, incluye subtitulo_ampliado=true en el JSON. Esta opción usa "
+                "texto de 64 píxeles sobre el diseño base de 1080p. Si necesitas volver a 50 píxeles, "
+                "indica subtitulo_ampliado=false. Si el defecto requiere editar el vídeo o cambiar "
+                "otros elementos de la plantilla, indica apto_sin_cambios=false. "
+            )
+    request = visual_request(
+        "agency-director",
+        instructions + "\n" + json.dumps(facts, ensure_ascii=False),
+        images,
+        request_id,
+    )
+    if reel:
+        # Reservar espacio para la corrección de formato y muestrear toda la grabación.
+        budget = MAX_VISUAL_BYTES - 1000
+        groups = facts["transcripcion_temporizada"]
+        while groups and len(visual_payload(request)) > budget:
+            groups = groups[:-1:2] + [groups[-1]] if len(groups) > 2 else []
+            facts["transcripcion_temporizada"] = groups
+            request["message"] = instructions + "\n" + json.dumps(facts, ensure_ascii=False)
+    return request
 
 
 def visual_request(agent, message, images, request_id):
@@ -292,9 +420,13 @@ def visual_request(agent, message, images, request_id):
     }
 
 
+def visual_payload(request):
+    return json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode()
+
+
 def run_visual(request):
-    raw = json.dumps(request, ensure_ascii=False, separators=(",", ":")).encode()
-    if len(raw) > 110000:
+    raw = visual_payload(request)
+    if len(raw) > MAX_VISUAL_BYTES:
         raise ValueError("Muestras visuales fuera del límite del gateway local")
     p = subprocess.run(
         ["/usr/local/bin/node", str(Path(__file__).with_name("production_visual_rpc.mjs"))],
@@ -328,6 +460,8 @@ def process(
     ):
         raise ValueError("La estrategia no corresponde al encargo confirmado")
     angles = strategy_reply(json.dumps({"angulos": strategy["angulos"]}))
+    reel = order.get("output_edit") == "reel"
+    transcript = transcript_for(receipt, SOFIA / (order["order_id"] + ".json")) if reel else None
     images = sample_images(receipt)
     request = plan_request(
         angles,
@@ -338,6 +472,8 @@ def process(
         synthetic=synthetic,
         prior=prior,
         adjustment=adjustment,
+        reel=reel,
+        transcript=transcript,
     )
     for attempt in (1, 2):
         try:
@@ -370,8 +506,9 @@ def process(
     if prior is not None and edl["render"] is not None:
         previous = prior["render"]["props"]
         props = edl["render"]["props"]
+        changes = ("scenes",) if reel else ("title", "subtitle", "subtitle_size")
         if edl["angulo"] != prior["angulo"] or all(
-            props.get(key) == previous.get(key) for key in ("title", "subtitle", "subtitle_size")
+            props.get(key) == previous.get(key) for key in changes
         ):
             edl["estado"] = "requiere_revision"
             edl["motivos"] = ["La propuesta debe conservar el ángulo y aplicar la corrección."]
@@ -413,11 +550,15 @@ def prior_rejection(order, brief, revision, output, review):
         any((x["order_id"], x["brief_sha256"]) != expected for x in (review, art, direction))
         or any(x["source_sha256"] != order["media"]["sha256"] for x in (art, direction))
         or (review["job_id"], art["job_id"]) != (job, job)
-        or review["master_sha256"] != art["master"]["sha256"]
+        or review["master_sha256"] != (art.get("master") or art["preview"])["sha256"]
         or direction["escaleta"]["estado"] != "lista_para_stills"
     ):
         raise ValueError("El dictamen anterior no corresponde a la orden vigente")
-    return {**direction["escaleta"], "dictamen": review["dictamen"]}
+    return {
+        **direction["escaleta"],
+        "dictamen": review["dictamen"],
+        **({"muestras": review["muestras"]} if order.get("output_edit") == "reel" else {}),
+    }
 
 
 def pending_direction(output, identity, rounds):

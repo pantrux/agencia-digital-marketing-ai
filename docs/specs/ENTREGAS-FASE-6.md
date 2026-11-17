@@ -86,6 +86,14 @@ El comando de auditoría consulta los briefs confirmados en los últimos 30 día
 & '.tools\venvs\synology-audit\Scripts\python.exe' -I -B sre/audit_studio_production_latency.py --registrar
 ```
 
+### Reel por escenas
+
+En Producción, **Montaje** permite pedir un reel de 30–45 segundos. Studio conserva la selección en la orden y Valeria genera de dos a seis cortes ordenados sobre el material recibido. Los rótulos tienen posición y límites por fotograma. El mismo montaje sincroniza el audio del MP4 y la gráfica transparente del MOV cuando se solicita ProRes.
+
+Lucas guarda la vista previa de 1080p y su recibo antes de solicitar el máster. Elena revisa la apertura, el cierre y muestras por escena, con el rótulo esperado en cada punto. Un rechazo de vista previa sigue el circuito existente de revisiones y se vincula a la huella de la escaleta y del archivo revisado. El máster aprobado sigue el flujo normal de Kitsu y Entregas.
+
+La activación del selector requiere aplicar primero la migración `0018_production_edit.sql` y tener el despachador, el receptor, Valeria, Lucas, Elena y el puente de render en la versión que admite el montaje.
+
 ### Medición continua de entregas
 
 `agency-studio-delivery-metrics.timer` ejecuta la consulta cada cinco minutos desde `vm-media-01`. Lee la duración firmada que se guardó en D1 y envía recuentos y percentiles agregados por TLS mutuo al receptor OTLP de Prometheus. Las etiquetas identifican el origen del pedido y su entorno. Los recuentos de completados y de duraciones verificadas permiten detectar entregas históricas sin duración firmada. [Receptor OTLP de Prometheus](https://prometheus.io/docs/guides/opentelemetry/)

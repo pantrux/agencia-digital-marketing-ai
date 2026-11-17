@@ -62,7 +62,7 @@ function sqliteAdapter(database: DatabaseSync): SqlDatabase {
   };
 }
 
-function databaseForIngest(output: "1080p" | "4k" = "1080p", format: "mp4" | "prores4444" = "mp4"): DatabaseSync {
+function databaseForIngest(output: "1080p" | "4k" = "1080p", format: "mp4" | "prores4444" = "mp4", edit: "full" | "reel" = "full"): DatabaseSync {
   const db = new DatabaseSync(":memory:");
   const schema = new URL("../cloudflare-saas/migrations/0001_schema.sql", import.meta.url);
   db.exec(readFileSync(schema, "utf-8"));
@@ -72,6 +72,7 @@ function databaseForIngest(output: "1080p" | "4k" = "1080p", format: "mp4" | "pr
   db.exec(readFileSync(new URL("../cloudflare-saas/migrations/0012_delivery_prores.sql", import.meta.url), "utf-8"));
   db.exec(readFileSync(new URL("../cloudflare-saas/migrations/0014_upload_abort_reason.sql", import.meta.url), "utf-8"));
   db.exec(readFileSync(new URL("../cloudflare-saas/migrations/0015_brand_profiles.sql", import.meta.url), "utf-8"));
+  db.exec(readFileSync(new URL("../cloudflare-saas/migrations/0018_production_edit.sql", import.meta.url), "utf-8"));
   const now = Math.floor(Date.now() / 1000);
   const plan = format === "prores4444" ? "ilimitado" : output === "4k" ? "ultra" : "free";
   db.exec("INSERT INTO users (id, google_sub, email) VALUES ('user', 'google-user', 'fixture@example.invalid')");
@@ -81,9 +82,9 @@ function databaseForIngest(output: "1080p" | "4k" = "1080p", format: "mp4" | "pr
       VALUES('paid-test','user',?,'active','paid','production','ref-fixture','mandato-sintetico',?,?)`).run(plan, now - 60, now + 60);
   }
   db.prepare(`INSERT INTO orders (id,user_id,plan_id,kind,status,idempotency_key,request_sha256,
-    project_slug,queue_priority,created_at,output_resolution,output_format)
-    SELECT ?, 'user', plan_id,'production','queued','key',?,'job-fixture',queue_priority,?,?,?
-    FROM plan_quotas WHERE plan_id=?`).run(order, digest, now, output, format, plan);
+    project_slug,queue_priority,created_at,output_resolution,output_format,output_edit)
+    SELECT ?, 'user', plan_id,'production','queued','key',?,'job-fixture',queue_priority,?,?,?,?
+    FROM plan_quotas WHERE plan_id=?`).run(order, digest, now, output, format, edit, plan);
   db.prepare(`INSERT INTO usage_ledger (id,user_id,order_id,period_start,created_at)
     VALUES ('ledger','user',?,strftime('%Y-%m-01',?,'unixepoch'),?)`).run(order, now, now);
   db.exec(readFileSync(new URL("../cloudflare-saas/migrations/0006_production_portal_origin.sql", import.meta.url), "utf-8"));
@@ -224,9 +225,9 @@ it("confirma el brief de la orden propia sin duplicarlo ni editarlo después", a
   } finally { db.close(); }
 });
 
-it.each([["1080p", "mp4", "free"], ["4k", "mp4", "ultra"], ["4k", "prores4444", "ilimitado"]] as const)(
-  "despacha una sola producción %s %s y exige su lease para acreditar recepción", async (output, format, plan) => {
-  const db = databaseForIngest(output, format);
+it.each([["1080p", "mp4", "free", "full"], ["4k", "mp4", "ultra", "full"], ["4k", "prores4444", "ilimitado", "reel"]] as const)(
+  "despacha una sola producción %s %s del plan %s con montaje %s", async (output, format, plan, edit) => {
+  const db = databaseForIngest(output, format, edit);
   try {
     const migration = new URL("../cloudflare-saas/migrations/0004_production_dispatch.sql", import.meta.url);
     db.exec(readFileSync(migration, "utf8"));
@@ -250,6 +251,9 @@ it.each([["1080p", "mp4", "free"], ["4k", "mp4", "ultra"], ["4k", "prores4444", 
     else expect(result.job).not.toHaveProperty("output_resolution");
     if (format === "prores4444") expect(result.job).toHaveProperty("output_format", "prores4444");
     else expect(result.job).not.toHaveProperty("output_format");
+    if (edit === "reel") expect(result.job).toHaveProperty("output_edit", "reel");
+    else expect(result.job).not.toHaveProperty("output_edit");
+    expect(() => db.prepare("UPDATE orders SET output_edit=?").run(edit === "reel" ? "full" : "reel")).toThrow("OUTPUT_EDIT_IMMUTABLE");
     expect(await (await send({ action: "claim" })).json()).toEqual({ job: null });
     db.exec("UPDATE production_dispatch SET available_at=0");
     const next = await (await send({ action: "claim" })).json() as { job: { lease: string } };

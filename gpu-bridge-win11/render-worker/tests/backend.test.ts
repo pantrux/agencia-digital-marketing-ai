@@ -1,9 +1,9 @@
 import {after, mock, test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, writeFile, rm, access} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, rm, access, readFile, stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {RenderBackend} from '../src/backend.ts';
+import {RenderBackend, timelineImages} from '../src/backend.ts';
 import {outputDimensions, parseRender, parseStills, TITLE_FADE_FRAMES, type OutputFormat, type Resolution} from '../src/contracts.ts';
 import type {RuntimeConfig} from '../src/config.ts';
 import {ScratchSpace} from '../src/scratch.ts';
@@ -13,6 +13,23 @@ mock.method(ScratchSpace.prototype, 'ensureSpace', async (bytes: number) => {
   assert.ok(Number.isFinite(bytes) && bytes >= 0);
 });
 after(() => mock.restoreAll());
+
+test('el reel de 45 segundos mantiene los fotogramas transparentes sin superar el límite NTFS', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'rotulos-secundarios-'));
+  try {
+    const title = path.join(root, 'titulo.png'), transparent = path.join(root, 'transparente.png');
+    await writeFile(title, 'título');
+    await writeFile(transparent, 'alfa');
+    const pattern = await timelineImages(root, [0, 90], [title, transparent], 1350, new AbortController().signal);
+    const frame = (index: number) => pattern.replace('%d', String(index));
+    assert.equal(await readFile(frame(89), 'utf8'), 'título');
+    assert.equal(await readFile(frame(90), 'utf8'), 'alfa');
+    assert.equal(await readFile(frame(1349), 'utf8'), 'alfa');
+    for (const index of [90, 602, 1114, 1349]) assert.ok((await stat(frame(index))).nlink <= 513);
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
 
 const request = parseRender({project_id: 'sansevieras', job_id: 'prueba', composition: 'AgencyVertical', plan: 'Free', props: {title: 'Prueba sintética', duration_seconds: 3, audio_path: 'proyectos/sansevieras/03_assets/voz.wav'}});
 async function setup(badPeak: boolean, options: {format?: OutputFormat; resolution?: Resolution; badAlpha?: boolean; failProresProbe?: boolean; missingColor?: boolean; duration?: number; badTiming?: boolean; recoverPeak?: boolean; normalizedVideo?: boolean} = {}) {
@@ -64,6 +81,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
       const output = args.at(-1)!;
       if (options.failProresProbe && args.includes('prores_ks')) throw new Error('Codificador ProRes no disponible.');
       if (output.endsWith('.mp4') || output.endsWith('.mov')) await writeFile(output, 'vídeo controlado');
+      if (output.endsWith('.wav') && args.includes('-filter_complex')) await writeFile(output, 'audio por escenas');
       if (output.endsWith('.raw')) {const mask = Buffer.alloc(4096, 255); if (!options.badAlpha) mask.fill(0, 0, 2048); await writeFile(output, mask);}
       if (args.includes('-af')) {
         const firstMasterCheck = options.recoverPeak && output === '-'
@@ -87,6 +105,26 @@ test('salud no disponible antes de pruebas y publicación solo después de medic
     await access(path.join(fixture.nas, result.files[0]!.path));
     assert.equal(result.audio.true_peak_dbtp, -1.4);
   } finally {await rm(fixture.root, {recursive: true, force: true});}
+});
+
+test('el ProRes por escenas codifica una vez cada estado del rótulo y sincroniza el MOV de 45 segundos', async () => {
+  const fixture = await setup(false, {duration: 45, format: 'prores4444', resolution: '4k'});
+  const edit = parseRender({project_id:request.project_id, job_id:'reel-alfa', composition:'AgencyVertical',
+    plan:'Ilimitado', format:'prores4444', resolution:'4k', props:{...request.props, duration_seconds:45, scenes:[
+      {source_start_frame:30, source_end_frame:390, label:{text:'Catálogo', start_frame:30, end_frame:105, position:'top'}},
+      {source_start_frame:900, source_end_frame:1890},
+    ]}});
+  try {
+    await fixture.backend.initialize();
+    const result = await fixture.backend.render(edit, new AbortController().signal);
+    assert.equal(result.alpha_verified, true);
+    assert.deepEqual(fixture.captures.at(-1), [0, 30, 105]);
+    const fragments = fixture.calls.filter(args => args.includes('prores_ks') && path.basename(args.at(-1)!).startsWith('prores-escena-'));
+    assert.equal(fragments.length, 3);
+    assert.ok(fragments.every(args => args[args.indexOf('-frames:v') + 1] === '1'));
+    const master = fixture.calls.find(args => path.basename(args.at(-1)!) === 'master.mov');
+    assert.equal(master?.[master.indexOf('-c:v') + 1], 'copy');
+  } finally {await rm(fixture.root, {recursive:true, force:true});}
 });
 test('pico final fuera de límite rechaza incluso segundo intento y no publica al NAS', async () => {
   const fixture = await setup(true);

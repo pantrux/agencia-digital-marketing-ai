@@ -1,6 +1,6 @@
 import { validateSyncJob } from "../../../src/media/sync-contract.js";
 import { HttpError, readJson, response, type SqlDatabase } from "./platform.js";
-import type { OutputFormat, OutputResolution } from "./orders.js";
+import type { OutputEdit, OutputFormat, OutputResolution } from "./orders.js";
 
 export interface ProductionDispatchEnv {
   DB: SqlDatabase;
@@ -10,7 +10,7 @@ export interface ProductionDispatchEnv {
 
 type Claimed = { order_id: string; attempts: number; lease: string; available_at: number };
 type Work = { user_id: string; plan_id: string; upload_id: string; payload: string; sha256: string; bytes: number;
-  project_slug: string; output_resolution: OutputResolution; output_format: OutputFormat };
+  project_slug: string; output_resolution: OutputResolution; output_format: OutputFormat; output_edit: OutputEdit };
 export const productionDispatchPath = "/api/internal/production/dispatch";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const tokenPattern = /^[a-f0-9]{64}$/u;
@@ -46,7 +46,7 @@ async function claim(env: ProductionDispatchEnv, now: number): Promise<Response>
     RETURNING order_id,attempts,lease,available_at`).bind(now + leaseSeconds, lease, now, env.BILLING_MODE).first<Claimed>();
   if (!taken) return response({ job: null });
   const work = await env.DB.withSession("first-primary").prepare(`SELECT o.user_id,o.plan_id,o.project_slug,s.id AS upload_id,
-    s.sha256,s.bytes,j.payload,o.output_resolution,o.output_format FROM orders o JOIN job_outbox j ON j.order_id=o.id
+    s.sha256,s.bytes,j.payload,o.output_resolution,o.output_format,o.output_edit FROM orders o JOIN job_outbox j ON j.order_id=o.id
     JOIN usage_ledger u ON u.order_id=o.id AND u.user_id=o.user_id AND u.status='consumed'
     JOIN upload_sessions s ON s.order_id=o.id AND s.user_id=o.user_id AND s.status='completed'
     WHERE o.id=? AND o.kind='production' AND o.status='processing' AND COALESCE(o.provider_mode,'production')=?`)
@@ -58,7 +58,8 @@ async function claim(env: ProductionDispatchEnv, now: number): Promise<Response>
   return response({ job: { order_id: taken.order_id, attempt: taken.attempts, lease: taken.lease,
     lease_expires_at: taken.available_at, user_id: work.user_id, plan_id: work.plan_id, upload_id: work.upload_id,
     mode: env.BILLING_MODE, media, ...(work.output_resolution === "4k" ? { output_resolution: "4k" } : {}),
-    ...(work.output_format === "prores4444" ? { output_format: work.output_format } : {}) } });
+    ...(work.output_format === "prores4444" ? { output_format: work.output_format } : {}),
+    ...(work.output_edit === "reel" ? { output_edit: work.output_edit } : {}) } });
 }
 
 async function recordQualityOutcome(body: Record<string, unknown>, env: ProductionDispatchEnv, now: number): Promise<Response> {
