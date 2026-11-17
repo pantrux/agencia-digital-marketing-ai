@@ -25,6 +25,7 @@ MAX_RESPONSE = 2 * 1024**2
 MAX_MEDIA = 3 * 1024**3
 MAX_REQUEST = MAX_MEDIA + 1024**2
 CHUNK = 256 * 1024
+ATTACHMENT_READ_BYTES = 32 * 1024**2
 MAX_ROWS = 1000
 PREVIEW_STATUSES = {"processing", "ready", "broken", "missing"}
 
@@ -582,27 +583,38 @@ def _stage_upload(out, source, sha256, *, zip_file=False):
 
 def _attachment_digest(token, attachment_id, filename, expected_bytes):
     client = http.client.HTTPConnection(HOST, PORT, timeout=68)
+    route = f"/api/data/attachment-files/{attachment_id}/file/{filename}"
+    request_headers = {"Authorization": "Bearer " + token, "Accept-Encoding": "identity"}
+    use_ranges = expected_bytes > ATTACHMENT_READ_BYTES
+    digest = hashlib.sha256()
     try:
-        client.request(
-            "GET",
-            f"/api/data/attachment-files/{attachment_id}/file/{filename}",
-            headers={"Authorization": "Bearer " + token, "Accept-Encoding": "identity"},
-        )
-        with client.getresponse() as response:
-            _require(
-                response.status == 200
-                and response.getheader("Content-Type", "").split(";", 1)[0] == "application/zip"
-                and response.getheader("Content-Encoding") in (None, "identity")
-                and response.getheader("Content-Length") == str(expected_bytes),
-                "KITSU_ADJUNTO_HUELLA",
-            )
-            digest = hashlib.sha256()
-            size = 0
-            while block := response.read(CHUNK):
-                size += len(block)
-                _require(size <= expected_bytes, "KITSU_ADJUNTO_HUELLA")
-                digest.update(block)
-            return digest.hexdigest(), size
+        # Las respuestas grandes de Zou pueden cerrarse antes de enviar todos los bytes.
+        for start in range(0, expected_bytes, ATTACHMENT_READ_BYTES):
+            length = min(ATTACHMENT_READ_BYTES, expected_bytes - start)
+            end = start + length - 1
+            if use_ranges:
+                request_headers["Range"] = f"bytes={start}-{end}"
+            client.request("GET", route, headers=request_headers)
+            with client.getresponse() as response:
+                _require(
+                    response.status == (206 if use_ranges else 200)
+                    and response.getheader("Content-Type", "").split(";", 1)[0] == "application/zip"
+                    and response.getheader("Content-Encoding") in (None, "identity")
+                    and response.getheader("Content-Length") == str(length)
+                    and (
+                        not use_ranges
+                        or response.getheader("Content-Range")
+                        == f"bytes {start}-{end}/{expected_bytes}"
+                    ),
+                    "KITSU_ADJUNTO_HUELLA",
+                )
+                remaining = length
+                while block := response.read(CHUNK):
+                    remaining -= len(block)
+                    _require(remaining >= 0, "KITSU_ADJUNTO_HUELLA")
+                    digest.update(block)
+                _require(remaining == 0, "KITSU_ADJUNTO_HUELLA")
+        return digest.hexdigest(), expected_bytes
     except (OSError, http.client.HTTPException):
         raise UpstreamError(None, "KITSU_TRANSPORTE") from None
     finally:

@@ -460,6 +460,59 @@ def test_http_pins_destination_rejects_redirect_and_never_exposes_response(
     assert closed == [True]
 
 
+@pytest.mark.parametrize(
+    "payload_size, failure", [(4, None), (9, None), (9, "truncated"), (9, "offset"), (9, "ignored")]
+)
+def test_attachment_digest_verifies_every_byte(adapter, monkeypatch, payload_size, failure):
+    module, _, _ = adapter
+    data = b"123456789"[:payload_size]
+    calls = []
+
+    class Response(io.BytesIO):
+        def getheader(self, name, default=None):
+            return self.headers.get(name, default)
+
+    class Connection:
+        def __init__(self, _host, _port, *, timeout):
+            assert timeout > 0
+
+        def request(self, method, path, *, headers):
+            assert method == "GET"
+            assert path == f"/api/data/attachment-files/{OTHER}/file/kit.zip"
+            assert headers["Accept-Encoding"] == "identity"
+            assert headers["Authorization"] == "Bearer opaque-fixture"
+            self.requested_range = headers.get("Range")
+            calls.append(self.requested_range)
+
+        def getresponse(self):
+            start = 4 * (len(calls) - 1)
+            chunk = data[start : start + 4]
+            span = f"bytes {start}-{start + len(chunk) - 1}/{len(data)}"
+            if start == 4 and failure == "offset":
+                span = f"bytes 0-3/{len(data)}"
+            response = Response(chunk[:-1] if start == 4 and failure == "truncated" else chunk)
+            response.status = 206 if self.requested_range and failure != "ignored" else 200
+            response.headers = {
+                "Content-Type": "application/zip",
+                "Content-Length": str(len(chunk)),
+                "Content-Range": span,
+            }
+            return response
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(module, "ATTACHMENT_READ_BYTES", 4, raising=False)
+    monkeypatch.setattr(module.http.client, "HTTPConnection", Connection)
+    if failure:
+        with pytest.raises(ValueError, match="KITSU_ADJUNTO_HUELLA"):
+            module._attachment_digest("opaque-fixture", OTHER, "kit.zip", len(data))
+    else:
+        result = module._attachment_digest("opaque-fixture", OTHER, "kit.zip", len(data))
+        assert result == (hashlib.sha256(data).hexdigest(), len(data))
+        assert calls == ([None] if payload_size == 4 else ["bytes=0-3", "bytes=4-7", "bytes=8-8"])
+
+
 def test_multipart_bounds_include_framing(adapter, monkeypatch):
     module, _, _ = adapter
 
