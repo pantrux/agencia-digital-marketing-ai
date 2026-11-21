@@ -290,9 +290,11 @@ def test_servicio_de_revision_reclama_y_registra_rechazo(handoff, order, monkeyp
 def test_revision_releva_el_dictamen_de_una_vista_previa_verificada(
     handoff, order, monkeypatch, tmp_path
 ):
+    import production_elena as reviewer
     import production_lucas as editor
     import production_revision as revision
 
+    order = {**order, "output_edit": "reel"}
     identity = str(uuid.uuid4())
     claim = {"id": identity, "order_id": order["order_id"]}
     brief = {"objective": "Probar un título nuevo"}
@@ -300,35 +302,46 @@ def test_revision_releva_el_dictamen_de_una_vista_previa_verificada(
         "order_id": order["order_id"],
         "source_sha256": order["media"]["sha256"],
         "brief_sha256": hashlib.sha256(handoff.canonical(brief)).hexdigest(),
-        "escaleta": {"estado": "lista_para_stills"},
+        "escaleta": {
+            "estado": "lista_para_stills",
+            "angulo": "Detalle",
+            "render": {
+                "project_id": order["media"]["project_slug"],
+                "job_id": f"{order['order_id']}-v1",
+                "plan": "Free",
+                "composition": "AgencyVertical",
+                "format": "mp4",
+                "resolution": "1080p",
+                "props": {"scenes": [], "duration_seconds": 30},
+            },
+        },
     }
     render = tmp_path / f"{identity}.json"
     review_dir = tmp_path / "review"
     review_dir.mkdir()
-    preview = {
-        "order_id": order["order_id"],
-        "job_id": f"{identity}-r",
-        "brief_sha256": draft["brief_sha256"],
-        "direction_sha256": hashlib.sha256(handoff.canonical(draft)).hexdigest(),
-        "master_sha256": "c" * 64,
-        "fase": "vista_previa",
-        "dictamen": {"decision": "rechazado", "defectos": ["Rótulo sobre el producto"]},
-    }
-    raw = json.dumps(preview).encode()
-    render.write_text(
-        json.dumps(
-            {
-                "preview_review_sha256": hashlib.sha256(raw).hexdigest(),
-                "preview": {"sha256": preview["master_sha256"]},
-            }
-        )
-    )
+
+    def preview_only(kind, body, *_, **__):
+        assert kind == "render" and body["job_id"] == f"{identity}-r-preview"
+        return {"sha256": "c" * 64, "path": "vista-previa.mp4"}
+
     receipt = render.with_suffix(".preview-review.receipt")
-    receipt.write_bytes(raw)
     monkeypatch.setattr(revision, "approved_base", lambda *_: {"brief": brief})
-    monkeypatch.setattr(editor, "run", lambda *_, **__: None)
+    monkeypatch.setattr(editor, "verified_inputs", lambda *_: {})
+    monkeypatch.setattr(editor, "submit_with_receipt", preview_only)
+    monkeypatch.setattr(editor, "verify_mp4", lambda result, _: result)
+    monkeypatch.setattr(
+        reviewer,
+        "review_video",
+        lambda *_: {
+            "dictamen": {"decision": "rechazado", "defectos": ["Rótulo sobre el producto"]}
+        },
+    )
     args = (claim, {"order": order}, {}, tmp_path, draft, render, review_dir / render.name, "gpu")
-    assert revision.render_and_review(*args) == {"status": "rechazado", "review": preview}
+    result = revision.render_and_review(*args)
+    raw = receipt.read_bytes()
+    assert result == {"status": "rechazado", "review": json.loads(raw)}
+    assert result["review"]["fase"] == "vista_previa"
+    monkeypatch.setattr(editor, "run", lambda *_, **__: None)
     receipt.write_bytes(raw.replace(b"rechazado", b"aprobado"))
     with pytest.raises(ValueError, match="dictamen de vista previa"):
         revision.render_and_review(*args)
@@ -821,6 +834,32 @@ def test_correccion_multiple_situa_defectos_y_conserva_tiempos_por_fuente(handof
     normalized, frames = director.multi_reel_scenes(previous["escenas"], {first: 24, second: 24})
     assert normalized == scenes
     assert frames == 900
+    prior["dictamen"].update(
+        {
+            "decision": "rechazado",
+            "puntaje": 75,
+            "reglas_duras_incumplidas": ["Audio fuera del intervalo de sonoridad"],
+        }
+    )
+    request, _ = director.multiple_plan_request(
+        angles,
+        brief,
+        batches,
+        analyses,
+        str(uuid.uuid4()),
+        prior=prior,
+        adjustment="Usa el ángulo inicial",
+        user_revision=True,
+    )
+    message = request["message"]
+    facts = json.loads(message[message.index('{"objetivo"') :])
+    assert "Elena rechazó la versión previa" in message
+    assert "Cambia el ángulo si el titular lo solicita" in message
+    assert facts["ajuste_del_titular"] == "Usa el ángulo inicial"
+    assert facts["revision_previa"]["reglas_duras_incumplidas"] == [
+        "Audio fuera del intervalo de sonoridad"
+    ]
+    assert facts["revision_previa"]["puntaje"] == 75
 
 
 def test_escaleta_multiple_entrega_rutas_y_subtitulos_de_cada_fuente(handoff, order):
@@ -2513,6 +2552,19 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(
         == direction
     )
     assert len(generated) == 1
+    attempt_id = revisions.revision_attempt_id(claim["id"], 2)
+    rejected = {**direction["escaleta"], "dictamen": {"decision": "rechazado"}}
+    draft_revision(
+        {**claim, "id": attempt_id},
+        {"order": order},
+        {"strategy": "test"},
+        direction,
+        path,
+        tmp_path / f"{attempt_id}.json",
+        rejected=rejected,
+    )
+    assert generated[-1][1]["user_revision"] is True
+    assert generated[-1][1]["prior"] == rejected
     with pytest.raises(ValueError, match="contenido distinto"):
         draft_revision(
             {**claim, "instructions": "Otro cambio"}, {"order": order}, {}, direction, path, target

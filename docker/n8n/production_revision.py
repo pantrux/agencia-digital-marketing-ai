@@ -242,7 +242,7 @@ def draft_revision(claim, receipt, strategy, direction, kit_path, target, *, rej
             request_id,
             prior=prior,
             adjustment=claim["instructions"].strip(),
-            user_revision=rejected is None,
+            user_revision=True,
         )
     result = json.loads(read_regular(target, METADATA_LIMIT))
     if (
