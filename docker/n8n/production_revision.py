@@ -653,10 +653,11 @@ def run_once(profile, paths, token, gpu, r2, studio, dispatch):
 
 
 def main():
+    from production_lucas import VALERIA
     from production_mateo import dispatch_request
     from production_publish import credentials, r2_request, studio_request
     from production_sofia import JOURNAL
-    from production_valeria import MATEO, VALERIA
+    from production_valeria import MATEO
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("profile", type=Path)
