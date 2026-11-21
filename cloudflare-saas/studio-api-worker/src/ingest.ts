@@ -55,6 +55,8 @@ export interface IngestEnv {
   BILLING_MODE: "sandbox" | "production";
 }
 
+export type MultipartObserver = (preparation: number, storage: number, confirmation: number, testAccount?: boolean) => void;
+
 export function uploadsConfigured(env: IngestEnv): boolean {
   return /^[a-f0-9]{32}$/u.test(env.R2_ACCOUNT_ID)
     && /^[a-f0-9]{32}$/u.test(env.R2_ACCESS_KEY_ID)
@@ -163,6 +165,7 @@ type UploadOwner = string | Awaited<ReturnType<typeof sessionLookup>>;
 
 async function createUpload(
   request: Request, env: IngestEnv, owner: UploadOwner, onCommitted?: (orderId: string) => void,
+  observe?: MultipartObserver,
 ): Promise<Response> {
   async function requireSession() {
     if (typeof owner === "string") return;
@@ -215,13 +218,15 @@ async function createUpload(
   `, id, key, job.sha256, job.bytes, content_type, extension, operation,
     current + operationLease, current, current + sessionTtl, order_id, job.project_slug,
     env.BILLING_MODE, ...storageQuotaArguments(job.bytes, current));
+  const started = performance.now();
   const result = await env.DB.batch<PortalIdentity | OrderWithReservation | UploadRow>([
     ...(typeof owner === "string" ? [] : [owner.statement(env.DB)]),
     orderLookup(env.DB),
     reserve,
     findUpload(env.DB, env.BILLING_MODE, owner, order_id, "order_id"),
   ]);
-  if (typeof owner !== "string" && !result.shift()?.results[0]) return fail(401, "AUTENTICACION_REQUERIDA");
+  const caller = typeof owner === "string" ? undefined : result.shift()?.results[0];
+  if (typeof owner !== "string" && !caller) return fail(401, "AUTENTICACION_REQUERIDA");
   const [matched, inserted, found] = result;
   if (!matched || !inserted || !found) return fail(503, "SUBIDA_NO_DISPONIBLE");
   const order = matched.results[0];
@@ -247,6 +252,7 @@ async function createUpload(
     if (renewed.meta.changes !== 1) return fail(409, "SUBIDA_EN_TRANSICION");
   }
   let handle: UploadHandle;
+  const storageStarted = performance.now();
   try {
     handle = await env.MEDIA.createMultipartUpload(row.object_key, {
       httpMetadata: { contentType: content_type },
@@ -257,6 +263,7 @@ async function createUpload(
       .bind(unix(), row.id, operation).run();
     return fail(503, "R2_NO_DISPONIBLE");
   }
+  const confirmationStarted = performance.now();
   const opened = await env.DB.prepare(`
     UPDATE upload_sessions SET status = 'open', upload_id = ?, operation_id = NULL, lease_until = NULL
     WHERE id = ? AND user_id = ? AND status = 'creating' AND operation_id = ?
@@ -265,7 +272,10 @@ async function createUpload(
     try { await handle.abort(); } catch { /* La política nativa de R2 expira multipart huérfanos. */ }
     return fail(409, "SUBIDA_EN_TRANSICION");
   }
-  return uploadInfo({ ...row, status: "open", upload_id: handle.uploadId }, true);
+  const reply = uploadInfo({ ...row, status: "open", upload_id: handle.uploadId }, true);
+  observe?.(storageStarted - started, confirmationStarted - storageStarted, performance.now() - confirmationStarted,
+    Boolean(caller && "email" in caller && caller.email.toLowerCase().endsWith(".invalid")));
+  return reply;
 }
 
 function credentials(env: IngestEnv) {
@@ -586,9 +596,9 @@ export async function handlePartAccess(request: Request, env: AuthEnv & IngestEn
 }
 
 export async function handleUploadCreation(
-  request: Request, env: AuthEnv & IngestEnv, onCommitted?: (orderId: string) => void,
+  request: Request, env: AuthEnv & IngestEnv, onCommitted?: (orderId: string) => void, observe?: MultipartObserver,
 ): Promise<Response> {
-  return await createUpload(request, env, await sessionLookup(request, env), onCommitted);
+  return await createUpload(request, env, await sessionLookup(request, env), onCommitted, observe);
 }
 
 export async function handleIngest(

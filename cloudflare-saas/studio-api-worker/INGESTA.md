@@ -85,6 +85,32 @@ GROUP BY ruta, conexion
 ORDER BY ruta, conexion
 ```
 
+### Latencia de la apertura multipart
+
+Cada apertura nueva confirmada registra las tres etapas en una misma muestra
+de `studio_worker_http_v1`. `multipart_inicio_etapas` identifica la carga
+de un archivo y `multifuente_inicio_etapas`, la carga de una fuente de un
+pedido con varios materiales. La preparación incluye la reserva en D1 y,
+en una recuperación, las comprobaciones antes de crear la carga. La segunda
+etapa mide `createMultipartUpload` en R2 y la tercera, la confirmación en D1.
+Las cuentas sintéticas y las vistas previas quedan en `ensayo`. En el portal
+público, las cuentas reales se registran en `piloto` mientras la facturación
+esté en prueba. `produccion` identifica las aperturas de cuentas reales con
+facturación en producción. La muestra prescinde de identificadores, contenido
+y direcciones. Una reapertura conserva la métrica HTTP de solicitud de su ruta
+sin repetir las tres etapas.
+
+```sql
+SELECT index1 AS ruta, blob1 AS entorno, count() AS observaciones,
+       quantileExactWeighted(0.95)(double3, _sample_interval) AS preparacion_ms,
+       quantileExactWeighted(0.95)(double4, _sample_interval) AS r2_ms,
+       quantileExactWeighted(0.95)(double5, _sample_interval) AS confirmacion_ms
+FROM studio_worker_http_v1
+WHERE index1 IN ('multipart_inicio_etapas', 'multifuente_inicio_etapas')
+  AND timestamp >= NOW() - INTERVAL '30' DAY
+GROUP BY ruta, entorno
+```
+
 ### Perfiles opcionales para el CTA
 
 Un brief de anuncio en MP4 puede enviar `ad_contacts` con las URLs opcionales

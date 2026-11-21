@@ -4,7 +4,7 @@ import { brandRoute, handleBrands } from "./brands.js";
 import { handleSofiaChat, type ChatEnv } from "./chat.js";
 import { readConversation } from "./conversation.js";
 import { deliveryRevisionRoute, handleDeliveryRevisions, type DeliveryRevisionEnv } from "./delivery-revisions.js";
-import { expireAbandonedReservations, handleIngest, handlePartAccess, handleUploadCreation, partAccessTarget, uploadsConfigured, type IngestEnv } from "./ingest.js";
+import { expireAbandonedReservations, handleIngest, handlePartAccess, handleUploadCreation, partAccessTarget, uploadsConfigured, type IngestEnv, type MultipartObserver } from "./ingest.js";
 import { dispatchOutbox, dispatchSourceOutbox, syncQueue, type JobEnv, type JobMessage } from "./jobs.js";
 import { handleKits, kitView, prepareKits, type KitRow } from "./kits.js";
 import { handleKitProducer, kitProducerPath, type KitProducerEnv } from "./kit-producer.js";
@@ -40,7 +40,24 @@ const measuredRoutes = new Map([
 ]);
 
 const browserRoutes = new Set(["auth_me", "panel", "multipart_inicio", "multipart_firma"]);
+const sourceUploadRoute = /^\/api\/orders\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/sources\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/(upload|complete|parts(?:\/([1-9][0-9]?)\/sign)?)$/u;
 type BrowserSample = [string, number, number, boolean];
+
+function observeMultipart(env: WorkerEnv, route: "multipart_inicio_etapas" | "multifuente_inicio_etapas",
+  testAccount = false): MultipartObserver | undefined {
+  const metrics = env.STUDIO_HTTP_METRICS;
+  if (!metrics) return undefined;
+  return (preparation, storage, confirmation, fromTestSession = false) => {
+    const cohort = env.PUBLIC_ORIGIN === "https://studio.e-scale.cl" && !testAccount && !fromTestSession
+      ? (env.BILLING_MODE === "production" ? "produccion" : "piloto") : "ensayo";
+    try {
+      metrics.writeDataPoint({ indexes: [route], blobs: [cohort],
+        doubles: [preparation + storage + confirmation, 200, preparation, storage, confirmation] });
+    } catch {
+      // Una pérdida de telemetría no modifica la carga confirmada.
+    }
+  };
+}
 
 function isBrowserSample(value: unknown): value is BrowserSample {
   if (!Array.isArray(value) || value.length !== 4) return false;
@@ -128,7 +145,9 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
         // El cron recupera una orden si falla el despacho tras confirmar la carga.
       }));
     };
-    if (request.method === "POST" && path === "/api/uploads") return await handleUploadCreation(request, env, onUploadCommitted);
+    if (request.method === "POST" && path === "/api/uploads") {
+      return await handleUploadCreation(request, env, onUploadCommitted, observeMultipart(env, "multipart_inicio_etapas"));
+    }
     const user = await identity(request, env);
     if (path === "/api/metrics/ttfb" && request.method === "POST") {
       return await recordBrowserTimings(request, env, user.email.toLowerCase().endsWith(".invalid"));
@@ -152,12 +171,13 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
     if (deliveryRevision && !url.search) return await handleDeliveryRevisions(request, env, user.id, deliveryRevision[1]!);
     const sourceSet = sourceSetRoute.exec(path);
     if (sourceSet && !url.search) return await handleSourceSet(request, env, user.id, sourceSet[1]!);
-    const sourceUpload = /^\/api\/orders\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/sources\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/(upload|complete|parts(?:\/([1-9][0-9]?)\/sign)?)$/u.exec(path);
+    const sourceUpload = sourceUploadRoute.exec(path);
     if (sourceUpload && !url.search) {
       if (!uploadsConfigured(env)) throw new HttpError(503, "SUBIDA_NO_DISPONIBLE");
       const [, orderId, sourceId, action, part] = sourceUpload;
       if (request.method === "POST" && action === "upload") {
-        const result = await createSourceUpload(env, user.id, orderId!, sourceId!);
+        const measured = observeMultipart(env, "multifuente_inicio_etapas", user.email.toLowerCase().endsWith(".invalid"));
+        const result = await createSourceUpload(env, user.id, orderId!, sourceId!, measured);
         ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));
         return result;
       }
@@ -194,7 +214,8 @@ export default {
     const metrics = env.STUDIO_HTTP_METRICS;
     if (!metrics) return route(request, env, ctx);
     const url = new URL(request.url);
-    const label = measuredRoutes.get(`${request.method} ${url.pathname}`)
+    const sourceOpening = request.method === "POST" && !url.search && sourceUploadRoute.exec(url.pathname)?.[3] === "upload";
+    const label = measuredRoutes.get(`${request.method} ${url.pathname}`) ?? (sourceOpening ? "multifuente_inicio" : null)
       ?? (request.method === "POST" && partAccessTarget(url.pathname, request.method) ? "multipart_firma" : null);
     if (!label || url.origin !== env.PUBLIC_ORIGIN) return route(request, env, ctx);
     const start = performance.now();
