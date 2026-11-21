@@ -12,6 +12,8 @@ Para habilitar la banda de títulos del montaje continuo, actualiza primero el p
 
 Para probar la comparación de encuadre de Elena, audita un máster con banda cuyo original ya tenga un elemento parcialmente fuera de cuadro. Comprueba que ambos archivos se cotejan al inicio, al centro y al cierre con la huella del original de la orden. El dictamen debe distinguir un encuadre heredado de uno introducido por la edición y seguir rechazando los casos que incumplen el objetivo del brief. El cambio se verifica en los adaptadores de OpenClaw.
 
+Para verificar el p95 de entregas automáticas, compara una orden entregada sin intervención con otra reanudada tras un ajuste humano. Coteja la guarda y el historial de ajustes en D1 antes de comparar el recuento y el percentil por entorno con Prometheus. Ambas órdenes deben aparecer en el total de entregas. Sólo la automática debe influir en el p95 y en el recuento bajo 360 s.
+
 Al cambiar el aprovisionador de DSM, el monitor de D1 o la cola de la bóveda, ejecuta además `python -m pytest tests/test_r2_sync_provision.py tests/test_d1_backup_metrics.py tests/test_vault_changes.py`. Las pruebas por descriptor del aprovisionador se ejecutan en Linux. Para cambiar el manifiesto o el pipeline, valida también la lista del cambio con `python scripts/ci/check_docs.py --changed-files <archivo-json>` e incluye esta receta y el diagrama.
 
 Si Prometheus y Alertmanager quedan detenidos tras reiniciar DSM, usa `plan-start` para comprobar los contenedores, las bibliotecas fijadas y la sintaxis del plan. Aplica `start` con el mismo perfil y verifica la salud y TLS mutuo desde la red autorizada. [Procedimiento en DSM](../../../docker/observability/README-nas.md#recuperación-programada-en-dsm)

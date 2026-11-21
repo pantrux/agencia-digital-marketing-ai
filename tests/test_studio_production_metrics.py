@@ -124,9 +124,11 @@ class StudioProductionMetricsTests(unittest.TestCase):
             "reserved_test_domain": 1,
             "status": "completed",
             "manual_review": 0,
+            "manual_adjustment": 0,
             "order_id": "PRIVATE_ID_CANARY",
         }
-        report = audit.build_report([sample], 2000, audit.signed_duration)
+        assisted = {**sample, "manual_adjustment": 1, "delivered_at": 1815}
+        report = audit.build_report([sample, assisted], 2000, audit.signed_duration)
         uploads, signals = metrics.read_upload_window(lambda *_: [], 2000)
         payload = metrics.metrics_payload(
             report, 2_001_000_000_000, uploads=uploads, upload_signals=signals
@@ -144,6 +146,8 @@ class StudioProductionMetricsTests(unittest.TestCase):
         }
         self.assertEqual(values["portal_ensayo"], "1")
         self.assertEqual(values["portal_produccion"], "0")
+        assisted_points = by_name["studio_delivery_30d_completed_with_manual_review"]
+        self.assertEqual(assisted_points[1]["asInt"], "1")
 
     def test_rejects_partial_prometheus_delivery(self):
         with self.assertRaisesRegex(ValueError, "OTLP_PARCIAL"):
