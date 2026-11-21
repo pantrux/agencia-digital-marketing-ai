@@ -242,3 +242,7 @@ Para las colas de Mateo y Lucas, verifica dos órdenes listas en el mismo
 disparo. Si la primera falla antes de 15 segundos, registra su reintento
 y comprueba que la siguiente avance en ese disparo. La unidad conserva
 la señal de error y continúa aplicando la espera de cada orden.
+
+Para verificar la medición multipart, abre una carga de ensayo, repite
+la misma apertura y comprueba una sola muestra de las tres etapas. Coteja
+la preparación, R2 y la confirmación en la serie `ensayo` de Analytics Engine.

@@ -1,6 +1,6 @@
 import { validateSyncJob } from "../../../src/media/sync-contract.js";
 import { signR2UploadPart } from "../../../src/media/r2-signing.js";
-import { listMultipartParts, requestedParts, verifyDigest, type IngestEnv } from "./ingest.js";
+import { listMultipartParts, requestedParts, verifyDigest, type IngestEnv, type MultipartObserver } from "./ingest.js";
 import { HttpError, readJson, response } from "./platform.js";
 import { storageFits, storageQuotaArguments } from "./storage-quota.js";
 
@@ -14,13 +14,15 @@ type SourceRow = { id: string; order_id: string; project_slug: string; bytes: nu
 type UploadRow = { source_id: string; object_key: string; upload_id: string | null; status: string;
   operation_id: string | null; lease_until: number | null; expires_at: number; object_etag: string | null };
 
-/** Reserva y abre la carga de una fuente; el router aún no publica esta operación. */
-export async function createSourceUpload(env: IngestEnv, user: string, order: string, sourceId: string): Promise<Response> {
+/** Reserva y abre la carga de una fuente del pedido. */
+export async function createSourceUpload(env: IngestEnv, user: string, order: string, sourceId: string,
+  observe?: MultipartObserver): Promise<Response> {
   const lookup = `FROM production_sources source
     JOIN production_source_sets source_set ON source_set.order_id=source.order_id
     JOIN orders o ON o.id=source_set.order_id AND o.user_id=source_set.user_id
     JOIN usage_ledger ledger ON ledger.order_id=o.id AND ledger.user_id=o.user_id
     WHERE source.id=? AND o.id=? AND o.user_id=? AND COALESCE(o.provider_mode,'production')=?`;
+  const started = performance.now();
   const source = await env.DB.withSession("first-primary").prepare(`SELECT source.id,source.order_id,
     source.bytes,source.sha256,source.extension,o.project_slug,o.status AS order_status,ledger.status AS usage_status ${lookup}`)
     .bind(sourceId, order, user, env.BILLING_MODE).first<SourceRow>();
@@ -96,6 +98,7 @@ export async function createSourceUpload(env: IngestEnv, user: string, order: st
     if (claim.meta.changes !== 1) throw new HttpError(409, "SUBIDA_EN_TRANSICION");
   }
   let upload;
+  const storageStarted = performance.now();
   try {
     upload = await env.MEDIA.createMultipartUpload(key, {
       httpMetadata: { contentType }, customMetadata: { agency_asset_id: sourceId, agency_sha256: source.sha256 },
@@ -105,6 +108,7 @@ export async function createSourceUpload(env: IngestEnv, user: string, order: st
       .bind(now, sourceId, token).run();
     throw new HttpError(503, "R2_NO_DISPONIBLE");
   }
+  const confirmationStarted = performance.now();
   const opened = await env.DB.prepare(`UPDATE production_source_uploads SET status='open',upload_id=?,operation_id=NULL,lease_until=NULL
     WHERE source_id=? AND status='creating' AND operation_id=? AND EXISTS (
       SELECT 1 FROM production_sources source JOIN production_source_sets source_set ON source_set.order_id=source.order_id
@@ -117,6 +121,7 @@ export async function createSourceUpload(env: IngestEnv, user: string, order: st
     try { await upload.abort(); } catch { /* R2 expira subidas multipart huérfanas. */ }
     throw new HttpError(409, "SUBIDA_EN_TRANSICION");
   }
+  observe?.(storageStarted - started, confirmationStarted - storageStarted, performance.now() - confirmationStarted);
   return info({ ...row, status: "open", upload_id: upload.uploadId }, true);
 }
 

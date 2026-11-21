@@ -1023,8 +1023,10 @@ describe("Ingesta R2 multipart", () => {
       const adapter = sqliteAdapter(db);
       const batch = vi.spyOn(adapter, "batch");
       const separate = vi.spyOn(adapter, "withSession");
+      const writeDataPoint = vi.fn<(point: { indexes: string[] }) => void>();
+      if (version === 2) writeDataPoint.mockImplementation(() => { throw new Error("METRICAS_NO_DISPONIBLES"); });
       const env = { DB: adapter, MEDIA: bucket, PUBLIC_ORIGIN: origin, BILLING_MODE: "production",
-        STUDIO_JWT_SESSION_SECRET: secret } as Parameters<typeof worker.fetch>[1];
+        STUDIO_JWT_SESSION_SECRET: secret, STUDIO_HTTP_METRICS: { writeDataPoint } } as unknown as Parameters<typeof worker.fetch>[1];
       const send = (body: string) => worker.fetch(new Request(origin + "/api/uploads", {
         method: "POST", headers: { Origin: origin, Cookie: "__Host-studio_session=" + token, "Content-Type": "application/json" }, body,
       }), env, { waitUntil: vi.fn() });
@@ -1044,6 +1046,9 @@ describe("Ingesta R2 multipart", () => {
       db.exec("DELETE FROM upload_sessions");
       expect((await send(body)).status).toBe(401);
       expect((await send("{")).status).toBe(401);
+      expect(writeDataPoint.mock.calls.filter(([point]) => point.indexes[0] === "multipart_inicio_etapas"))
+        .toEqual([[{ indexes: ["multipart_inicio_etapas"], blobs: ["ensayo"],
+          doubles: [expect.any(Number), 200, expect.any(Number), expect.any(Number), expect.any(Number)] }]]);
       expect(bucket.createMultipartUpload).toHaveBeenCalledTimes(1);
       expect(db.prepare("SELECT count(*) AS n FROM upload_sessions").get()).toEqual({ n: 0 });
     } finally { db.close(); }
@@ -1197,16 +1202,18 @@ describe("Ingesta R2 multipart", () => {
       const env = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production",
         R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
         R2_SECRET_ACCESS_KEY: credentials.secretAccessKey } as IngestEnv;
-      await expect(createSourceUpload(env, "otro", order, sources[0]!.id)).rejects.toMatchObject({ status: 404 });
-      const attempts = await Promise.allSettled(sources.map(({ id }) => createSourceUpload(env, "user", order, id)));
+      const observe = vi.fn();
+      await expect(createSourceUpload(env, "otro", order, sources[0]!.id, observe)).rejects.toMatchObject({ status: 404 });
+      const attempts = await Promise.allSettled(sources.map(({ id }) => createSourceUpload(env, "user", order, id, observe)));
       expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
       expect(attempts.filter((attempt) => attempt.status === "rejected"))
         .toEqual([{ status: "rejected", reason: expect.objectContaining({ code: "ALMACENAMIENTO_AGOTADO" }) }]);
       const first = attempts.find((attempt) => attempt.status === "fulfilled") as PromiseFulfilledResult<Response>;
       const opened = await first.value.json() as { id: string; uploadId: string; status: string };
       expect(opened.status).toBe("open");
-      expect(await (await createSourceUpload(env, "user", order, opened.id)).json())
+      expect(await (await createSourceUpload(env, "user", order, opened.id, observe)).json())
         .toMatchObject({ id: opened.id, uploadId: opened.uploadId, status: "open" });
+      expect(observe.mock.calls).toEqual([[expect.any(Number), expect.any(Number), expect.any(Number)]]);
       await expect(signSourcePart(env, "otro", order, opened.id, 1)).rejects.toMatchObject({ status: 404 });
       await expect(signSourcePart(env, "user", order, opened.id, 2)).rejects.toMatchObject({ status: 405 });
       const signed = await (await signSourcePart(env, "user", order, opened.id, 1)).json() as { url: string; headers: object };
