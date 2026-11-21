@@ -14,7 +14,7 @@ export function readSofiaStyles(question: string, reply: string) {
     let content = text.slice(marker.index + marker[0].length, markers[index + 1]?.index).trim();
     if (index === 2) {
       const closing = /\n[ \t]*¿[^¿?\n]+\?$/u.exec(content);
-      if (closing && /\b(?:prefieres|eliges|elegir[ií]as|te quedas|te gusta(?:r[ií]a)?)\b/iu.test(closing[0])) {
+      if (closing) {
         outro = closing[0].trim();
         content = content.slice(0, closing.index).trim();
       }
