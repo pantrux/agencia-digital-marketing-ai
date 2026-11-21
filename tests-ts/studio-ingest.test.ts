@@ -1006,29 +1006,43 @@ describe("Ingesta R2 multipart", () => {
     } finally { db.close(); }
   });
 
-  it.each([1, 2])("abre multipart con la sesión %s en el mismo lote que reserva el pedido", async (version) => {
+  const measuredAccounts = [
+    [1, "fixture@example.invalid", "sandbox", "ensayo"],
+    [2, "fixture@example.org", "sandbox", "piloto"],
+    [2, "fixture@example.org", "production", "produccion"],
+    [2, "fixture@example.invalid", "production", "ensayo"],
+  ] as const;
+
+  function measuredSession(db: DatabaseSync, version: number, email: string, mode: string, secret: string): string {
+    db.prepare("UPDATE users SET email=? WHERE id='user'").run(email);
+    db.prepare("UPDATE orders SET provider_mode=? WHERE id=?").run(mode, order);
+    const nonce = "nonce-apertura";
+    const exp = Math.floor(Date.now() / 1000) + 300;
+    const owner = version === 1 ? { sub: "user" } : { version };
+    const encoded = Buffer.from(JSON.stringify({ kind: "session", ...owner, nonce, exp })).toString("base64url");
+    const signed = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." + encoded;
+    const token = signed + "." + createHmac("sha256", secret).update(signed).digest("base64url");
+    db.prepare("INSERT INTO sessions(id,user_id,nonce,expires_at) VALUES (?,'user',?,?)")
+      .run(createHash("sha256").update(token).digest("hex"), nonce, exp);
+    return "__Host-studio_session=" + token;
+  }
+
+  it.each(measuredAccounts)("abre multipart con la sesión %s de %s en %s y mide %s", async (version, email, mode, cohort) => {
     const db = databaseForIngest();
     try {
-      const origin = "https://studio.invalid";
+      const origin = "https://studio.e-scale.cl";
       const secret = "clave-ficticia-para-la-apertura-multipart";
-      const nonce = "nonce-apertura";
-      const exp = Math.floor(Date.now() / 1000) + 300;
-      const owner = version === 1 ? { sub: "user" } : { version };
-      const encoded = Buffer.from(JSON.stringify({ kind: "session", ...owner, nonce, exp })).toString("base64url");
-      const signed = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." + encoded;
-      const token = signed + "." + createHmac("sha256", secret).update(signed).digest("base64url");
-      db.prepare("INSERT INTO sessions(id,user_id,nonce,expires_at) VALUES (?,'user',?,?)")
-        .run(createHash("sha256").update(token).digest("hex"), nonce, exp);
+      const cookie = measuredSession(db, version, email, mode, secret);
       const { bucket } = mockMedia(new Uint8Array(7));
       const adapter = sqliteAdapter(db);
       const batch = vi.spyOn(adapter, "batch");
       const separate = vi.spyOn(adapter, "withSession");
       const writeDataPoint = vi.fn<(point: { indexes: string[] }) => void>();
       if (version === 2) writeDataPoint.mockImplementation(() => { throw new Error("METRICAS_NO_DISPONIBLES"); });
-      const env = { DB: adapter, MEDIA: bucket, PUBLIC_ORIGIN: origin, BILLING_MODE: "production",
+      const env = { DB: adapter, MEDIA: bucket, PUBLIC_ORIGIN: origin, BILLING_MODE: mode,
         STUDIO_JWT_SESSION_SECRET: secret, STUDIO_HTTP_METRICS: { writeDataPoint } } as unknown as Parameters<typeof worker.fetch>[1];
       const send = (body: string) => worker.fetch(new Request(origin + "/api/uploads", {
-        method: "POST", headers: { Origin: origin, Cookie: "__Host-studio_session=" + token, "Content-Type": "application/json" }, body,
+        method: "POST", headers: { Origin: origin, Cookie: cookie, "Content-Type": "application/json" }, body,
       }), env, { waitUntil: vi.fn() });
       const body = JSON.stringify({ order_id: order, project_slug: job.project_slug, extension: "mp4", bytes: 7,
         sha256: digest, content_type: "video/mp4" });
@@ -1047,10 +1061,44 @@ describe("Ingesta R2 multipart", () => {
       expect((await send(body)).status).toBe(401);
       expect((await send("{")).status).toBe(401);
       expect(writeDataPoint.mock.calls.filter(([point]) => point.indexes[0] === "multipart_inicio_etapas"))
-        .toEqual([[{ indexes: ["multipart_inicio_etapas"], blobs: ["ensayo"],
+        .toEqual([[{ indexes: ["multipart_inicio_etapas"], blobs: [cohort],
           doubles: [expect.any(Number), 200, expect.any(Number), expect.any(Number), expect.any(Number)] }]]);
       expect(bucket.createMultipartUpload).toHaveBeenCalledTimes(1);
       expect(db.prepare("SELECT count(*) AS n FROM upload_sessions").get()).toEqual({ n: 0 });
+    } finally { db.close(); }
+  });
+
+  it.each(measuredAccounts)("mide fuentes de la sesión %s de %s en %s como %s", async (version, email, mode, cohort) => {
+    const db = databaseForIngest();
+    try {
+      const origin = "https://studio.e-scale.cl";
+      const secret = "clave-ficticia-para-la-apertura-multifuente";
+      const cookie = measuredSession(db, version, email, mode, secret);
+      const manifest = JSON.stringify([{ name: "fuente.mp4", bytes: 7, sha256: digest, extension: "mp4" }]);
+      db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+        .run(order, manifest, digest);
+      const source = db.prepare("SELECT id FROM production_sources WHERE order_id=?").get(order) as { id: string };
+      const { bucket } = mockMedia(new Uint8Array(7));
+      const writeDataPoint = vi.fn<(point: { indexes: string[] }) => void>();
+      const env = { DB: sqliteAdapter(db), MEDIA: bucket, PUBLIC_ORIGIN: origin, BILLING_MODE: mode,
+        STUDIO_JWT_SESSION_SECRET: secret, STUDIO_HTTP_METRICS: { writeDataPoint },
+        R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
+        R2_SECRET_ACCESS_KEY: credentials.secretAccessKey,
+      } as unknown as Parameters<typeof worker.fetch>[1];
+      const send = () => worker.fetch(new Request(`${origin}/api/orders/${order}/sources/${source.id}/upload`, {
+        method: "POST", headers: { Origin: origin, Cookie: cookie },
+      }), env, { waitUntil: vi.fn() });
+      const first = await send();
+      expect(first.status).toBe(200);
+      expect(await first.json()).toMatchObject({ id: source.id, newlyOpened: true });
+      const replay = await send();
+      expect(replay.status).toBe(200);
+      expect(await replay.json()).not.toHaveProperty("newlyOpened");
+      const totals = writeDataPoint.mock.calls.filter(([point]) => point.indexes[0] === "multifuente_inicio");
+      expect(totals).toHaveLength(2);
+      expect(writeDataPoint.mock.calls.filter(([point]) => point.indexes[0] === "multifuente_inicio_etapas"))
+        .toEqual([[{ indexes: ["multifuente_inicio_etapas"], blobs: [cohort],
+          doubles: [expect.any(Number), 200, expect.any(Number), expect.any(Number), expect.any(Number)] }]]);
     } finally { db.close(); }
   });
 

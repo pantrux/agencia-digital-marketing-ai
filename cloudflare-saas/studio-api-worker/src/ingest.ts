@@ -272,9 +272,10 @@ async function createUpload(
     try { await handle.abort(); } catch { /* La política nativa de R2 expira multipart huérfanos. */ }
     return fail(409, "SUBIDA_EN_TRANSICION");
   }
+  const reply = uploadInfo({ ...row, status: "open", upload_id: handle.uploadId }, true);
   observe?.(storageStarted - started, confirmationStarted - storageStarted, performance.now() - confirmationStarted,
     Boolean(caller && "email" in caller && caller.email.toLowerCase().endsWith(".invalid")));
-  return uploadInfo({ ...row, status: "open", upload_id: handle.uploadId }, true);
+  return reply;
 }
 
 function credentials(env: IngestEnv) {

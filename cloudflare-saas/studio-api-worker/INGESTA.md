@@ -93,9 +93,12 @@ de un archivo y `multifuente_inicio_etapas`, la carga de una fuente de un
 pedido con varios materiales. La preparación incluye la reserva en D1 y,
 en una recuperación, las comprobaciones antes de crear la carga. La segunda
 etapa mide `createMultipartUpload` en R2 y la tercera, la confirmación en D1.
-Las cuentas sintéticas y las vistas previas quedan en `ensayo`. La muestra
-prescinde de identificadores, contenido y direcciones. Una reapertura de
-una sesión existente conserva la métrica de solicitud, sin repetir las tres etapas.
+Las cuentas sintéticas y las vistas previas quedan en `ensayo`. En el portal
+público, las cuentas reales se registran en `piloto` mientras la facturación
+esté en prueba. `produccion` identifica las aperturas de cuentas reales con
+facturación en producción. La muestra prescinde de identificadores, contenido
+y direcciones. Una reapertura conserva la métrica HTTP de solicitud de su ruta
+sin repetir las tres etapas.
 
 ```sql
 SELECT index1 AS ruta, blob1 AS entorno, count() AS observaciones,
