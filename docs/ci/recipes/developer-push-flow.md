@@ -8,6 +8,8 @@ La Fase 7 añade el ciclo de producción, la entrega y la reversión a los míni
 
 Para habilitar HyperFrames, instala las dependencias fijadas del renderer y verifica Chrome y FFmpeg en el worker de Windows. Aplica la migración 0021 de D1 antes de actualizar el Worker y habilita el selector del portal después de validar el renderer y los adaptadores de producción. En el ensayo, confirma que la vista previa muestra el vídeo con sus capas y que Elena puede revisar el MP4 antes de entregarlo.
 
+Para habilitar la banda de títulos del montaje continuo, actualiza primero el puente GPU. Comprueba un MP4 NVENC con la fuente completa debajo de la banda y que el alfa de la gráfica ProRes conserva transparente el área del vídeo. Después actualiza Valeria y Elena. Verifica en la escaleta las muestras de inicio y cierre y en el dictamen de Elena el encuadre del vídeo publicado.
+
 Al cambiar el aprovisionador de DSM, el monitor de D1 o la cola de la bóveda, ejecuta además `python -m pytest tests/test_r2_sync_provision.py tests/test_d1_backup_metrics.py tests/test_vault_changes.py`. Las pruebas por descriptor del aprovisionador se ejecutan en Linux. Para cambiar el manifiesto o el pipeline, valida también la lista del cambio con `python scripts/ci/check_docs.py --changed-files <archivo-json>` e incluye esta receta y el diagrama.
 
 Si Prometheus y Alertmanager quedan detenidos tras reiniciar DSM, usa `plan-start` para comprobar los contenedores, las bibliotecas fijadas y la sintaxis del plan. Aplica `start` con el mismo perfil y verifica la salud y TLS mutuo desde la red autorizada. [Procedimiento en DSM](../../../docker/observability/README-nas.md#recuperación-programada-en-dsm)

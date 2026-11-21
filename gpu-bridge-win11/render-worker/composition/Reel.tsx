@@ -1,10 +1,10 @@
 import React from 'react';
 import {AbsoluteFill, Easing, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {AD_ENDCARD_FRAME, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, TITLE_FADE_FRAMES, TITLE_PANEL_FRACTION, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
+import {AD_ENDCARD_FRAME, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, TITLE_BAND_BACKGROUND, TITLE_BAND_HEIGHT, TITLE_FADE_FRAMES, TITLE_PANEL_FRACTION, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
 import {graphicLabelTiming, sceneLength, socialFadeProgress} from '../src/timeline.ts';
 import {SocialEndcard} from './SocialEndcard.tsx';
 
-export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; video_is_montage?: boolean; scenes?: EditScene[]; ad?: ScriptedAd}
+export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; title_layout?: 'band'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; video_is_montage?: boolean; scenes?: EditScene[]; ad?: ScriptedAd}
 const videoStyle = {width: '100%', height: '100%', objectFit: 'cover'} as const;
 
 function cutVideo(file: string, scenes: EditScene[]) {
@@ -23,6 +23,7 @@ export const Reel: React.FC<ReelProps> = (props) => {
   const frame = useCurrentFrame();
   const scale = useVideoConfig().width / 1080;
   const opacity = interpolate(frame, [0, TITLE_FADE_FRAMES], [0, 1], {extrapolateRight: 'clamp'});
+  const band = props.title_layout === 'band';
   const social = props.ad?.destination;
   // Las capturas con crudo comparten el fundido del MP4. La capa sola se combina en FFmpeg.
   const previewFade = social && props.video_file && !props.transparent ? socialFadeProgress(frame) : 0;
@@ -39,13 +40,24 @@ export const Reel: React.FC<ReelProps> = (props) => {
     : caption?.position === 'right' ? {right:125,width:430,bottom:570,textAlign:'left' as const}
     : {left:82,right:155,bottom:330,textAlign:'center' as const};
   // Todo movimiento depende del fotograma; no se utiliza reloj ni azar.
-  return <AbsoluteFill style={{backgroundColor: props.transparent ? undefined : props.background, color: '#fff', fontFamily: 'Arial, sans-serif'}}>
+  return <AbsoluteFill style={{backgroundColor: props.transparent ? undefined : band ? TITLE_BAND_BACKGROUND : props.background, color: '#fff', fontFamily: 'Arial, sans-serif'}}>
     {props.video_file && (props.scenes && !props.video_is_montage
       ? cutVideo(props.video_file, props.scenes)
-      : <OffthreadVideo src={staticFile(props.video_file)} transparent={props.transparent} muted style={videoStyle} />)}
-    {!props.scenes && !(props.transparent && !props.overlay_only) && <AbsoluteFill style={{background: 'linear-gradient(180deg,rgba(0,0,0,.45),transparent 55%,rgba(0,0,0,.8))'}} />}
+      : band
+        ? <AbsoluteFill style={{top:TITLE_BAND_HEIGHT * scale,height:(1920 - TITLE_BAND_HEIGHT) * scale}}>
+          <OffthreadVideo src={staticFile(props.video_file)} muted style={{...videoStyle, objectFit:'contain'}} />
+        </AbsoluteFill>
+        : <OffthreadVideo src={staticFile(props.video_file)} transparent={props.transparent} muted style={videoStyle} />)}
+    {!props.scenes && !band && !(props.transparent && !props.overlay_only) && <AbsoluteFill style={{background: 'linear-gradient(180deg,rgba(0,0,0,.45),transparent 55%,rgba(0,0,0,.8))'}} />}
     <AbsoluteFill style={{width: 1080, height: 1920, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
-    {!props.scenes && <div style={{position: 'absolute', left: 60, right: 120, top: 200, opacity, backgroundColor: '#141714', padding: '32px 38px', borderRadius: 20}}>
+    {band && <div style={{position:'absolute',top:0,left:0,width:1080,height:TITLE_BAND_HEIGHT,backgroundColor:TITLE_BAND_BACKGROUND,
+      boxSizing:'border-box',display:'flex',alignItems:'center',padding:'16px 72px'}}>
+      <div style={{opacity,borderLeft:`6px solid ${props.accent}`,paddingLeft:26,width:'100%',minWidth:0,overflowWrap:'anywhere'}}>
+        <h1 style={{fontSize:props.title.length > 32 ? 40 : 46,lineHeight:1.08,margin:0}}>{props.title}</h1>
+        {props.subtitle && <p style={{fontSize:32,lineHeight:1.12,margin:'10px 0 0',color:'#dce7dd'}}>{props.subtitle}</p>}
+      </div>
+    </div>}
+    {!props.scenes && !band && <div style={{position: 'absolute', left: 60, right: 120, top: 200, opacity, backgroundColor: '#141714', padding: '32px 38px', borderRadius: 20}}>
       <div style={{height: 8, width: 120, backgroundColor: props.accent, marginBottom: 32}} />
       <h1 style={{fontSize: 76, lineHeight: 1.1, margin: 0, overflowWrap: 'anywhere'}}>{props.title}</h1>
       {props.subtitle && <p style={{fontSize: props.subtitle_size === 'large' ? 64 : 50, lineHeight: 1.25, margin: '20px 0 0', overflowWrap: 'anywhere'}}>{props.subtitle}</p>}

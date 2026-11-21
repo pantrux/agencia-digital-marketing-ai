@@ -397,7 +397,7 @@ export class RenderBackend implements Backend {
           ? correctMp4Audio(previousOutput, audio, output, request.durationInFrames, duration, measured, peak)
           : proresList
           ? muxProresFragments(proresList, audio, output, request.durationInFrames, duration, measured, peak)
-          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, usesHyperframes || multiScenes ? undefined : scenes, ad ? AD_MUSIC_ID : undefined, Boolean(ad?.destination) && !usesHyperframes);
+          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, usesHyperframes || multiScenes ? undefined : scenes, ad ? AD_MUSIC_ID : undefined, Boolean(ad?.destination) && !usesHyperframes, request.props.title_layout);
         await this.deps.run(this.config.ffmpeg, encode, {timeoutMs: 1200000, signal: bounded});
         const outputProbe = await this.#readProbe(output, bounded);
         if ((sourceVideo || proresList || correctingMp4 || scenes) && videoFrameCount(outputProbe) !== request.durationInFrames) {

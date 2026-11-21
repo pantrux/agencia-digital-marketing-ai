@@ -8,6 +8,7 @@ import {compositionCache} from './composition-cache.ts';
 export function compositionInput(request: RenderRequest, videoFile: string | null): Record<string, unknown> {
   return {title: request.props.title, subtitle: request.props.subtitle, duration_seconds: request.durationInFrames / 30, background: request.props.background, accent: request.props.accent, watermark: request.watermark, video_file: videoFile, resolution: request.resolution, transparent: request.transparent,
     ...(request.props.subtitle_size && {subtitle_size: request.props.subtitle_size}),
+    ...(request.props.title_layout && {title_layout: request.props.title_layout}),
     ...(request.props.scenes && {scenes: request.props.scenes}),
     ...(request.props.ad && {ad: request.props.ad})};
 }

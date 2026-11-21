@@ -415,6 +415,13 @@ def review_video(
                     check["rotulo_esperado"] = None
     duration = props["duration_seconds"]
     decode_options = {"stamps": [check["segundo"] for check in checks]} if checks else {}
+    band = props.get("title_layout") == "band"
+    if band:
+        decode_options["stamps"] = [
+            min(0.55, duration * 0.2),
+            duration * 0.5,
+            duration - min(0.12, duration * 0.08),
+        ]
     audio_check = None
     if ad:
         with tempfile.TemporaryDirectory(prefix="studio-qa-mezcla-") as workspace:
@@ -442,6 +449,12 @@ def review_video(
         "muestra (1, 2 o 3) y detalle, y defectos con objetos muestra y correccion. "
         "Incluye en defectos únicamente cambios necesarios para poder entregar. "
     )
+    if band:
+        instructions += (
+            "El título y el subtítulo deben leerse en la banda superior, fuera de la imagen. "
+            "Comprueba que se conserva el encuadre completo al inicio y al cierre. "
+            "Si la banda tapa el rostro o el producto, o el texto se corta, regístralo como defecto. "
+        )
     if checks:
         evidence["rotulos_por_muestra"] = [check["rotulo_esperado"] for check in checks]
         instructions = (

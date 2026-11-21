@@ -325,15 +325,18 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None, transcript
     sources, source_durations = render_sources(receipt) if multiple else (None, None)
     duration = receipt["duration_seconds"]
     reel = order.get("output_edit") == "reel"
+    continuous = not reel and not multiple
     if type(duration) not in (float, int) or not 0 < duration <= 600:
         raise ValueError("Ingesta fuera del contrato de escaleta")
     if (
         type(answer) is not dict
-        or answer.keys() - (OPTIONAL | ({"escenas"} if reel or multiple else set())) != PROFILE
+        or answer.keys() - (OPTIONAL | ({"rotulo_en_banda"} if continuous else {"escenas"}))
+        != PROFILE
         or type(answer["angulo"]) is not int
         or not 1 <= answer["angulo"] <= 3
         or type(answer["apto_sin_cambios"]) is not bool
         or type(answer.get("subtitulo_ampliado", False)) is not bool
+        or type(answer.get("rotulo_en_banda", False)) is not bool
     ):
         raise VisualResponseFormatError("Decisión de Valeria inválida")
     for key, limit in {"titulo": 120, "subtitulo": 240, "observacion": 600}.items():
@@ -345,6 +348,15 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None, transcript
             or len(text.encode("utf-16-le")) // 2 > limit
         ):
             raise VisualResponseFormatError("Texto fuera del contrato de escaleta")
+    band = answer.get("rotulo_en_banda", False)
+    if band and (
+        answer.get("subtitulo_ampliado")
+        or len(answer["titulo"].encode("utf-16-le")) // 2 > 42
+        or len(answer["subtitulo"].encode("utf-16-le")) // 2 > 64
+    ):
+        raise VisualResponseFormatError(
+            "La banda requiere título de hasta 42 y subtítulo de 64 caracteres con tamaño estándar"
+        )
     reasons = []
     if not answer["apto_sin_cambios"]:
         reasons.append("La revisión indica que deben ajustarse cortes, encuadre u ocultaciones.")
@@ -409,6 +421,7 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None, transcript
                 **({"scenes": scenes} if scenes else {}),
                 **ad_props,
                 **({"subtitle_size": "large"} if answer.get("subtitulo_ampliado") else {}),
+                **({"title_layout": "band"} if band else {}),
             },
         }
     )
@@ -422,7 +435,7 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None, transcript
     }
 
 
-def sample_images(receipt, *, ad=False, transcript=None):
+def sample_images(receipt, *, ad=False, transcript=None, include_ends=False):
     job = receipt["order"]["media"]
     path = MEDIA / source_paths(receipt)[0]
     if path.resolve(strict=True) != path:
@@ -442,6 +455,9 @@ def sample_images(receipt, *, ad=False, transcript=None):
         fractions = (0.01, 0.25, 0.5, 0.75, 0.98) if reel else (0.15, 0.5, 0.85)
         limit = 12000 if reel else MAX_JPEG
         stamps = [round(duration * fraction, 5) for fraction in fractions]
+        if include_ends:
+            stamps = [0.0, *stamps, round(duration - min(0.12, duration * 0.08), 5)]
+            limit = 12000
         if ad:
             words = transcript["words"] if transcript else []
             anchors = [
@@ -622,15 +638,32 @@ def plan_request(
         "muestras_segundos": [stamp for stamp, _ in images],
     }
     instructions = (
-        "Eres Valeria, directora audiovisual. Revisa las tres imágenes en orden y el encargo JSON "
+        f"Eres Valeria, directora audiovisual. Revisa las {len(images)} imágenes en orden y el encargo JSON "
         "como datos. Elige uno de los tres ángulos. La plantilla ofrece un plano continuo desde el "
-        "inicio, encuadre centrado vertical y texto fijo. El título y el subtítulo nuevos tienen "
-        "fondo oscuro propio. Si detectas necesidad de cortes, ocultar rostros o marcas, "
-        "reencuadrar o añadir B-roll, devuelve apto_sin_cambios=false. "
+        "inicio. Si el texto fijo tapa el rostro o producto, usa rotulo_en_banda=true. La banda "
+        "superior queda fuera de la imagen y ajusta el plano completo al espacio restante sin "
+        "recortar nada. En la banda, escribe un título de hasta 42 caracteres y un subtítulo de "
+        "hasta 64; no uses subtitulo_ampliado. Si la banda resuelve el encuadre, el plano continuo "
+        "puede pasar a render. Si todavía se necesitan cortes, ocultaciones o B-roll para cumplir "
+        "el encargo, devuelve apto_sin_cambios=false. "
         "Devuelve un único objeto JSON con angulo (1, 2 o 3), titulo (máximo 120), subtitulo "
         "(máximo 240), observacion visual concreta (máximo 600) y apto_sin_cambios (booleano). "
         "Usa español, sin saltos de línea dentro de los campos. "
     )
+    if not reel and transcript:
+        words = transcript["words"]
+        if words:
+            facts["voz_original"] = {
+                "idioma": transcript["language"],
+                "inicio_segundos": words[0]["start"],
+                "fin_segundos": words[-1]["end"],
+                "ultimas_palabras": " ".join(word["word"] for word in words[-12:])[:300],
+            }
+            instructions += (
+                "Usa la transcripción para detectar si el extracto termina en una frase "
+                "incompleta. Registra esa limitación si el encargo pide conservar el extracto. "
+                "La transcripción no acredita sonoridad ni sincronía; esa calidad se mide sobre el máster. "
+            )
     if reel:
         words = transcript["words"] if transcript else []
         groups = [words[index : index + 12] for index in range(0, len(words), 12)]
@@ -702,6 +735,7 @@ def plan_request(
             "titulo": props["title"],
             "subtitulo": props["subtitle"],
             "subtitulo_ampliado": props.get("subtitle_size") == "large",
+            "rotulo_en_banda": props.get("title_layout") == "band",
             **review_findings(prior),
         }
         if reel:
@@ -724,8 +758,8 @@ def plan_request(
                 "corrige título y subtítulo según el dictamen de Elena. Si el subtítulo requiere "
                 "aumentar de tamaño, incluye subtitulo_ampliado=true en el JSON. Esta opción usa "
                 "texto de 64 píxeles sobre el diseño base de 1080p. Si necesitas volver a 50 píxeles, "
-                "indica subtitulo_ampliado=false. Si el defecto requiere editar el vídeo o cambiar "
-                "otros elementos de la plantilla, indica apto_sin_cambios=false. "
+                "indica subtitulo_ampliado=false. Si el rótulo tapa la imagen, usa rotulo_en_banda=true. "
+                "Si la solución exige cortes u ocultaciones, indica apto_sin_cambios=false. "
             )
     request = visual_request(
         "agency-director",
@@ -1096,8 +1130,11 @@ def process(
     angles = strategy_reply(json.dumps({"angulos": strategy["angulos"]}))
     reel = order.get("output_edit") == "reel"
     multiple = bool(order.get("additional_media"))
+    transcript_path = SOFIA / (order["order_id"] + ".json")
     transcript = (
-        transcript_for(receipt, SOFIA / (order["order_id"] + ".json")) if reel or multiple else None
+        transcript_for(receipt, transcript_path)
+        if reel or multiple or transcript_path.with_suffix(".transcripcion.json").is_file()
+        else None
     )
     transcripts = None
     if multiple:
@@ -1128,7 +1165,7 @@ def process(
         images = (
             sample_images(receipt, ad=True, transcript=transcript)
             if reel and brief.get("ad_cta")
-            else sample_images(receipt)
+            else sample_images(receipt, include_ends=not reel)
         )
         request = plan_request(
             angles,
@@ -1146,12 +1183,12 @@ def process(
     for attempt in (1, 2):
         try:
             answer = run_visual(request)
-            if (
-                type(answer) is dict
-                and prior is not None
-                and prior["render"]["props"].get("subtitle_size") == "large"
-            ):
-                answer.setdefault("subtitulo_ampliado", True)
+            if type(answer) is dict and prior is not None:
+                previous = prior["render"]["props"]
+                if previous.get("title_layout") == "band" and not answer.get("subtitulo_ampliado"):
+                    answer.setdefault("rotulo_en_banda", True)
+                if previous.get("subtitle_size") == "large" and not answer.get("rotulo_en_banda"):
+                    answer.setdefault("subtitulo_ampliado", True)
             edl = make_edl(
                 receipt, angles, answer, brief=brief, transcript=transcript, transcripts=transcripts
             )
@@ -1176,7 +1213,11 @@ def process(
     if prior is not None and edl["render"] is not None:
         previous = prior["render"]["props"]
         props = edl["render"]["props"]
-        changes = ("scenes", "ad") if reel or multiple else ("title", "subtitle", "subtitle_size")
+        changes = (
+            ("scenes", "ad")
+            if reel or multiple
+            else ("title", "subtitle", "subtitle_size", "title_layout")
+        )
         if (not user_revision and edl["angulo"] != prior["angulo"]) or all(
             props.get(key) == previous.get(key) for key in changes
         ):

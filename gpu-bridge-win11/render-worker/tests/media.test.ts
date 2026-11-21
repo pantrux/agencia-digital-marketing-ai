@@ -163,6 +163,18 @@ test('NVENC, BT.709 y audio en dos pasadas son obligatorios en el comando', () =
   assert.ok(measureAudio('voz.wav', 3).includes('0:a:0'));
   assert.ok(audioPass(3).includes('apad='));
 });
+test('la capa de la banda conserva el cuadro completo y las dimensiones de salida', () => {
+  for (const [resolution, width, height, band] of [['1080p', 1080, 1920, 264], ['4k', 2160, 3840, 528]] as const) {
+    const args = encodeNvenc('frames/still-%d.png', 'voz.wav', 'kit.mp4', 1800, 60, measured, -1.5,
+      resolution, 'crudo.mp4', false, undefined, undefined, false, 'band');
+    const filter = args[args.indexOf('-filter_complex') + 1]!;
+    assert.ok(filter.includes(`scale=${width}:${height-band}:force_original_aspect_ratio=decrease`));
+    assert.ok(filter.includes(`pad=${width}:${height}:trunc((ow-iw)/4)*2:trunc((oh-ih+${band})/4)*2`));
+    assert.equal(args[args.indexOf('-frames:v') + 1], '1800');
+    assert.equal(args[args.indexOf('-c:v') + 1], 'h264_nvenc');
+  }
+});
+
 test('la secuencia JPEG convierte su matriz BT.601 a BT.709 antes de NVENC', () => {
   const args = encodeNvenc('frames/frame-%04d.jpeg', 'voice.wav', 'master.mp4', 1800, 60, measured);
   assert.match(args[args.indexOf('-vf') + 1]!, /in_range=pc:out_range=tv:in_color_matrix=bt601:out_color_matrix=bt709/);

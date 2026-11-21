@@ -24,6 +24,19 @@ test('el tamaño ampliado llega a la composición y el tamaño estándar conserv
   assert.throws(() => parseRender({...options, props: {...options.props, subtitle_size: 240}}), /tamaño del subtítulo/);
 });
 
+test('la banda llega al MP4 y a su gráfica ProRes, con un contrato acotado', () => {
+  const props = {title: 'Rincón de las Sansevieras', subtitle: 'Plantas de interior', duration_seconds: 60,
+    title_layout: 'band', audio_path: 'proyectos/sansevieras/03_assets/voz.wav'};
+  const order = {project_id: 'sansevieras', job_id: 'banda-60s', composition: 'AgencyVertical', plan: 'Ilimitado', props};
+  const picture = {...props, video_path: 'proyectos/sansevieras/01_raw/video.mp4'};
+  assert.equal(compositionInput(parseRender({...order, props: picture}), 'source.mp4').title_layout, 'band');
+  assert.equal(compositionInput(parseRender({...order, format: 'prores4444'}), null).title_layout, 'band');
+  assert.throws(() => parseRender(order), /montaje continuo/);
+  assert.throws(() => parseRender({...order, props: {...picture, title: 'a'.repeat(43)}}), /texto breve/);
+  assert.throws(() => parseRender({...order, props: {...picture, subtitle_size: 'large'}}), /texto breve/);
+  assert.throws(() => parseRender({...order, props: {...picture, scenes: []}}), /montaje continuo/);
+});
+
 test('dos trabajos reutilizan bundle conservando props, dimensiones y assets aislados', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'render-cached-scene-'));
   try {

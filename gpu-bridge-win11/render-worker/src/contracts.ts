@@ -11,6 +11,8 @@ export type Resolution = '1080p' | '4k';
 export type OutputFormat = 'mp4' | 'prores4444';
 export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom' | 'panel'; size?: 'large'}
 export const TITLE_PANEL_FRACTION = 0.25;
+export const TITLE_BAND_HEIGHT = 264;
+export const TITLE_BAND_BACKGROUND = '#141a15';
 export interface AdCaption {start_frame: number; end_frame: number; text: string; position?: 'top' | 'left' | 'right'}
 export const AD_MUSIC_ID = 'carefree-usuan1400037' as const;
 export type SocialChannel = 'facebook' | 'instagram' | 'whatsapp';
@@ -28,6 +30,7 @@ export interface RenderSource {id: string; video_path: string; audio_path?: stri
 export interface CompositionProps {
   title: string; subtitle: string; duration_seconds: number;
   subtitle_size?: 'large';
+  title_layout?: 'band';
   background: string; accent: string; video_path?: string; audio_path?: string;
   scenes?: EditScene[];
   sources?: RenderSource[];
@@ -191,7 +194,7 @@ function base(value: unknown, stills: boolean): RenderRequest {
   if (resolution !== '1080p' && resolution !== '4k') invalid('La resolución no está permitida.');
   if (resolution === '4k' && plan !== 'Ultra' && plan !== 'Ilimitado') invalid('4K requiere Ultra o Ilimitado.');
   if (format === 'prores4444' && plan !== 'Ilimitado') invalid('ProRes4444 alfa requiere Ilimitado.');
-  const input = object(data.props, ['title', 'subtitle', 'subtitle_size', 'duration_seconds', 'background', 'accent', 'video_path', 'audio_path', 'sources', 'scenes', 'ad']);
+  const input = object(data.props, ['title', 'subtitle', 'subtitle_size', 'title_layout', 'duration_seconds', 'background', 'accent', 'video_path', 'audio_path', 'sources', 'scenes', 'ad']);
   const duration_seconds = numeric(input.duration_seconds, 0.1, durations[plan]);
   const durationInFrames = Math.max(1, Math.round(duration_seconds * 30));
   const props: CompositionProps = {
@@ -203,6 +206,14 @@ function base(value: unknown, stills: boolean): RenderRequest {
   else if (input.subtitle_size !== undefined) invalid('El tamaño del subtítulo no está permitido.');
   if (input.video_path !== undefined) props.video_path = mediaPath(input.video_path, project_id);
   if (input.audio_path !== undefined) props.audio_path = mediaPath(input.audio_path, project_id);
+  if (input.title_layout !== undefined) {
+    if (input.title_layout !== 'band' || input.sources !== undefined || input.scenes !== undefined || input.ad !== undefined
+      || Boolean(props.video_path) !== (format === 'mp4') || props.subtitle_size
+      || props.title.length > 42 || props.subtitle.length > 64) {
+      invalid('La banda de títulos necesita texto breve y un montaje continuo.');
+    }
+    props.title_layout = input.title_layout;
+  }
   if (input.sources !== undefined) {
     if (!Array.isArray(input.sources) || input.sources.length < 2 || input.sources.length > 32 || props.video_path || props.audio_path) invalid('Las fuentes múltiples requieren entre 2 y 32 materiales independientes.');
     const ids = new Set<string>(), paths = new Set<string>();
