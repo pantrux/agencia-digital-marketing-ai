@@ -177,6 +177,12 @@ GROUPS = [
 
 
 def documentation(key: str) -> list[str]:
+    if key == "DAVINCI_MCP_TOKEN":
+        return [
+            f"# Para qué: Autenticar el MCP de DaVinci Resolve para Lucas con {key}.",
+            "# Dónde: DaVinci Resolve en Windows (.6) y cliente MCP de OpenClaw (.7) mediante SSH.",
+            "# Riesgo al rotar: Actualizar ambos extremos antes de reiniciar el MCP de Resolve y verificar el acceso de Lucas.",
+        ]
     group = next((item for item in GROUPS if key.startswith(item[0])), None)
     if group is None:
         raise ValueError(f"Documentar ubicación de la variable {key} antes de usarla.")

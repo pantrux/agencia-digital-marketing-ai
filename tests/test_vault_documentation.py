@@ -43,6 +43,15 @@ class PhaseFourVaultDocumentation(unittest.TestCase):
         with self.assertRaises(ValueError):
             documentation("CAMPO_SIN_UBICACION")
 
+    def test_token_de_davinci_documenta_ambos_extremos_del_mcp(self):
+        purpose, location, risk = documentation("DAVINCI_MCP_TOKEN")
+        self.assertIn("Lucas", purpose)
+        self.assertIn(".6", location)
+        self.assertIn(".7", location)
+        self.assertIn("ambos extremos", risk)
+        with self.assertRaises(ValueError):
+            documentation("DAVINCI_MCP_TOKEN_INCORRECTO")
+
 
 if __name__ == "__main__":
     unittest.main()
