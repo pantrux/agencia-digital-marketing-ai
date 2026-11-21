@@ -39,6 +39,7 @@ from production_valeria import (
     MAX_JPEG,
     VisualResponseFormatError,
     run_visual,
+    sample_frames,
     visual_request,
 )
 
@@ -46,6 +47,7 @@ AD_MUSIC_CREDIT = (
     "Carefree — Kevin MacLeod (incompetech.com), CC BY 4.0. Fragmento editado y mezclado. "
     "https://creativecommons.org/licenses/by/4.0/"
 )
+BAND_SAMPLE_BYTES = 12000
 
 VALERIA = Path("/var/lib/agency-production-valeria")
 LUCAS = Path("/var/lib/agency-production-lucas")
@@ -159,7 +161,9 @@ def close_music_matches(ff, reference):
     return matching_music_window(actual, original)
 
 
-def decode(path, expected, duration, *, stamps=None, speech=None, music_reference=None):
+def decode(
+    path, expected, duration, *, stamps=None, speech=None, music_reference=None, sample_bytes=None
+):
     if path.resolve(strict=True) != path:
         raise ValueError("Ruta del máster inválida")
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -247,7 +251,7 @@ def decode(path, expected, duration, *, stamps=None, speech=None, music_referenc
         checkpoints = stamps or [
             round(min(duration, metrics["duration"]) * fraction, 5) for fraction in (0.2, 0.5, 0.8)
         ]
-        limit = min(MAX_JPEG, 63000 // len(checkpoints)) if stamps else MAX_JPEG
+        limit = sample_bytes or (min(MAX_JPEG, 63000 // len(checkpoints)) if stamps else MAX_JPEG)
         sizes = ((360, 5), (360, 8), (288, 10), (192, 16), (144, 22))
         for timestamp in checkpoints:
             for width, quality in sizes:
@@ -276,7 +280,7 @@ def decode(path, expected, duration, *, stamps=None, speech=None, music_referenc
                 if len(image) <= limit:
                     break
             if (
-                not 4 <= len(image) <= MAX_JPEG
+                not 4 <= len(image) <= (sample_bytes or MAX_JPEG)
                 or not image.startswith(b"\xff\xd8")
                 or not image.endswith(b"\xff\xd9")
             ):
@@ -389,6 +393,8 @@ def review_video(
     *,
     synthetic=False,
     music_reference=None,
+    source_order=None,
+    objective=None,
 ):
     scenes = props.get("scenes")
     checks = scene_checks(scenes) if scenes else []
@@ -417,11 +423,14 @@ def review_video(
     decode_options = {"stamps": [check["segundo"] for check in checks]} if checks else {}
     band = props.get("title_layout") == "band"
     if band:
+        if scenes or source_order is None:
+            raise ValueError("La revisión de la banda requiere el original del montaje continuo")
         decode_options["stamps"] = [
             min(0.55, duration * 0.2),
             duration * 0.5,
             duration - min(0.12, duration * 0.08),
         ]
+        decode_options["sample_bytes"] = BAND_SAMPLE_BYTES
     audio_check = None
     if ad:
         with tempfile.TemporaryDirectory(prefix="studio-qa-mezcla-") as workspace:
@@ -432,12 +441,13 @@ def review_video(
             audio_check = verify_mix_speech(speech, ad["captions"])
     else:
         metrics, images = decode(path, digest, duration, **decode_options)
+    stamps = [second for second, _ in images]
     evidence = {
         "titulo_esperado": props["title"],
         "subtitulo_esperado": props["subtitle"],
         "angulo": angle,
         "mediciones": metrics,
-        "segundos_de_muestras": [second for second, _ in images],
+        "segundos_de_muestras": stamps,
     }
     instructions = (
         "Eres Elena, auditora audiovisual. Evalúa los tres fotogramas del MP4 final usando "
@@ -449,11 +459,33 @@ def review_video(
         "muestra (1, 2 o 3) y detalle, y defectos con objetos muestra y correccion. "
         "Incluye en defectos únicamente cambios necesarios para poder entregar. "
     )
+    originals = []
     if band:
+        source = {
+            "order": source_order,
+            "raw": props["video_path"],
+            "audio": None,
+            "duration_seconds": duration,
+        }
+        originals = sample_frames(source, stamps, BAND_SAMPLE_BYTES)
+        if [second for second, _ in originals] != stamps:
+            raise ValueError("Las muestras del original no coinciden con las del máster")
+        evidence["comparacion_encuadre"] = [
+            {"master": index, "original": index + len(images), "segundo": second}
+            for index, second in enumerate(stamps, 1)
+        ]
+        if objective:
+            evidence["objetivo_confirmado"] = objective
         instructions += (
             "El título y el subtítulo deben leerse en la banda superior, fuera de la imagen. "
-            "Comprueba que se conserva el encuadre completo al inicio y al cierre. "
-            "Si la banda tapa el rostro o el producto, o el texto se corta, regístralo como defecto. "
+            "Las muestras 1 a 3 son del máster; 4 a 6 son referencias del original. "
+            "Compara las parejas del JSON en el mismo instante. Verifica si la edición recortó "
+            "contenido visible en el original al inicio, en el centro o al cierre. "
+            "Describe en observaciones los cortes de encuadre que ya estaban en la grabación. "
+            "Si un corte de origen impide cumplir el objetivo confirmado, regístralo como defecto "
+            "y explica qué toma hace falta. Registra como defecto cualquier recorte introducido "
+            "por la edición, banda sobre el rostro o producto, o texto cortado. "
+            "Cita sólo números de muestra del máster en el dictamen y evalúa su calidad final. "
         )
     if checks:
         evidence["rotulos_por_muestra"] = [check["rotulo_esperado"] for check in checks]
@@ -524,7 +556,7 @@ def review_video(
     request = visual_request(
         "agency-critic",
         instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
-        images,
+        images + originals,
         request_id,
     )
     try:
@@ -583,6 +615,19 @@ def review_video(
         **({"creditos_musica": AD_MUSIC_CREDIT} if metrics.get("musica_catalogo") else {}),
         "dictamen": qa,
         "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
+        **(
+            {
+                "referencia_original": {
+                    "sha256": source_order["media"]["sha256"],
+                    "muestras": [
+                        {"segundo": s, "sha256": hashlib.sha256(p).hexdigest()}
+                        for s, p in originals
+                    ],
+                }
+            }
+            if band
+            else {}
+        ),
     }
 
 
@@ -635,6 +680,7 @@ def audit(
     *,
     synthetic=False,
     revision_id=None,
+    objective=None,
 ):
     decision = edl["escaleta"]
     render = decision["render"]
@@ -703,6 +749,8 @@ def audit(
             resolution,
             request_id,
             synthetic=synthetic,
+            source_order=order,
+            objective=objective,
         ),
         "modelo": "openai/gpt-6.1-sol",
         "runtime": "openclaw",
@@ -802,7 +850,15 @@ def run_pending(profile, dispatch, output):
         elif review is None:
             request_id = str(uuid.uuid5(uuid.UUID(identity), f"elena:v{revision}:" + digest))
             review = audit(
-                order, edl, digest, request_id, target, rendered, revision, synthetic=synthetic
+                order,
+                edl,
+                digest,
+                request_id,
+                target,
+                rendered,
+                revision,
+                synthetic=synthetic,
+                objective=brief["objective"],
             )
         if terminal and review["dictamen"]["decision"] == "rechazado":
             report_rejection(order, brief, rendered, review, dispatch, revision)
