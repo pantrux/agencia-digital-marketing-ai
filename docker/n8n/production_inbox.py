@@ -189,7 +189,7 @@ class Handler(BaseHTTPRequestHandler):
         length = self.headers.get_all("Content-Length", [])
         if (
             len(length) != 1
-            or not re.fullmatch(r"[1-9][0-9]{0,3}", length[0])
+            or not re.fullmatch(r"[1-9][0-9]{0,4}", length[0])
             or int(length[0]) > MAX_BODY
             or self.headers.get_all("Content-Type", []) != ["application/json"]
             or self.headers.get("Transfer-Encoding")

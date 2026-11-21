@@ -7,8 +7,11 @@ import sqlite3
 import sys
 import uuid
 import zipfile
+from contextlib import closing
+from http.client import HTTPConnection
+from http.server import HTTPServer
 from pathlib import Path
-from threading import Event
+from threading import Event, Thread
 from types import SimpleNamespace
 from xml.etree import ElementTree
 
@@ -48,6 +51,71 @@ def order():
             "object_key": f"ingest/{job}/{asset}.mp4",
         },
     }
+
+
+def test_inbox_recibe_una_orden_http_con_32_materiales(handoff, order, monkeypatch, tmp_path):
+    import production_inbox as inbox
+
+    checked_assets = []
+
+    def verify_source(media):
+        checked_assets.append(media["asset_id"])
+        return True
+
+    monkeypatch.setattr(inbox, "source_matches", verify_source)
+    extra = []
+    for _ in range(31):
+        asset = str(uuid.uuid4())
+        extra.append(
+            dict(
+                order["media"], asset_id=asset, object_key=f"ingest/{order['order_id']}/{asset}.mp4"
+            )
+        )
+    request = dict(
+        order, additional_media=extra, attempt=1, lease=str(uuid.uuid4()), lease_expires_at=1
+    )
+    body = json.dumps(request).encode()
+    assert 9999 < len(body) <= inbox.MAX_BODY
+
+    database = tmp_path / "inbox.sqlite3"
+    with closing(sqlite3.connect(database)) as db:
+        db.execute(
+            "CREATE TABLE inbox(order_id TEXT PRIMARY KEY, payload TEXT, received_at INTEGER)"
+        )
+    with HTTPServer(("127.0.0.1", 0), inbox.Handler) as server:
+        server.peer = "127.0.0.1"
+        server.token = b"a" * 64
+        server.database = database
+        worker = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+        worker.start()
+        try:
+            headers = {
+                "Authorization": "Bearer " + server.token.decode(),
+                "Content-Type": "application/json",
+            }
+            with closing(HTTPConnection(*server.server_address, timeout=4)) as client:
+                client.request("POST", "/v1/productions", body=body, headers=headers)
+                with client.getresponse() as response:
+                    assert response.status == 200
+                    assert json.loads(response.read()) == {
+                        "accepted": True,
+                        "order_id": order["order_id"],
+                    }
+                client.request(
+                    "POST", "/v1/productions", body=b" " * (inbox.MAX_BODY + 1), headers=headers
+                )
+                with client.getresponse() as response:
+                    assert response.status == 400
+        finally:
+            server.shutdown()
+            worker.join(timeout=2)
+    assert checked_assets == [item["asset_id"] for item in [order["media"], *extra]]
+    with closing(sqlite3.connect(database)) as db:
+        assert db.execute("SELECT count(*) FROM inbox").fetchone() == (1,)
+        stored = db.execute(
+            "SELECT payload FROM inbox WHERE order_id=?", (order["order_id"],)
+        ).fetchone()
+        assert json.loads(stored[0])["additional_media"] == extra
 
 
 def test_verifica_contrato_firmado_y_separa_ordenes(handoff, order):
