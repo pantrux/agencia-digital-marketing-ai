@@ -38,6 +38,7 @@ class PruebasDocumentacion(unittest.TestCase):
             "docker/immich-server/README-LAN.md",
             "docker/n8n/README-private-deploy.md",
             "docker/observability/README-nas.md",
+            "docker/r2-sync-consumer/README-multiple-sources.md",
             "gpu-bridge-win11/README.md",
             "gpu-bridge-win11/Stop-GpuBridge.ps1",
             "ingress/README.md",
