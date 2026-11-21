@@ -1149,9 +1149,9 @@ def test_mateo_reintenta_sin_bloquear_las_ordenes_siguientes(monkeypatch, tmp_pa
     monkeypatch.setattr(mateo, "run_mateo", strategy)
     with pytest.raises(TimeoutError):
         mateo.main()
+    assert (output / f"{second}.json").is_file()
     now += 10
     mateo.main()
-    assert (output / f"{second}.json").is_file()
     now += 19
     mateo.main()
     assert attempts == [first, second]
@@ -2102,7 +2102,7 @@ def test_lucas_respeta_el_reintento_y_renderiza_otra_orden(monkeypatch, tmp_path
     monkeypatch.setattr(lucas, "JOURNAL", journal)
     monkeypatch.setattr(lucas, "VALERIA", direction)
     monkeypatch.setattr(lucas, "lookup", lambda *_: brief)
-    monkeypatch.setattr(lucas, "time", SimpleNamespace(time=lambda: clock))
+    monkeypatch.setattr(lucas, "time", SimpleNamespace(time=lambda: clock, monotonic=lambda: clock))
 
     def render(pending, _receipt, _edl, _token, _revision, target):
         if pending["order_id"] == blocked and fails:
@@ -2112,9 +2112,9 @@ def test_lucas_respeta_el_reintento_y_renderiza_otra_orden(monkeypatch, tmp_path
     monkeypatch.setattr(lucas, "run", render)
     with pytest.raises(TimeoutError):
         lucas.run_pending(profile, "b" * 64, "a" * 64, rendered)
+    assert (rendered / f"{ready}.json").is_file()
     clock += 55
     lucas.run_pending(profile, "b" * 64, "a" * 64, rendered)
-    assert (rendered / f"{ready}.json").is_file()
     clock += 5
     with pytest.raises(TimeoutError):
         lucas.run_pending(profile, "b" * 64, "a" * 64, rendered)

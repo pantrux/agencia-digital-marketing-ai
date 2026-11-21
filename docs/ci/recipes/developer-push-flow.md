@@ -237,3 +237,8 @@ Para el ProRes 4444 largo, verifica un MOV 4K de varios GiB en el volumen
 temporal del renderer. La lectura íntegra de las marcas de los paquetes
 tiene hasta 180 segundos dentro del plazo general del render. Comprueba
 que se conservan todos los fotogramas, la transparencia y el audio de la entrega.
+
+Para las colas de Mateo y Lucas, verifica dos órdenes listas en el mismo
+disparo. Si la primera falla antes de 15 segundos, registra su reintento
+y comprueba que la siguiente avance en ese disparo. La unidad conserva
+la señal de error y continúa aplicando la espera de cada orden.

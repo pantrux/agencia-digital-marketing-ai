@@ -294,6 +294,8 @@ def run_pending(profile, token, dispatch, output):
     state.mkdir(mode=0o700, exist_ok=True)
     if state.resolve(strict=True) != state:
         raise ValueError("Directorio de reintentos de render inválido")
+    started = time.monotonic()
+    deferred_error = None
     with closing(sqlite3.connect(state / "lucas.sqlite3")) as db:
         db.execute(
             """CREATE TABLE IF NOT EXISTS retries (
@@ -316,7 +318,7 @@ def run_pending(profile, token, dispatch, output):
                 continue
             try:
                 rendered = render_pending(path, target, version, profile, token, dispatch)
-            except (*ORDER_ERRORS, subprocess.SubprocessError):
+            except (*ORDER_ERRORS, subprocess.SubprocessError) as error:
                 failures = min(previous[0] + 1, 4) if previous else 1
                 # La primera espera supera los 55 s del temporizador de Lucas.
                 due_at = int(time.time()) + min(60 * 2 ** (failures - 1), 300)
@@ -327,12 +329,18 @@ def run_pending(profile, token, dispatch, output):
                         SET failures=excluded.failures, due_at=excluded.due_at""",
                         (path.stem, failures, due_at),
                     )
-                raise
+                # Un fallo temprano puede corresponder a esta orden. Da paso a una siguiente.
+                if deferred_error is not None or time.monotonic() - started >= 15:
+                    raise
+                deferred_error = error
+                continue
             if previous:
                 with db:
                     db.execute("DELETE FROM retries WHERE revision_id=?", (path.stem,))
             if rendered:
-                return
+                break
+    if deferred_error is not None:
+        raise deferred_error
 
 
 def main():
