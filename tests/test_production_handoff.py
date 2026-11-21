@@ -1195,6 +1195,11 @@ def test_escaleta_de_valeria_exige_fuente_confirmada_y_preserva_el_plan(
     props = edl["render"]["props"]
     assert props["video_path"] == raw and props["audio_path"] == audio
     assert "subtitle_size" not in props
+    assert "title_layout" not in props
+    band = make_edl(receipt, angles, {**answer, "rotulo_en_banda": True})
+    assert band["render"]["props"] == {**props, "title_layout": "band"}
+    with pytest.raises(ValueError, match="La banda requiere"):
+        make_edl(receipt, angles, {**answer, "rotulo_en_banda": True, "titulo": "a" * 43})
     expanded = make_edl(receipt, angles, {**answer, "subtitulo_ampliado": True})
     assert expanded["render"]["props"] == {**props, "subtitle_size": "large"}
     assert props["duration_seconds"] == 4.0 and edl["render"]["plan"] == plan
@@ -1343,6 +1348,8 @@ def test_valeria_solo_reduce_jpeg_que_supera_el_limite(
     assert [stamp for stamp, _ in images] == [0.6, 2.0, 3.4]
     assert all(len(image) == 100 for _, image in images)
     assert attempts == qualities * 3
+    boundary_images = director.sample_images(receipt, include_ends=True)
+    assert [stamp for stamp, _ in boundary_images] == [0.0, 0.6, 2.0, 3.4, 3.88]
 
 
 def test_valeria_admite_el_piloto_y_envia_las_muestras_por_stdin(monkeypatch, order):
@@ -1454,7 +1461,8 @@ def test_valeria_corrige_solo_el_formato_de_la_respuesta(monkeypatch, order, tmp
     }
     samples, requests = [], []
 
-    def sample(source):
+    def sample(source, *, include_ends=False):
+        assert include_ends
         samples.append(source)
         return [(1, b"imagen")]
 

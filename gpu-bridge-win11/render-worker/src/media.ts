@@ -1,4 +1,4 @@
-import {AD_FRAMES, SOCIAL_FADE_FRAME, TITLE_PANEL_FRACTION} from './contracts.ts';
+import {AD_FRAMES, SOCIAL_FADE_FRAME, TITLE_BAND_BACKGROUND, TITLE_BAND_HEIGHT, TITLE_PANEL_FRACTION} from './contracts.ts';
 import {MAX_SEGMENT_SECONDS, outputDimensions, TITLE_FADE_FRAMES, WorkerError, type EditScene, type MultiSourceScene, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
 
 export interface Loudness {integrated_lufs: number; true_peak_dbtp: number; range_lu: number; threshold_lufs: number; offset_lu: number}
@@ -247,7 +247,7 @@ export function stageHyperframesPicture(source: string, scenes: readonly EditSce
     '-g','30','-movflags','+faststart',output];
 }
 
-export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string, social = false): string[] {
+export function encodeNvenc(frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, resolution: Resolution = '1080p', sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string, social = false, titleLayout?: RenderRequest['props']['title_layout']): string[] {
   if (scenes && !sourceVideo) return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);
   const {width,height} = outputDimensions(resolution);
@@ -258,15 +258,17 @@ export function encodeNvenc(frames: string, audio: string, output: string, count
     ? sceneVideo(sourceVideo!,scenes)
     : {videoInputs: sourceVideo ? ['-i',sourceVideo] : [], cuts: []};
   const videoFilter = scenes ? '[montaje]' : `[0:v]fps=fps=30:start_time=0,${tail}`;
-  const scale = `${videoFilter}scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=bilinear`;
-  const crop = `crop=${width}:${height},setsar=1`;
+  const band = titleLayout === 'band' ? TITLE_BAND_HEIGHT * width / 1080 : 0;
+  const scale = `${videoFilter}scale=${width}:${height-band}:force_original_aspect_ratio=${band ? 'decrease' : 'increase'}:force_divisible_by=2:flags=bilinear`;
+  const fit = band ? `pad=${width}:${height}:trunc((ow-iw)/4)*2:trunc((oh-ih+${band})/4)*2:color=0x${TITLE_BAND_BACKGROUND.slice(1)}`
+    : `crop=${width}:${height}`;
   const graphicsInput = scenes?.length ?? 1;
   const overlay = 'alpha=straight:eof_action=repeat:repeatlast=1';
   const pictureFade = social ? ',fade=t=out:s=' + SOCIAL_FADE_FRAME + ':n=' + (AD_FRAMES - SOCIAL_FADE_FRAME - 1) : '';
   // El crudo admitido ya está en YUV BT.709. Solo se convierte la capa RGBA.
   const filter = [
     ...cuts,
-    `${scale}:${scenes ? 'out_color_matrix=bt709:out_range=tv' : 'in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=tv'},${crop},format=yuv420p[video]`,
+    `${scale}:${scenes ? 'out_color_matrix=bt709:out_range=tv' : 'in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=tv'},${fit},setsar=1,format=yuv420p[video]`,
     `[${graphicsInput}:v]scale=in_range=pc:out_range=tv:out_color_matrix=bt709,format=yuva420p[capa]`,
     `[video][capa]overlay=format=yuv420:${overlay}${pictureFade},${limitedBt709}[comp]`,
   ].join(';');
@@ -303,8 +305,8 @@ export function muxProresFragments(list: string, audio: string, output: string, 
     '-video_track_timescale',String(proresTimescale),'-af',audioFilter,...pcmAudio,'-f','mov',output];
 }
 
-export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string, social = false): string[] {
-  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo, normalize, scenes, musicId, social);
+export function encodeOutput(format: OutputFormat, resolution: Resolution, frames: string, audio: string, output: string, count: number, duration: number, measured: Loudness, peak = -1.5, sourceVideo?: string, normalize = false, scenes?: readonly EditScene[], musicId?: string, social = false, titleLayout?: RenderRequest['props']['title_layout']): string[] {
+  if (format === 'mp4') return encodeNvenc(frames, audio, output, count, duration, measured, peak, resolution, sourceVideo, normalize, scenes, musicId, social, titleLayout);
   outputDimensions(resolution);
   if (format !== 'prores4444') return bad();
   const audioFilter = normalizeAudio(count, duration, measured, peak);
