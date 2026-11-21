@@ -63,12 +63,6 @@ class Reject extends Error {
   }
 }
 
-class TranscriptUnavailable extends Reject {
-  constructor() {
-    super(503);
-  }
-}
-
 function uncodedCategory(error) {
   const message = typeof error?.message === "string" ? error.message.slice(0, 384) : "";
   if (message === "Async work scope is closed") return "WORK_SCOPE_CLOSED";
@@ -337,7 +331,8 @@ export function completeOwnerTurn(api, oauthProfileId, policy = SOFIA, transcrip
     try {
       transcript = policy.id === SOFIA.id && orderId ? await transcriptReader(orderId) : null;
     } catch {
-      throw new TranscriptUnavailable();
+      // El turno puede continuar con el contexto del chat mientras falta un recibo válido.
+      transcript = null;
     }
     let pending;
     try {
@@ -469,7 +464,6 @@ export function createOwnerService(settings, complete, readiness, scheduler, pol
         text = await pending;
         signal.throwIfAborted();
       } catch (error) {
-        if (error instanceof TranscriptUnavailable) throw error;
         // El SDK puede rechazar por timeout antes de que termine su limpieza nativa.
         if (req.url === policy.path) {
           uncertain = true;

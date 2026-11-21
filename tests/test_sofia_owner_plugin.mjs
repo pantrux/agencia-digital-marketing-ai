@@ -442,11 +442,10 @@ test("un recibo en publicación o inválido no detiene los turnos de Sofía", {
 
     await writeFile(receipt, "{recibo inválido");
     const invalid = await sendTurn();
-    assert.equal(invalid.status, 503);
-    assert.deepEqual(JSON.parse(invalid.raw), { error: "SOFIA_OWNER_REJECTED" });
-    assert.equal(calls.length, 2);
+    assert.equal(invalid.status, 200);
+    assert.equal(JSON.parse(calls[2].messages[0].content), TURN.message);
     assert.equal((await sendTurn(otherOrder)).status, 200);
-    assert.equal(calls.length, 3);
+    assert.equal(calls.length, 4);
 
     api.runtime.llm.complete = async () => {
       throw Object.assign(new Error("timeout de ensayo"), { code: "LLM_COMPLETION_TIMEOUT" });
