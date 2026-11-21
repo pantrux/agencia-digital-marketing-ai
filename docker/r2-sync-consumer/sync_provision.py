@@ -16,7 +16,6 @@ import stat
 import subprocess
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass
-from uuid import uuid4
 
 from sync_protocol import VerifiedRequest
 from sync_storage import (
@@ -32,6 +31,7 @@ from sync_storage import (
 )
 
 MARKER = ".agency-sync-project.json"
+RECONCILE_MARKER = ".agency-sync-project-v2.tmp"
 RAW = "01_raw"
 OWNER = "agencia-digital-marketing-ai:r2-sync-project:v1"
 RENAME_NOREPLACE = 1
@@ -163,7 +163,7 @@ def _write_marker(fd, body, *, name=MARKER):
     os.fsync(fd)
 
 
-def _verify_marker(fd, body, proof, *, name=MARKER):
+def _verify_marker(fd, body, proof, *, name=MARKER, partial=False):
     with ExitStack() as stack:
         marker = _own_fd(
             stack,
@@ -181,12 +181,13 @@ def _verify_marker(fd, body, proof, *, name=MARKER):
             or info.st_gid != proof.gid
             or info.st_nlink != 1
             or (not proof.synology_acl and stat.S_IMODE(info.st_mode) != 0o600)
-            or info.st_size != len(body)
+            or info.st_size > len(body)
+            or (not partial and info.st_size != len(body))
         ):
             raise StorageError("MARCADOR_PROYECTO_INVALIDO")
         if proof.synology_acl:
             _verify_acl(marker, directory=False)
-        expected = hashlib.sha256(body).hexdigest(), len(body)
+        expected = hashlib.sha256(body[: info.st_size]).hexdigest(), info.st_size
         if (
             _hash_fd(marker, len(body)) != expected
             or _file_snapshot(info)
@@ -194,6 +195,13 @@ def _verify_marker(fd, body, proof, *, name=MARKER):
             or _file_snapshot(info) != _file_snapshot(os.fstat(marker))
         ):
             raise StorageError("MARCADOR_PROYECTO_INVALIDO")
+
+
+def _discard_reconcile_marker(fd, body, proof):
+    if _exists(fd, RECONCILE_MARKER):
+        # Una caída puede dejar el prefijo que alcanzó a escribir el conciliador.
+        _verify_marker(fd, body, proof, name=RECONCILE_MARKER, partial=True)
+        os.unlink(RECONCILE_MARKER, dir_fd=fd)
 
 
 def _rename_noreplace(parent, source, destination):
@@ -236,8 +244,11 @@ def _read_tree(
         previous_body = _marker_body(job, legacy, info)
         _verify_marker(fd, previous_body, proof)
     if staged:
+        allowed = {MARKER, RAW}
+        if previous_body is not None:
+            allowed.add(RECONCILE_MARKER)
         with os.scandir(fd) as files:
-            if any(item.name not in {MARKER, RAW} for item in files):
+            if any(item.name not in allowed for item in files):
                 raise StorageError("STAGE_PROYECTO_INESPERADO")
         if not _exists(fd, RAW):
             anchors.validate()
@@ -255,17 +266,16 @@ def _read_tree(
         os.fsync(fd)
     anchors.validate()
     if previous_body is not None:
-        temporary = ".agency-sync-marker-" + uuid4().hex
-        _write_marker(fd, body, name=temporary)
+        _discard_reconcile_marker(fd, body, proof)
         try:
-            _verify_marker(fd, body, proof, name=temporary)
+            _write_marker(fd, body, name=RECONCILE_MARKER)
+            _verify_marker(fd, body, proof, name=RECONCILE_MARKER)
             anchors.validate()
             _verify_marker(fd, previous_body, proof)
-            os.replace(temporary, MARKER, src_dir_fd=fd, dst_dir_fd=fd)
+            os.replace(RECONCILE_MARKER, MARKER, src_dir_fd=fd, dst_dir_fd=fd)
             os.fsync(fd)
         finally:
-            if _exists(fd, temporary):
-                os.unlink(temporary, dir_fd=fd)
+            _discard_reconcile_marker(fd, body, proof)
     _verify_marker(fd, body, proof)
     return info
 

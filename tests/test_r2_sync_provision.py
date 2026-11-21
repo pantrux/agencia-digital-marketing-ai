@@ -197,6 +197,28 @@ class NativeProvisionTests(unittest.TestCase):
         ):
             self.ensure()
         previous_inode = self.stage.stat().st_ino
+        partial = self.stage / PROVISION.RECONCILE_MARKER
+        partial.touch(mode=0o600)
+        partial.write_bytes(b"ajeno")
+        with self.assertRaisesRegex(StorageError, "MARCADOR_PROYECTO_INVALIDO"):
+            PROVISION.ensure_project(self.storage, self.proof, verified, reconcile_legacy_v2=True)
+        self.assertEqual(partial.read_bytes(), b"ajeno")
+        partial.write_bytes(b'{"device":')
+
+        write_marker = PROVISION._write_marker
+
+        def interrupt_write(*args, **kwargs):
+            write_marker(*args, **kwargs)
+            raise OSError("Escritura interrumpida")
+
+        with (
+            patch.object(PROVISION, "_write_marker", side_effect=interrupt_write),
+            self.assertRaisesRegex(StorageError, "APROVISIONAMIENTO_NO_CONCILIADO"),
+        ):
+            PROVISION.ensure_project(self.storage, self.proof, verified, reconcile_legacy_v2=True)
+        self.assertFalse(partial.exists())
+        partial.touch(mode=0o600)
+        partial.write_bytes(b'{"device":')
         result = PROVISION.ensure_project(
             self.storage, self.proof, verified, reconcile_legacy_v2=True
         )
@@ -204,6 +226,7 @@ class NativeProvisionTests(unittest.TestCase):
         self.assertEqual(result.inode, previous_inode)
         self.assertFalse(self.stage.exists())
         self.assertEqual(self.project.stat().st_ino, previous_inode)
+        self.assertFalse((self.project / PROVISION.RECONCILE_MARKER).exists())
 
     def test_rechaza_otra_identidad_de_filesystem_o_marcador_aun_con_el_mismo_dispositivo(self):
         filesystem_id = os.statvfs(self.media).f_fsid
