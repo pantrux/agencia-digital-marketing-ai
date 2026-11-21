@@ -67,6 +67,7 @@ def _authorized(verified):
     if (
         type(verified) is not VerifiedRequest
         or type(verified.job) is not AssetJob
+        or verified.protocol not in ("v1", "v2")
         or type(verified.job.job_id) is not str
         or verified.job.project_slug != "job-" + verified.job.job_id.replace("-", "")
     ):
@@ -279,13 +280,19 @@ def ensure_project(
     fingerprint = hashlib.sha256(body).hexdigest()
     if fingerprint != verified.fingerprint:
         raise StorageError("ORDEN_APROVISIONAMIENTO_INVALIDA")
+    # Cada material se autentica por separado. En v2 la carpeta pertenece a la orden.
+    project_fingerprint = (
+        hashlib.sha256(f"studio-nas-project-v2\n{job.job_id}".encode("ascii")).hexdigest()
+        if verified.protocol == "v2"
+        else fingerprint
+    )
     final = job.project_slug
     stage = f".agency-sync-project-{job.job_id}.staging"
     try:
         with ExitStack() as stack:
             anchors, parent = _projects(stack, storage, proof, filesystem_id)
             if _exists(parent, final):
-                info = _read_tree(anchors, parent, final, job, fingerprint, proof)
+                info = _read_tree(anchors, parent, final, job, project_fingerprint, proof)
                 os.fsync(parent)
                 anchors.validate()
                 return ProjectDirectory(*_identity(info), created=False)
@@ -296,7 +303,7 @@ def ensure_project(
             except FileExistsError:
                 fresh = False
             info = _read_tree(
-                anchors, parent, stage, job, fingerprint, proof, staged=True, fresh=fresh
+                anchors, parent, stage, job, project_fingerprint, proof, staged=True, fresh=fresh
             )
             os.fsync(parent)
             anchors.validate()
@@ -308,7 +315,7 @@ def ensure_project(
             # Tras un rename, comprobar las nuevas vinculaciones por FDs nuevos;
             # conservar el stage anterior abierto para cotejar el inode esperado.
             after, current_parent = _projects(stack, storage, proof, filesystem_id)
-            current = _read_tree(after, current_parent, final, job, fingerprint, proof)
+            current = _read_tree(after, current_parent, final, job, project_fingerprint, proof)
             if _identity(current) != _identity(info):
                 raise StorageError("DESTINO_PROYECTO_DISTINTO")
             os.fsync(current_parent)

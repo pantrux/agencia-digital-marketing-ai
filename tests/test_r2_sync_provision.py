@@ -16,7 +16,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "docker/r2-sync-consumer"))
 import sync_provision as PROVISION  # noqa: E402
 from sync_nas_entry import provision  # noqa: E402
-from sync_protocol import verify_request  # noqa: E402
+from sync_protocol import verify_request, verify_source_request  # noqa: E402
 from sync_storage import RootProof, StorageError, SyncStorage  # noqa: E402
 
 JOB = "22222222-2222-4222-8222-222222222222"
@@ -26,21 +26,22 @@ STAGE = ".agency-sync-project-" + JOB + ".staging"
 KEY = bytes(range(32))
 
 
-def authorized(slug=SLUG):
-    data = b"x"
+def authorized(slug=SLUG, *, asset=ASSET, data=b"x", version="v1"):
     value = {
         "job_id": JOB,
-        "asset_id": ASSET,
+        "asset_id": asset,
         "project_slug": slug,
         "extension": "mp4",
         "bytes": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),
-        "object_key": f"ingest/{JOB}/{ASSET}.mp4",
+        "object_key": f"ingest/{JOB}/{asset}.mp4",
     }
     raw = json.dumps(value, separators=(",", ":")).encode("ascii")
     fingerprint = hashlib.sha256(raw).hexdigest()
-    sig = hmac.new(KEY, f"v1\n42\nPOST\n/v1/sync\n{fingerprint}".encode(), "sha256").hexdigest()
-    return value, verify_request(raw, "42", f"v1={sig}", KEY, 1024, lambda: 42)
+    message = f"{version}\n42\nPOST\n/{version}/sync\n{fingerprint}".encode()
+    sig = hmac.new(KEY, message, "sha256").hexdigest()
+    verify = verify_source_request if version == "v2" else verify_request
+    return value, verify(raw, "42", f"{version}={sig}", KEY, 1024, lambda: 42)
 
 
 class PortableContractTests(unittest.TestCase):
@@ -123,6 +124,30 @@ class NativeProvisionTests(unittest.TestCase):
         self.assertEqual(replay["inode"], result["inode"])
         self.assertEqual(profile["media_proof"]["device"], previous_device)
         self.assertEqual(profile["projects_proof"]["device"], previous_device)
+
+    def test_dos_materiales_firmados_reutilizan_una_carpeta_y_conservan_sus_archivos(self):
+        first, first_verified = authorized(version="v2")
+        first_dir = PROVISION.ensure_project(self.storage, self.proof, first_verified)
+        self.assertTrue(first_dir.created)
+        self.storage.publish(first, iter((b"x",)))
+
+        second_asset = "33333333-3333-4333-8333-333333333333"
+        second, second_verified = authorized(asset=second_asset, data=b"yy", version="v2")
+        self.assertNotEqual(first_verified.fingerprint, second_verified.fingerprint)
+        second_dir = PROVISION.ensure_project(self.storage, self.proof, second_verified)
+        self.assertFalse(second_dir.created)
+        self.assertEqual(second_dir.inode, first_dir.inode)
+        self.storage.publish(second, iter((b"yy",)))
+
+        raw = self.project / "01_raw"
+        self.assertEqual((raw / f"{ASSET}.mp4").read_bytes(), b"x")
+        self.assertEqual((raw / f"{second_asset}.mp4").read_bytes(), b"yy")
+        self.assertEqual(
+            PROVISION.ensure_project(self.storage, self.proof, first_verified), second_dir
+        )
+        self.assertFalse(self.stage.exists())
+        with self.assertRaisesRegex(StorageError, "MARCADOR_PROYECTO_INVALIDO"):
+            self.ensure()
 
     def test_rechaza_otra_identidad_de_filesystem_o_marcador_aun_con_el_mismo_dispositivo(self):
         filesystem_id = os.statvfs(self.media).f_fsid
