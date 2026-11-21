@@ -16,6 +16,7 @@ import stat
 import subprocess
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass
+from uuid import uuid4
 
 from sync_protocol import VerifiedRequest
 from sync_storage import (
@@ -141,12 +142,12 @@ def _marker_body(job, fingerprint, info):
     ).encode("ascii")
 
 
-def _write_marker(fd, body):
+def _write_marker(fd, body, *, name=MARKER):
     with ExitStack() as stack:
         writer = _own_fd(
             stack,
             os.open(
-                MARKER,
+                name,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
                 0o600,
                 dir_fd=fd,
@@ -162,12 +163,12 @@ def _write_marker(fd, body):
     os.fsync(fd)
 
 
-def _verify_marker(fd, body, proof):
+def _verify_marker(fd, body, proof, *, name=MARKER):
     with ExitStack() as stack:
         marker = _own_fd(
             stack,
             os.open(
-                MARKER,
+                name,
                 os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
                 dir_fd=fd,
             ),
@@ -189,7 +190,7 @@ def _verify_marker(fd, body, proof):
         if (
             _hash_fd(marker, len(body)) != expected
             or _file_snapshot(info)
-            != _file_snapshot(os.stat(MARKER, dir_fd=fd, follow_symlinks=False))
+            != _file_snapshot(os.stat(name, dir_fd=fd, follow_symlinks=False))
             or _file_snapshot(info) != _file_snapshot(os.fstat(marker))
         ):
             raise StorageError("MARCADOR_PROYECTO_INVALIDO")
@@ -217,14 +218,23 @@ def _rename_noreplace(parent, source, destination):
         raise OSError(code, "renameat2")
 
 
-def _read_tree(anchors, parent, name, job, fingerprint, proof, *, staged=False, fresh=False):
+def _read_tree(
+    anchors, parent, name, job, fingerprint, proof, *, staged=False, fresh=False, legacy=None
+):
     fd = anchors.open_directory(parent, name)
     info = _stat_directory(fd, proof)
     body = _marker_body(job, fingerprint, info)
     anchors.validate()
     if fresh:
         _write_marker(fd, body)
-    _verify_marker(fd, body, proof)
+    previous_body = None
+    try:
+        _verify_marker(fd, body, proof)
+    except StorageError:
+        if legacy is None:
+            raise
+        previous_body = _marker_body(job, legacy, info)
+        _verify_marker(fd, previous_body, proof)
     if staged:
         with os.scandir(fd) as files:
             if any(item.name not in {MARKER, RAW} for item in files):
@@ -244,6 +254,18 @@ def _read_tree(anchors, parent, name, job, fingerprint, proof, *, staged=False, 
         os.fsync(raw)
         os.fsync(fd)
     anchors.validate()
+    if previous_body is not None:
+        temporary = ".agency-sync-marker-" + uuid4().hex
+        _write_marker(fd, body, name=temporary)
+        try:
+            _verify_marker(fd, body, proof, name=temporary)
+            anchors.validate()
+            _verify_marker(fd, previous_body, proof)
+            os.replace(temporary, MARKER, src_dir_fd=fd, dst_dir_fd=fd)
+            os.fsync(fd)
+        finally:
+            if _exists(fd, temporary):
+                os.unlink(temporary, dir_fd=fd)
     _verify_marker(fd, body, proof)
     return info
 
@@ -260,7 +282,12 @@ def _projects(stack, storage, proof, filesystem_id):
 
 
 def ensure_project(
-    storage: SyncStorage, proof: ProjectsProof, verified: VerifiedRequest, *, filesystem_id=None
+    storage: SyncStorage,
+    proof: ProjectsProof,
+    verified: VerifiedRequest,
+    *,
+    filesystem_id=None,
+    reconcile_legacy_v2=False,
 ):
     """Prepara sólo un slug del portal, con igual inode para los reintentos propios.
 
@@ -269,6 +296,8 @@ def ensure_project(
     Un stage sin marcador válido requiere conciliación y queda preservado.
     """
     job = _authorized(verified)
+    if reconcile_legacy_v2 and verified.protocol != "v2":
+        raise StorageError("ORDEN_APROVISIONAMIENTO_INVALIDA")
     if type(storage) is not SyncStorage or type(proof) is not ProjectsProof:
         raise StorageError("CONFIGURACION_APROVISIONAMIENTO_INVALIDA")
     if filesystem_id is not None and (
@@ -292,18 +321,39 @@ def ensure_project(
         with ExitStack() as stack:
             anchors, parent = _projects(stack, storage, proof, filesystem_id)
             if _exists(parent, final):
-                info = _read_tree(anchors, parent, final, job, project_fingerprint, proof)
+                info = _read_tree(
+                    anchors,
+                    parent,
+                    final,
+                    job,
+                    project_fingerprint,
+                    proof,
+                    legacy=fingerprint if reconcile_legacy_v2 else None,
+                )
                 os.fsync(parent)
                 anchors.validate()
                 return ProjectDirectory(*_identity(info), created=False)
             anchors.validate()
-            try:
-                os.mkdir(stage, 0o700, dir_fd=parent)
-                fresh = True
-            except FileExistsError:
+            if reconcile_legacy_v2:
+                if not _exists(parent, stage):
+                    raise StorageError("PROYECTO_V2_AUSENTE")
                 fresh = False
+            else:
+                try:
+                    os.mkdir(stage, 0o700, dir_fd=parent)
+                    fresh = True
+                except FileExistsError:
+                    fresh = False
             info = _read_tree(
-                anchors, parent, stage, job, project_fingerprint, proof, staged=True, fresh=fresh
+                anchors,
+                parent,
+                stage,
+                job,
+                project_fingerprint,
+                proof,
+                staged=True,
+                fresh=fresh,
+                legacy=fingerprint if reconcile_legacy_v2 else None,
             )
             os.fsync(parent)
             anchors.validate()

@@ -149,6 +149,62 @@ class NativeProvisionTests(unittest.TestCase):
         with self.assertRaisesRegex(StorageError, "MARCADOR_PROYECTO_INVALIDO"):
             self.ensure()
 
+    def test_conciliacion_v2_preserva_el_inodo_y_el_primer_material(self):
+        # El marcador antiguo usa el mismo formato y la huella del primer material.
+        before = self.ensure()
+        self.storage.publish(self.value, iter((b"x",)))
+        marker = self.project / PROVISION.MARKER
+        earlier_marker = marker.read_bytes()
+        first, first_verified = authorized(version="v2")
+        second, second_verified = authorized(
+            asset="33333333-3333-4333-8333-333333333333", data=b"yy", version="v2"
+        )
+        with self.assertRaisesRegex(StorageError, "MARCADOR_PROYECTO_INVALIDO"):
+            PROVISION.ensure_project(self.storage, self.proof, second_verified)
+        with self.assertRaisesRegex(StorageError, "MARCADOR_PROYECTO_INVALIDO"):
+            PROVISION.ensure_project(
+                self.storage, self.proof, second_verified, reconcile_legacy_v2=True
+            )
+        self.assertEqual(marker.read_bytes(), earlier_marker)
+
+        reconciled = PROVISION.ensure_project(
+            self.storage, self.proof, first_verified, reconcile_legacy_v2=True
+        )
+        self.assertEqual(reconciled.inode, before.inode)
+        self.assertFalse(reconciled.created)
+        self.assertNotEqual(marker.read_bytes(), earlier_marker)
+        self.assertEqual(
+            PROVISION.ensure_project(self.storage, self.proof, second_verified), reconciled
+        )
+        self.storage.publish(second, iter((b"yy",)))
+        self.assertEqual((self.project / "01_raw" / f"{first['asset_id']}.mp4").read_bytes(), b"x")
+        self.assertEqual(
+            PROVISION.ensure_project(
+                self.storage, self.proof, first_verified, reconcile_legacy_v2=True
+            ),
+            reconciled,
+        )
+
+    def test_conciliacion_v2_recupera_un_directorio_temporal_interrumpido(self):
+        _, verified = authorized(version="v2")
+        with self.assertRaisesRegex(StorageError, "PROYECTO_V2_AUSENTE"):
+            PROVISION.ensure_project(self.storage, self.proof, verified, reconcile_legacy_v2=True)
+        with (
+            patch.object(
+                PROVISION, "_rename_noreplace", side_effect=StorageError("RENOMBRE_INTERRUMPIDO")
+            ),
+            self.assertRaisesRegex(StorageError, "RENOMBRE_INTERRUMPIDO"),
+        ):
+            self.ensure()
+        previous_inode = self.stage.stat().st_ino
+        result = PROVISION.ensure_project(
+            self.storage, self.proof, verified, reconcile_legacy_v2=True
+        )
+        self.assertTrue(result.created)
+        self.assertEqual(result.inode, previous_inode)
+        self.assertFalse(self.stage.exists())
+        self.assertEqual(self.project.stat().st_ino, previous_inode)
+
     def test_rechaza_otra_identidad_de_filesystem_o_marcador_aun_con_el_mismo_dispositivo(self):
         filesystem_id = os.statvfs(self.media).f_fsid
         profile = self.nas_profile()
