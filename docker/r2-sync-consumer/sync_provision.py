@@ -31,6 +31,7 @@ from sync_storage import (
 )
 
 MARKER = ".agency-sync-project.json"
+RECONCILE_MARKER = ".agency-sync-project-v2.tmp"
 RAW = "01_raw"
 OWNER = "agencia-digital-marketing-ai:r2-sync-project:v1"
 RENAME_NOREPLACE = 1
@@ -67,6 +68,7 @@ def _authorized(verified):
     if (
         type(verified) is not VerifiedRequest
         or type(verified.job) is not AssetJob
+        or verified.protocol not in ("v1", "v2")
         or type(verified.job.job_id) is not str
         or verified.job.project_slug != "job-" + verified.job.job_id.replace("-", "")
     ):
@@ -140,12 +142,12 @@ def _marker_body(job, fingerprint, info):
     ).encode("ascii")
 
 
-def _write_marker(fd, body):
+def _write_marker(fd, body, *, name=MARKER):
     with ExitStack() as stack:
         writer = _own_fd(
             stack,
             os.open(
-                MARKER,
+                name,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
                 0o600,
                 dir_fd=fd,
@@ -161,12 +163,12 @@ def _write_marker(fd, body):
     os.fsync(fd)
 
 
-def _verify_marker(fd, body, proof):
+def _verify_marker(fd, body, proof, *, name=MARKER, partial=False):
     with ExitStack() as stack:
         marker = _own_fd(
             stack,
             os.open(
-                MARKER,
+                name,
                 os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
                 dir_fd=fd,
             ),
@@ -179,19 +181,27 @@ def _verify_marker(fd, body, proof):
             or info.st_gid != proof.gid
             or info.st_nlink != 1
             or (not proof.synology_acl and stat.S_IMODE(info.st_mode) != 0o600)
-            or info.st_size != len(body)
+            or info.st_size > len(body)
+            or (not partial and info.st_size != len(body))
         ):
             raise StorageError("MARCADOR_PROYECTO_INVALIDO")
         if proof.synology_acl:
             _verify_acl(marker, directory=False)
-        expected = hashlib.sha256(body).hexdigest(), len(body)
+        expected = hashlib.sha256(body[: info.st_size]).hexdigest(), info.st_size
         if (
             _hash_fd(marker, len(body)) != expected
             or _file_snapshot(info)
-            != _file_snapshot(os.stat(MARKER, dir_fd=fd, follow_symlinks=False))
+            != _file_snapshot(os.stat(name, dir_fd=fd, follow_symlinks=False))
             or _file_snapshot(info) != _file_snapshot(os.fstat(marker))
         ):
             raise StorageError("MARCADOR_PROYECTO_INVALIDO")
+
+
+def _discard_reconcile_marker(fd, body, proof):
+    if _exists(fd, RECONCILE_MARKER):
+        # Una caída puede dejar el prefijo que alcanzó a escribir el conciliador.
+        _verify_marker(fd, body, proof, name=RECONCILE_MARKER, partial=True)
+        os.unlink(RECONCILE_MARKER, dir_fd=fd)
 
 
 def _rename_noreplace(parent, source, destination):
@@ -216,17 +226,29 @@ def _rename_noreplace(parent, source, destination):
         raise OSError(code, "renameat2")
 
 
-def _read_tree(anchors, parent, name, job, fingerprint, proof, *, staged=False, fresh=False):
+def _read_tree(
+    anchors, parent, name, job, fingerprint, proof, *, staged=False, fresh=False, legacy=None
+):
     fd = anchors.open_directory(parent, name)
     info = _stat_directory(fd, proof)
     body = _marker_body(job, fingerprint, info)
     anchors.validate()
     if fresh:
         _write_marker(fd, body)
-    _verify_marker(fd, body, proof)
+    previous_body = None
+    try:
+        _verify_marker(fd, body, proof)
+    except StorageError:
+        if legacy is None:
+            raise
+        previous_body = _marker_body(job, legacy, info)
+        _verify_marker(fd, previous_body, proof)
     if staged:
+        allowed = {MARKER, RAW}
+        if previous_body is not None:
+            allowed.add(RECONCILE_MARKER)
         with os.scandir(fd) as files:
-            if any(item.name not in {MARKER, RAW} for item in files):
+            if any(item.name not in allowed for item in files):
                 raise StorageError("STAGE_PROYECTO_INESPERADO")
         if not _exists(fd, RAW):
             anchors.validate()
@@ -243,6 +265,17 @@ def _read_tree(anchors, parent, name, job, fingerprint, proof, *, staged=False, 
         os.fsync(raw)
         os.fsync(fd)
     anchors.validate()
+    if previous_body is not None:
+        _discard_reconcile_marker(fd, body, proof)
+        try:
+            _write_marker(fd, body, name=RECONCILE_MARKER)
+            _verify_marker(fd, body, proof, name=RECONCILE_MARKER)
+            anchors.validate()
+            _verify_marker(fd, previous_body, proof)
+            os.replace(RECONCILE_MARKER, MARKER, src_dir_fd=fd, dst_dir_fd=fd)
+            os.fsync(fd)
+        finally:
+            _discard_reconcile_marker(fd, body, proof)
     _verify_marker(fd, body, proof)
     return info
 
@@ -259,7 +292,12 @@ def _projects(stack, storage, proof, filesystem_id):
 
 
 def ensure_project(
-    storage: SyncStorage, proof: ProjectsProof, verified: VerifiedRequest, *, filesystem_id=None
+    storage: SyncStorage,
+    proof: ProjectsProof,
+    verified: VerifiedRequest,
+    *,
+    filesystem_id=None,
+    reconcile_legacy_v2=False,
 ):
     """Prepara sólo un slug del portal, con igual inode para los reintentos propios.
 
@@ -268,6 +306,8 @@ def ensure_project(
     Un stage sin marcador válido requiere conciliación y queda preservado.
     """
     job = _authorized(verified)
+    if reconcile_legacy_v2 and verified.protocol != "v2":
+        raise StorageError("ORDEN_APROVISIONAMIENTO_INVALIDA")
     if type(storage) is not SyncStorage or type(proof) is not ProjectsProof:
         raise StorageError("CONFIGURACION_APROVISIONAMIENTO_INVALIDA")
     if filesystem_id is not None and (
@@ -279,24 +319,51 @@ def ensure_project(
     fingerprint = hashlib.sha256(body).hexdigest()
     if fingerprint != verified.fingerprint:
         raise StorageError("ORDEN_APROVISIONAMIENTO_INVALIDA")
+    # Cada material se autentica por separado. En v2 la carpeta pertenece a la orden.
+    project_fingerprint = (
+        hashlib.sha256(f"studio-nas-project-v2\n{job.job_id}".encode("ascii")).hexdigest()
+        if verified.protocol == "v2"
+        else fingerprint
+    )
     final = job.project_slug
     stage = f".agency-sync-project-{job.job_id}.staging"
     try:
         with ExitStack() as stack:
             anchors, parent = _projects(stack, storage, proof, filesystem_id)
             if _exists(parent, final):
-                info = _read_tree(anchors, parent, final, job, fingerprint, proof)
+                info = _read_tree(
+                    anchors,
+                    parent,
+                    final,
+                    job,
+                    project_fingerprint,
+                    proof,
+                    legacy=fingerprint if reconcile_legacy_v2 else None,
+                )
                 os.fsync(parent)
                 anchors.validate()
                 return ProjectDirectory(*_identity(info), created=False)
             anchors.validate()
-            try:
-                os.mkdir(stage, 0o700, dir_fd=parent)
-                fresh = True
-            except FileExistsError:
+            if reconcile_legacy_v2:
+                if not _exists(parent, stage):
+                    raise StorageError("PROYECTO_V2_AUSENTE")
                 fresh = False
+            else:
+                try:
+                    os.mkdir(stage, 0o700, dir_fd=parent)
+                    fresh = True
+                except FileExistsError:
+                    fresh = False
             info = _read_tree(
-                anchors, parent, stage, job, fingerprint, proof, staged=True, fresh=fresh
+                anchors,
+                parent,
+                stage,
+                job,
+                project_fingerprint,
+                proof,
+                staged=True,
+                fresh=fresh,
+                legacy=fingerprint if reconcile_legacy_v2 else None,
             )
             os.fsync(parent)
             anchors.validate()
@@ -308,7 +375,7 @@ def ensure_project(
             # Tras un rename, comprobar las nuevas vinculaciones por FDs nuevos;
             # conservar el stage anterior abierto para cotejar el inode esperado.
             after, current_parent = _projects(stack, storage, proof, filesystem_id)
-            current = _read_tree(after, current_parent, final, job, fingerprint, proof)
+            current = _read_tree(after, current_parent, final, job, project_fingerprint, proof)
             if _identity(current) != _identity(info):
                 raise StorageError("DESTINO_PROYECTO_DISTINTO")
             os.fsync(current_parent)

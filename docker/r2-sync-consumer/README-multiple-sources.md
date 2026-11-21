@@ -7,6 +7,19 @@ el ledger nuevo, el servicio actualizado y la versión correspondiente del
 provisionador del NAS. El estado `ready` de `/healthz` solo acredita el ledger
 original y no demuestra que `/v2/sync` esté listo.
 
+El provisionador de /v2/sync vincula la carpeta a la orden. Cada material
+conserva su firma, huella, nombre y recibo. El marcador de /v1/sync conserva
+la identidad de su único material y los dos protocolos se mantienen aislados.
+
+Para recuperar una carpeta creada por la versión anterior de v2, detener su
+procesamiento y cotejar la huella del primer material con su entrada exacta
+en el ledger v2. Respaldar el marcador anterior. Como operador del NAS, ejecutar
+el provisionador local con el perfil vigente y el modo reconcile-v2. Entregar
+por stdin el sobre firmado v2 del primer material, con fecha vigente. El modo
+exige que exista la carpeta publicada o su directorio temporal y coteja la
+huella exacta del marcador antiguo. Repite la solicitud del segundo material
+después de cotejar el inodo. La ruta HTTP comprueba el marcador en cada solicitud.
+
 Tras revisar y aprobar el cambio, preparar una imagen nueva con las fuentes
 fijadas del proyecto y conservar su identidad. Usando el mismo usuario,
 montajes, configuración privada y límites del consumidor revisado, ejecutar

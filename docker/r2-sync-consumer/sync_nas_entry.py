@@ -50,7 +50,7 @@ def load_profile(path):
     return profile
 
 
-def provision(profile, encoded):
+def provision(profile, encoded, *, reconcile_legacy_v2=False):
     from sync_protocol import verify_request, verify_source_request
     from sync_provision import ProjectsProof, ensure_project
     from sync_storage import RootProof, SyncStorage
@@ -81,7 +81,13 @@ def provision(profile, encoded):
         media_proof = replace(media_proof, device=device)
         projects_proof = replace(projects_proof, device=device)
     storage = SyncStorage(media_root, media_proof, max_object_bytes=maximum)
-    project = ensure_project(storage, projects_proof, verified, filesystem_id=filesystem_id)
+    project = ensure_project(
+        storage,
+        projects_proof,
+        verified,
+        filesystem_id=filesystem_id,
+        reconcile_legacy_v2=reconcile_legacy_v2,
+    )
     reply = {
         "fingerprint": verified.fingerprint,
         "inode": project.inode,
@@ -145,9 +151,13 @@ def main():
             server.profile = profile
             server.serve_forever()
         return 0
-    if sys.argv[2:]:
+    if sys.argv[2:] not in ([], ["reconcile-v2"]):
         raise ValueError("Modo inválido")
-    raw, _ = provision(profile, sys.stdin.buffer.read(8193))
+    raw, _ = provision(
+        profile,
+        sys.stdin.buffer.read(8193),
+        reconcile_legacy_v2=sys.argv[2:] == ["reconcile-v2"],
+    )
     sys.stdout.buffer.write(raw + b"\n")
     return 0
 

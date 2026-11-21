@@ -193,6 +193,8 @@ npm --prefix cloudflare-saas/studio-portal-web audit --package-lock-only --audit
 
 ## Resultado esperado
 
+Para aceptar el provisionador NAS de carga múltiple, envía dos materiales firmados bajo la misma orden y coteja la identidad de la carpeta, las dos huellas y el reintento. [Procedimiento del consumidor](../../../docker/r2-sync-consumer/README-multiple-sources.md)
+
 Los contratos de almacenamiento utilizan `192.168.0.8:/volume2/producciones` hacia `/mnt/producciones` y el recurso SMB `producciones` hacia `P:`, según [ADR-001](../../decisions/ADR-001-volumen-producciones.md). Actualizar juntos contrato, documentación y pruebas cuando cambie el origen; un nombre local de montaje idéntico no acredita el servidor correcto. Las pruebas locales no crean el recurso ni montan NFS/SMB; la evidencia real de Fase 2 se registra por separado y debe preservar `/volume2/NFS`.
 
 El control de Fase 4 exige las fuentes del supervisor R2 y sus unidades. La aceptación en destino coteja el CID, la exportación NFSv4.1 y su marcador antes de iniciar el contenedor. [Operación del consumidor R2](../../../docker/README-r2-service.md)
