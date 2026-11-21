@@ -639,6 +639,48 @@ def test_escaleta_multiple_usa_todas_las_palabras_si_caben_en_el_contexto(
     assert [source["id"] for source in facts(bounded)] == [first, second]
 
 
+def test_correccion_multiple_situa_defectos_y_conserva_tiempos_por_fuente(handoff, order):
+    import production_valeria as director
+
+    first, second = order["media"]["asset_id"], str(uuid.uuid4())
+    batches = [{"source_id": asset, "images": [(0, b"imagen")]} for asset in (first, second)]
+    analyses = [
+        {"source_id": asset, "duracion_segundos": 24, "resumen": "Planta", "muestras": []}
+        for asset in (first, second)
+    ]
+    brief = {"objective": "Mostrar plantas", "audience": "Coleccionistas", "tone": "Cercano"}
+    angles = [{"angulo": "Variedad"}, {"angulo": "Detalle"}, {"angulo": "Maceteros"}]
+    scenes = [
+        {
+            "source_id": first,
+            "source_start_frame": 15,
+            "source_end_frame": 465,
+            "label": {"text": "Sansevierias", "start_frame": 0, "end_frame": 90, "position": "top"},
+        },
+        {"source_id": second, "source_start_frame": 30, "source_end_frame": 480},
+    ]
+    defect = {"muestra": 2, "correccion": "Mover el rótulo fuera del producto"}
+    prior = {
+        "angulo": "Detalle",
+        "dictamen": {"defectos": [defect]},
+        "render": {"props": {"scenes": scenes}},
+        "muestras": [{"segundo": 1.5, "sha256": "a" * 64}, {"segundo": 5, "sha256": "b" * 64}],
+    }
+
+    request, _ = director.multiple_plan_request(
+        angles, brief, batches, analyses, str(uuid.uuid4()), prior=prior
+    )
+    message = request["message"]
+    previous = json.loads(message[message.index('{"objetivo"') :])["revision_previa"]
+    assert previous["angulo"] == 2
+    assert previous["defectos"] == [defect]
+    assert previous["segundos_por_muestra"] == [1.5, 5]
+    assert "sha256" not in previous
+    normalized, frames = director.multi_reel_scenes(previous["escenas"], {first: 24, second: 24})
+    assert normalized == scenes
+    assert frames == 900
+
+
 def test_escaleta_multiple_entrega_rutas_y_subtitulos_de_cada_fuente(handoff, order):
     from production_valeria import ad_captions, make_edl
 
