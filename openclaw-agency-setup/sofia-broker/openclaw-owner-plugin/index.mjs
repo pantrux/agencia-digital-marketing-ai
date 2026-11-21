@@ -63,6 +63,12 @@ class Reject extends Error {
   }
 }
 
+class TranscriptUnavailable extends Reject {
+  constructor() {
+    super(503);
+  }
+}
+
 function uncodedCategory(error) {
   const message = typeof error?.message === "string" ? error.message.slice(0, 384) : "";
   if (message === "Async work scope is closed") return "WORK_SCOPE_CLOSED";
@@ -294,8 +300,11 @@ export async function readTranscript(orderId, directory = "/var/lib/agency-produ
     catch (error) { if (error?.code === "ENOENT") continue; throw error; }
     try {
       const info = await stream.stat();
-      if (!info.isFile() || info.nlink !== 1 || info.size < 1 || info.size > 4 * 1024 ** 2 ||
+      if (!info.isFile() || info.size < 1 || info.size > 4 * 1024 ** 2 ||
           (typeof process.getuid === "function" && info.uid !== process.getuid())) throw new Reject(503);
+      // El publicador enlaza el recibo y después retira su nombre temporal.
+      if (info.nlink === 2) continue;
+      if (info.nlink !== 1) throw new Reject(503);
       const raw = await stream.readFile();
       if (raw.length !== info.size) throw new Reject(503);
       const record = JSON.parse(utf8.decode(raw));
@@ -324,9 +333,14 @@ export function completeOwnerTurn(api, oauthProfileId, policy = SOFIA, transcrip
       throw inferenceFailure(error, "LLM_SURFACE");
     }
     if (typeof llm?.complete !== "function") throw inferenceFailure(new TypeError("complete is not a function"), "LLM_SURFACE");
+    let transcript;
+    try {
+      transcript = policy.id === SOFIA.id && orderId ? await transcriptReader(orderId) : null;
+    } catch {
+      throw new TranscriptUnavailable();
+    }
     let pending;
     try {
-      const transcript = policy.id === SOFIA.id && orderId ? await transcriptReader(orderId) : null;
       const content = transcript ? { mensaje: message, transcripcion: transcript } : message;
       pending = llm.complete({
         agentId: policy.agent, systemPrompt: policy.prompt, purpose: policy.id,
@@ -455,6 +469,7 @@ export function createOwnerService(settings, complete, readiness, scheduler, pol
         text = await pending;
         signal.throwIfAborted();
       } catch (error) {
+        if (error instanceof TranscriptUnavailable) throw error;
         // El SDK puede rechazar por timeout antes de que termine su limpieza nativa.
         if (req.url === policy.path) {
           uncertain = true;

@@ -117,6 +117,24 @@ describe("Historial de Sofía", () => {
     expect(context.historial).toEqual([{usuario:"Prefiero una edición cálida y cercana",sofia:"Usaré música suave y rótulos discretos."}]);
     expect(context.mensaje_actual).toBe("¿Y el cierre?");
   });
+  it("mantiene parte del último turno junto a un mensaje largo sin exceder el límite en bytes", async () => {
+    const { env } = fixture();
+    const next = "33a8a5da-cff2-4d02-99e8-0e8ec20d0049";
+    const previous = "🌿".repeat(50);
+    const reply = "🎬".repeat(50);
+    const message = "a".repeat(1830);
+    await prepareConversation(env, user, order, requestId, previous);
+    await saveConversation(env, user, order, requestId, previous, reply);
+    const wire = await prepareConversation(env, user, order, next, message, {
+      objetivo_confirmado: "Mostrar varias plantas", referencia_texto_publico: "Vivero".repeat(100),
+    });
+    expect(new TextEncoder().encode(wire).length).toBeLessThanOrEqual(2048);
+    const context = JSON.parse(wire);
+    expect(context.mensaje_actual).toBe(message);
+    expect(context.historial).toHaveLength(1);
+    expect(context.historial[0].usuario).toMatch(/^(?:🌿)+$/u);
+    expect(context.historial[0].sofia).toMatch(/^(?:🎬)+$/u);
+  });
 });
 
 describe("Materiales de la producción", () => {

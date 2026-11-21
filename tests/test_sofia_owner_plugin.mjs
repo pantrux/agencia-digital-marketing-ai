@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { chmod, lstat, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdtemp, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -408,6 +408,58 @@ function send(socketPath, turn, path = PATH) {
     req.end(raw);
   });
 }
+
+test("un recibo en publicación o inválido no detiene los turnos de Sofía", {
+  skip: process.platform !== "linux",
+}, async () => {
+  const root = await mkdtemp(join(tmpdir(), "sofia-transcripcion-socket-"));
+  const socketPath = join(root, "sofia-owner.sock");
+  const receipt = join(root, TURN.order_id + ".transcripcion.json");
+  const publishingLink = join(root, ".orden-publicando");
+  const extraLink = join(root, ".otro-enlace");
+  const otherOrder = randomUUID();
+  const { api, calls } = fixture();
+  const complete = completeOwnerTurn(api, PROFILE, undefined, (id) => readTranscript(id, root));
+  const service = createOwnerService({ socketPath, key: Buffer.from(KEY) }, complete, () => admitOAuth(api, PROFILE));
+  const sendTurn = (order_id = TURN.order_id, message = TURN.message, path = PATH) =>
+    send(socketPath, { ...TURN, order_id, request_id: randomUUID(), message }, path);
+  try {
+    await service.start();
+    assert.equal((await sendTurn(otherOrder, "startup-readiness", READY_PATH)).status, 200);
+    await writeFile(receipt, JSON.stringify({ order_id: TURN.order_id, result: { text: "Plantas resistentes." } }));
+    await link(receipt, publishingLink);
+    assert.equal((await sendTurn()).status, 200);
+    assert.equal(JSON.parse(calls[0].messages[0].content), TURN.message);
+
+    await link(receipt, extraLink);
+    await assert.rejects(readTranscript(TURN.order_id, root), { status: 503 });
+    await unlink(extraLink);
+    await unlink(publishingLink);
+    assert.equal((await sendTurn()).status, 200);
+    assert.deepEqual(JSON.parse(calls[1].messages[0].content), {
+      mensaje: TURN.message, transcripcion: "Plantas resistentes.",
+    });
+
+    await writeFile(receipt, "{recibo inválido");
+    const invalid = await sendTurn();
+    assert.equal(invalid.status, 503);
+    assert.deepEqual(JSON.parse(invalid.raw), { error: "SOFIA_OWNER_REJECTED" });
+    assert.equal(calls.length, 2);
+    assert.equal((await sendTurn(otherOrder)).status, 200);
+    assert.equal(calls.length, 3);
+
+    api.runtime.llm.complete = async () => {
+      throw Object.assign(new Error("timeout de ensayo"), { code: "LLM_COMPLETION_TIMEOUT" });
+    };
+    const failure = await sendTurn(otherOrder);
+    assert.equal(failure.status, 503);
+    assert.equal(JSON.parse(failure.raw).error, "SOFIA_OWNER_NATIVE_LLM_COMPLETION_TIMEOUT");
+    assert.equal((await sendTurn(otherOrder)).status, 429);
+  } finally {
+    await service.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("Unix 0600 verifica firma, excluye concurrencia y detiene admisión tras un fallo", {
   skip: typeof process.getuid !== "function",

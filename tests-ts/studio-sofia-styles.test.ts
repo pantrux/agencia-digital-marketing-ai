@@ -28,6 +28,16 @@ it("conserva como conversación una lista que responde a otra pregunta", () => {
   expect(readSofiaStyles("¿Cómo preparo mi anuncio?", "1. Graba el producto.\n2. Sube el vídeo.\n3. Comparte la entrega.")).toBeNull();
 });
 
+it("conserva los párrafos de la tercera propuesta antes de la pregunta de elección", () => {
+  const detail = "Planos cuidados y gráficos sencillos.\n\nEl logo aparece al final.";
+  const closing = "¿Con cuál de las opciones te quedas?";
+  const multiline = reply.slice(0, reply.indexOf("3. Elegante"))
+    + ["3. **Elegante y minimalista**", detail, closing].join("\n\n");
+  const styles = readSofiaStyles(request, multiline);
+  expect(styles?.choices[2]).toEqual({ title: "Elegante y minimalista", detail });
+  expect(styles?.outro).toBe(closing);
+});
+
 it("deja editable el brief si faltan opciones o una propuesta supera el límite", () => {
   expect(readSofiaStyles(request, "1. Editorial: Pausado.\n2. Dinámico: Cortes rápidos.")).toBeNull();
   expect(readSofiaStyles(request, reply.replace("Planos cuidados y gráficos sencillos.", "Texto ".repeat(100)))).toBeNull();

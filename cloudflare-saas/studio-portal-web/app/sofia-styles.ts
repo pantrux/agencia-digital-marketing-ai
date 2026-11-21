@@ -13,10 +13,10 @@ export function readSofiaStyles(question: string, reply: string) {
   for (const [index, marker] of markers.entries()) {
     let content = text.slice(marker.index + marker[0].length, markers[index + 1]?.index).trim();
     if (index === 2) {
-      const end = content.search(/\n(?=[ \t]*(?:\n|¿))/u);
-      if (end !== -1) {
-        outro = content.slice(end).trim();
-        content = content.slice(0, end).trim();
+      const closing = /\n[ \t]*¿[^¿?\n]+\?$/u.exec(content);
+      if (closing && /\b(?:prefieres|eliges|elegir[ií]as|te quedas|te gusta(?:r[ií]a)?)\b/iu.test(closing[0])) {
+        outro = closing[0].trim();
+        content = content.slice(0, closing.index).trim();
       }
     }
     const heading = /^(?:\*\*([^*\n]{1,80})\*\*[ \t]*:?|([^:\n]{1,80}):)[ \t]*/u.exec(content);

@@ -51,7 +51,7 @@ export async function prepareConversation(
   });
   // Reservar espacio para el diálogo cuando ya hay turnos, incluso si el
   // proyecto contiene una referencia extensa. El mensaje actual no se recorta.
-  const projectBudget = rows.results.length ? Math.max(1536, encoder.encode(format([])).length) : 2048;
+  const projectBudget = rows.results.length ? 1536 : 2048;
   for (const [key, value] of Object.entries(project)) {
     if (typeof value !== "string" || !value.trim()) continue;
     context[key] = Array.from(value.trim()).slice(0, key === "referencia_texto_publico" ? 600 : 200).join("");
@@ -69,7 +69,9 @@ export async function prepareConversation(
       if (encoder.encode(format([item, ...history])).length <= 2048) low = midpoint;
       else high = midpoint - 1;
     }
-    if (low < 24 && (userChars.length > low || replyChars.length > low)) break;
+    // Si el mensaje actual ocupa casi todo el espacio, conserva lo que quepa
+    // del último intercambio. Los turnos más antiguos requieren más contexto.
+    if (low === 0 || (history.length > 0 && low < 24 && (userChars.length > low || replyChars.length > low))) break;
     history.unshift({ usuario: userChars.slice(0, low).join(""), sofia: replyChars.slice(0, low).join("") });
     wire = format(history);
   }
