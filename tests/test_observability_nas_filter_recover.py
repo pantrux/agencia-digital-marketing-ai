@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from runpy import run_path
+from types import SimpleNamespace
 
 import pytest
 from test_observability_nas_alertmanager_filter import SMTP, am, baseline_with_nat
@@ -113,3 +114,61 @@ def test_arranque_rechaza_un_salto_nat_ajeno_en_prerouting():
     recover = run_path(str(SOURCE))
     with pytest.raises(ValueError, match="PREROUTING_INESPERADO"):
         recover["startup_target"](repair, am, SMTP, live, approved)
+
+
+def test_arranque_conserva_default_forward_detras_del_filtro_propio():
+    live, approved = states()
+    live["4:filter"] += (
+        ("CHAIN", "DEFAULT_FORWARD", "-"),
+        ("-A", "FORWARD", "-j", "DEFAULT_FORWARD"),
+        ("-A", "DEFAULT_FORWARD", "-j", "DOCKER-USER"),
+    )
+    recover = run_path(str(SOURCE))
+    target = recover["startup_target"](repair, am, SMTP, live, approved)
+    table = repair.chains(target["4:filter"])
+    assert table["FORWARD"]["rules"] == [
+        ("-j", "PPPOE_FORWARD"),
+        ("-j", repair.owned_chain("FORWARD")),
+        ("-j", "DEFAULT_FORWARD"),
+    ]
+    assert table["DEFAULT_FORWARD"] == repair.chains(live["4:filter"])["DEFAULT_FORWARD"]
+    steps = recover["recovery_plan"](repair, am, SMTP, live, target, startup=True)
+    [ipv4] = [step for step in steps if step.get("preserve_dsm_forward")]
+    assert (ipv4["action"], ipv4["family"]) == ("hooks", 4)
+    assert recover["recovery_plan"](repair, am, SMTP, target, target, startup=True) == []
+
+
+@pytest.mark.parametrize("failure", [ValueError("COMANDO_RECHAZADO"), KeyboardInterrupt()])
+def test_arranque_de_contenedores_exige_filtros_y_revierte_si_falla(monkeypatch, failure):
+    recover = run_path(str(SOURCE))
+    launch = recover["start_containers"]
+    identities = ({"cid": "prometheus"}, {"cid": "alertmanager"}, {})
+    commands = []
+
+    def command(argv):
+        commands.append(argv[-2:])
+        if argv[-1] == "prometheus":
+            raise failure
+        return argv[-1].encode()
+
+    host = SimpleNamespace(
+        DOCKER="docker",
+        snapshot=lambda: {"filter": "seguro"},
+        hashes=lambda state: state,
+        command=command,
+    )
+    monkeypatch.setattr(
+        launch.__globals__["subprocess"], "run", lambda argv, **_options: commands.append(argv[-2:])
+    )
+    with pytest.raises(ValueError, match="CAMBIO_CONCURRENTE"):
+        launch(host, identities, {"filter": "incompleto"}, lambda: identities)
+    assert commands == []
+    with pytest.raises(type(failure)) as raised:
+        launch(host, identities, {"filter": "seguro"}, lambda: identities)
+    assert raised.value is failure
+    assert [command[-1] for command in commands] == [
+        "alertmanager",
+        "prometheus",
+        "prometheus",
+        "alertmanager",
+    ]

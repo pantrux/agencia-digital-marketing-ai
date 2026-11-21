@@ -10,6 +10,8 @@ Para habilitar HyperFrames, instala las dependencias fijadas del renderer y veri
 
 Al cambiar el aprovisionador de DSM, el monitor de D1 o la cola de la bóveda, ejecuta además `python -m pytest tests/test_r2_sync_provision.py tests/test_d1_backup_metrics.py tests/test_vault_changes.py`. Las pruebas por descriptor del aprovisionador se ejecutan en Linux. Para cambiar el manifiesto o el pipeline, valida también la lista del cambio con `python scripts/ci/check_docs.py --changed-files <archivo-json>` e incluye esta receta y el diagrama.
 
+Si Prometheus y Alertmanager quedan detenidos tras reiniciar DSM, usa `plan-start` para comprobar los contenedores, las bibliotecas fijadas y la sintaxis del plan. Aplica `start` con el mismo perfil y verifica la salud y TLS mutuo desde la red autorizada. [Procedimiento en DSM](../../../docker/observability/README-nas.md#recuperación-programada-en-dsm)
+
 Para sustituir la imagen de PostgreSQL de aplicaciones, coteja el Compose resuelto y los pines de [n8n](../../../docker/n8n/README-private-deploy.md) y del [respaldo diario](../../../sre/README-backup-321-orchestrator.md). La aceptación en la VM exige conservar PGDATA, confirmar las conexiones de Kitsu y n8n y comprobar el perfil actualizado antes de la siguiente copia programada.
 
 Antes de promover PostgreSQL 16.16, verifica el manifiesto oficial y el candidato por digest. Ensaya un clúster desechable con dos arranques, autenticación SCRAM y persistencia. Revisa por base de datos las extensiones C y los índices afectados por los cambios publicados. Immich requiere recompilar sus extensiones contra los headers de 16.16 y repetir la aceptación vectorial. [Notas de PostgreSQL 16.16](https://www.postgresql.org/docs/16/release-16-16.html)

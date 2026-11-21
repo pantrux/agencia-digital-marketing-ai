@@ -60,6 +60,7 @@ flowchart TB
     R2NAS4["Verificar montaje NFS e identidad del volumen en el aprovisionador DSM"] -->|Evidencia operativa| FASE4
     COPIAS4["Cotejar recibos de D1 y restauración de la bóveda desde R2"] -->|Evidencia operativa| FASE4
     ALERT4["Verificar TLS mutuo de Prometheus a Alertmanager y el acceso SMTP desde su bridge"] -->|Evidencia operativa| FASE4
+    ARRANQUE4["Ensayar y reponer los filtros de DSM antes de iniciar Prometheus y Alertmanager"] --> ALERT4
 
     %% Las líneas discontinuas representan trabajo futuro, no trabajos activos de entrega.
     subgraph FUTURO["Fases posteriores: activar después de verificar recursos y salvaguardas"]
