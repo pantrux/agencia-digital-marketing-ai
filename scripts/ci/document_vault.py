@@ -83,6 +83,11 @@ GROUPS = [
         "perfil privado de MCP en Ubuntu-OpenClaw (.7)",
     ),
     (
+        ("DAVINCI_MCP_TOKEN",),
+        "Autenticar el MCP de DaVinci Resolve para Lucas",
+        "DaVinci Resolve en Windows (.6) y cliente MCP de OpenClaw (.7) mediante SSH",
+    ),
+    (
         ("GOOGLE_AI_", "ELEVENLABS_"),
         "Proveedor auxiliar de generación audiovisual",
         "agentes (.7) y servicios de medios (.85)",
@@ -198,6 +203,8 @@ def documentation(key: str) -> list[str]:
         risk = "Conservar clave anterior: cambiarla sin migración impide descifrar respaldos históricos."
     elif key == "N8N_ENCRYPTION_KEY":
         risk = "Conservar clave anterior y migrar credenciales cifradas antes de reiniciar n8n."
+    elif key == "DAVINCI_MCP_TOKEN":
+        risk = "Actualizar ambos extremos antes de reiniciar el MCP de Resolve y verificar el acceso de Lucas."
     elif key.endswith(("PASSWORD", "SECRET", "SECRET_KEY", "ENCRYPTION_KEYS")):
         risk = "Coordinar cambio en origen y todos los consumidores; reiniciar sesiones o conexiones afectadas."
     elif "TOKEN" in key or "API_KEY" in key or key.endswith("KEY_ID"):
