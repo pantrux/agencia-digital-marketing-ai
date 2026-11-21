@@ -144,6 +144,18 @@ export async function signSyncJob(value: unknown, policy: SyncPolicy, key: Crypt
   return Object.freeze({ body, timestamp, signature: `v1=${hex(mac)}`, bodySha256 });
 }
 
+/** El dominio v2 impide reutilizar una firma de conjuntos en el protocolo anterior. */
+export async function signSourceSyncJob(value: unknown, policy: SyncPolicy, key: CryptoKey, timestamp: string): Promise<SignedSyncRequest & { readonly bodySha256: string }> {
+  const body = encodeSyncJob(value, policy);
+  checkTimestamp(timestamp);
+  checkKey(key, 'sign');
+  const bodySha256 = await bodyHash(body);
+  let mac: ArrayBuffer;
+  try { mac = await crypto.subtle.sign('HMAC', key, encoder.encode(`v2\n${timestamp}\nPOST\n/v2/sync\n${bodySha256}`)); }
+  catch { return fail('FIRMA'); }
+  return Object.freeze({ body, timestamp, signature: `v2=${hex(mac)}`, bodySha256 });
+}
+
 export async function verifySyncRequest(request: SignedSyncRequest, policy: SyncPolicy, key: CryptoKey, nowSeconds: () => number): Promise<Readonly<VerifiedSyncJob>> {
   // Copiar antes del primer await evita que el llamador cambie los bytes autenticados.
   const body = snapshot(request.body);

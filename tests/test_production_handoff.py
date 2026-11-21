@@ -7,8 +7,11 @@ import sqlite3
 import sys
 import uuid
 import zipfile
+from contextlib import closing
+from http.client import HTTPConnection
+from http.server import HTTPServer
 from pathlib import Path
-from threading import Event
+from threading import Event, Thread
 from types import SimpleNamespace
 from xml.etree import ElementTree
 
@@ -50,6 +53,71 @@ def order():
     }
 
 
+def test_inbox_recibe_una_orden_http_con_32_materiales(handoff, order, monkeypatch, tmp_path):
+    import production_inbox as inbox
+
+    checked_assets = []
+
+    def verify_source(media):
+        checked_assets.append(media["asset_id"])
+        return True
+
+    monkeypatch.setattr(inbox, "source_matches", verify_source)
+    extra = []
+    for _ in range(31):
+        asset = str(uuid.uuid4())
+        extra.append(
+            dict(
+                order["media"], asset_id=asset, object_key=f"ingest/{order['order_id']}/{asset}.mp4"
+            )
+        )
+    request = dict(
+        order, additional_media=extra, attempt=1, lease=str(uuid.uuid4()), lease_expires_at=1
+    )
+    body = json.dumps(request).encode()
+    assert 9999 < len(body) <= inbox.MAX_BODY
+
+    database = tmp_path / "inbox.sqlite3"
+    with closing(sqlite3.connect(database)) as db:
+        db.execute(
+            "CREATE TABLE inbox(order_id TEXT PRIMARY KEY, payload TEXT, received_at INTEGER)"
+        )
+    with HTTPServer(("127.0.0.1", 0), inbox.Handler) as server:
+        server.peer = "127.0.0.1"
+        server.token = b"a" * 64
+        server.database = database
+        worker = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+        worker.start()
+        try:
+            headers = {
+                "Authorization": "Bearer " + server.token.decode(),
+                "Content-Type": "application/json",
+            }
+            with closing(HTTPConnection(*server.server_address, timeout=4)) as client:
+                client.request("POST", "/v1/productions", body=body, headers=headers)
+                with client.getresponse() as response:
+                    assert response.status == 200
+                    assert json.loads(response.read()) == {
+                        "accepted": True,
+                        "order_id": order["order_id"],
+                    }
+                client.request(
+                    "POST", "/v1/productions", body=b" " * (inbox.MAX_BODY + 1), headers=headers
+                )
+                with client.getresponse() as response:
+                    assert response.status == 400
+        finally:
+            server.shutdown()
+            worker.join(timeout=2)
+    assert checked_assets == [item["asset_id"] for item in [order["media"], *extra]]
+    with closing(sqlite3.connect(database)) as db:
+        assert db.execute("SELECT count(*) FROM inbox").fetchone() == (1,)
+        stored = db.execute(
+            "SELECT payload FROM inbox WHERE order_id=?", (order["order_id"],)
+        ).fetchone()
+        assert json.loads(stored[0])["additional_media"] == extra
+
+
 def test_verifica_contrato_firmado_y_separa_ordenes(handoff, order):
     secret = b"a" * 64
     raw = handoff.seal(order, secret)
@@ -71,6 +139,189 @@ def test_publica_una_vez_y_conserva_colision(handoff, tmp_path):
     with pytest.raises(ValueError):
         handoff.publish(target, b"dos")
     assert [(p.name, p.read_bytes()) for p in tmp_path.iterdir()] == [("orden.json", b"uno")]
+
+
+def test_revision_de_valeria_admite_ingestas_multiples_grandes(
+    handoff, order, monkeypatch, tmp_path
+):
+    import production_valeria as director
+
+    receipt = tmp_path / f"{order['order_id']}.json"
+    receipt.write_text(json.dumps({"order": order, "metadata": "x" * 20000}), encoding="utf-8")
+    monkeypatch.setattr(director, "validate", lambda *_: None)
+    monkeypatch.setattr(director, "eligible", lambda *_: False)
+    assert director.process_pending(receipt, None, None, None, tmp_path, None) is False
+
+
+def test_publicacion_admite_recibo_de_ingesta_multiple_grande(
+    handoff, order, monkeypatch, tmp_path
+):
+    import production_publish as publisher
+
+    journal = tmp_path / "journal"
+    journal.mkdir()
+    local = tmp_path / f"{order['order_id']}.json"
+    local.write_text(json.dumps({"order_id": order["order_id"], "kitsu": {"task_id": "task"}}))
+    (journal / local.name).write_text(json.dumps({"order": order, "metadata": "x" * 20000}))
+    monkeypatch.setattr(publisher, "JOURNAL", journal)
+    monkeypatch.setattr(publisher, "validate", lambda *_: None)
+    monkeypatch.setattr(publisher, "eligible", lambda *_: False)
+    with pytest.raises(ValueError, match="La orden no corresponde al piloto"):
+        publisher.publish_assigned(
+            {}, order["order_id"], {"task": "task"}, local, tmp_path, None, None, pending=False
+        )
+
+
+def test_orquestador_de_revision_no_publica_si_calidad_rechaza(handoff, monkeypatch, tmp_path):
+    import production_revision as revision
+
+    folders = {name: tmp_path / name for name in ("draft", "render", "review")}
+    for folder in folders.values():
+        folder.mkdir()
+    claim = {"id": str(uuid.uuid4()), "lease": str(uuid.uuid4())}
+    calls = []
+    monkeypatch.setattr(
+        revision, "draft_revision", lambda *_: {"escaleta": {"estado": "lista_para_stills"}}
+    )
+
+    def rejected_review(*args):
+        assert args[-1] == "gpu-token"
+        return {"status": "rechazado"}
+
+    monkeypatch.setattr(revision, "render_and_review", rejected_review)
+    monkeypatch.setattr(revision, "stage_approved_revision", lambda *_: calls.append("stage"))
+    monkeypatch.setattr(revision, "publish_staged_revision", lambda *_: calls.append("publish"))
+
+    def renew(_):
+        calls.append("renew")
+
+    result = revision.process_claim(
+        claim,
+        {},
+        {},
+        {},
+        tmp_path,
+        folders,
+        "dispatch-token",
+        "gpu-token",
+        None,
+        None,
+        renew,
+        "Reel",
+    )
+    assert result == {"status": "needs_review", "stage": "quality"}
+    assert calls == ["renew", "renew"]
+    monkeypatch.setattr(
+        revision, "render_and_review", lambda *_: {"status": "aprobado", "render": {}, "review": {}}
+    )
+    monkeypatch.setattr(revision, "stage_approved_revision", lambda *_: {"path": "kit"})
+    monkeypatch.setattr(revision, "publish_staged_revision", lambda *_: {"id": "kit"})
+    calls.clear()
+    assert revision.process_claim(
+        claim, {}, {}, {}, tmp_path, folders, "token", None, None, None, renew, "Reel"
+    ) == {"status": "completed", "kit": {"id": "kit"}}
+    assert calls == ["renew"] * 4
+
+
+def test_servicio_de_revision_reclama_y_registra_rechazo(handoff, order, monkeypatch, tmp_path):
+    import production_revision as revision
+
+    claim = {"id": str(uuid.uuid4()), "lease": str(uuid.uuid4()), "base_kit_title": "Mi reel"}
+    paths = {
+        name: tmp_path for name in ("journal", "strategy", "direction", "draft", "render", "review")
+    }
+    events = []
+
+    def dispatch(payload, token):
+        assert token == "token"
+        events.append(payload)
+        if payload["action"] == "delivery_revision_claim":
+            return {"revision": claim}
+        if payload["action"] == "delivery_revision_failed":
+            return {"recorded": True}
+        raise AssertionError("Despacho inesperado")
+
+    monkeypatch.setattr(
+        revision,
+        "load_claim_context",
+        lambda *_: {
+            "receipt": {"order": order},
+            "strategy": {},
+            "direction": {},
+            "kit_path": tmp_path,
+        },
+    )
+    monkeypatch.setattr(revision, "eligible", lambda *_: True)
+    monkeypatch.setattr(
+        revision, "process_claim", lambda *_: {"status": "needs_review", "stage": "quality"}
+    )
+    result = revision.run_once({}, paths, "token", None, None, None, dispatch)
+    assert result == {"status": "needs_review", "stage": "quality"}
+    assert events[-1] == {
+        "action": "delivery_revision_failed",
+        "id": claim["id"],
+        "lease": claim["lease"],
+        "stage": "quality",
+    }
+
+
+def test_entrega_rechaza_dictamen_de_otra_escaleta(handoff, order, monkeypatch, tmp_path):
+    import production_delivery as delivery
+
+    monkeypatch.setattr(delivery, "MEDIA", tmp_path)
+    identity = order["order_id"]
+    brief = {"order_id": identity, "user_id": order["user_id"], "objective": "Plantas"}
+    digest = hashlib.sha256(handoff.canonical(brief)).hexdigest()
+    job = f"{identity}-v1"
+    relative = (
+        Path("proyectos")
+        / order["media"]["project_slug"]
+        / "06_renders"
+        / job
+        / "render"
+        / "master.mp4"
+    )
+    master = tmp_path / relative
+    master.parent.mkdir(parents=True)
+    master.write_bytes(b"video")
+    render = {
+        "brief_sha256": digest,
+        "source_sha256": order["media"]["sha256"],
+        "job_id": job,
+        "direction_sha256": "a" * 64,
+        "master": {"path": relative.as_posix()},
+    }
+    review = {"brief_sha256": digest, "direction_sha256": "a" * 64}
+    assert delivery.approved_master(order, render, review, brief) == master
+    with pytest.raises(ValueError, match="Brief o crudo ajeno"):
+        delivery.approved_master(order, render, {**review, "direction_sha256": "b" * 64}, brief)
+
+
+def test_escaleta_antigua_se_acredita_con_recibo_del_puente(handoff, order, monkeypatch, tmp_path):
+    import production_lucas as lucas
+    import production_revision as revision
+
+    monkeypatch.setattr(revision, "LUCAS", tmp_path)
+    source = {"video": "a" * 64, "audio": "b" * 64, "brief": "c" * 64}
+    monkeypatch.setattr(lucas, "verified_inputs", lambda *_: source)
+    master = {"path": "master.mp4", "sha256": "d" * 64, "bytes": 5}
+    monkeypatch.setattr(lucas, "verify_mp4", lambda *_: master)
+    original = {"job_id": order["order_id"] + "-v1", "props": {"title": "Plantas"}}
+    direction = {"escaleta": {"render": original}}
+    job = order["order_id"] + "-v2"
+    request_hash = hashlib.sha256(
+        handoff.canonical({"request": {**original, "job_id": job}, "source": source})
+    ).hexdigest()
+    journal = tmp_path / f"{order['order_id']}-v2.render.receipt"
+    journal.write_text(json.dumps({"request_sha256": request_hash, "result": {"test": True}}))
+    revision.legacy_direction_proof(
+        order, {"order": order}, direction, {"job_id": job, "master": master}, "c" * 64
+    )
+    direction["escaleta"]["render"]["props"]["title"] = "Otro"
+    with pytest.raises(ValueError, match="no corresponde a la escaleta"):
+        revision.legacy_direction_proof(
+            order, {"order": order}, direction, {"job_id": job, "master": master}, "c" * 64
+        )
 
 
 @pytest.mark.parametrize("plan", ["ultra", "ilimitado"])
@@ -111,6 +362,72 @@ def test_el_formato_prores_se_conserva_en_buzon_y_sobre_firmado(handoff, order, 
     for plan in ("free", "pro", "ultra"):
         with pytest.raises(ValueError, match="Formato fuera del plan"):
             handoff.seal({**selected, "plan_id": plan, "output_resolution": "1080p"}, key)
+
+
+def test_recibe_y_sella_todos_los_materiales_solo_si_coinciden(handoff, order, monkeypatch):
+    import production_inbox
+
+    asset = str(uuid.uuid4())
+    second = {
+        **order["media"],
+        "asset_id": asset,
+        "object_key": f"ingest/{order['order_id']}/{asset}.mp4",
+    }
+    selected = {**order, "additional_media": [second]}
+    request = dict(selected, attempt=1, lease=order["order_id"], lease_expires_at=0)
+    checked = []
+    monkeypatch.setattr(
+        production_inbox, "source_matches", lambda media: checked.append(media["asset_id"]) or True
+    )
+    with sqlite3.connect(":memory:") as db:
+        db.execute(
+            "CREATE TABLE inbox (order_id TEXT PRIMARY KEY, payload TEXT, received_at INTEGER)"
+        )
+        production_inbox.receive(db, request)
+        assert checked == [order["media"]["asset_id"], asset]
+        assert json.loads(db.execute("SELECT payload FROM inbox").fetchone()[0]) == selected
+    key = b"a" * 64
+    assert handoff.verify(handoff.seal(selected, key), key, order["order_id"]) == selected
+    with pytest.raises(ValueError, match="duplicado"):
+        production_inbox.verify_order({**request, "additional_media": [order["media"]]})
+    monkeypatch.setattr(
+        production_inbox, "source_matches", lambda media: media["asset_id"] != asset
+    )
+    with sqlite3.connect(":memory:") as db:
+        db.execute(
+            "CREATE TABLE inbox (order_id TEXT PRIMARY KEY, payload TEXT, received_at INTEGER)"
+        )
+        with pytest.raises(ValueError, match="Crudo"):
+            production_inbox.receive(db, request)
+        assert db.execute("SELECT COUNT(*) FROM inbox").fetchone()[0] == 0
+    from production_valeria import source_paths
+
+    with pytest.raises(ValueError, match="varios materiales"):
+        source_paths({"order": selected})
+
+
+def test_preparacion_identifica_cada_video_y_conserva_su_orden(
+    handoff, order, monkeypatch, tmp_path
+):
+    import production_intake
+
+    second = {**order["media"], "asset_id": str(uuid.uuid4())}
+    calls = []
+
+    def source(media, audio_name):
+        calls.append((media["asset_id"], audio_name))
+        return {"media": media, "raw": media["asset_id"], "duration_seconds": 5, "audio": None}
+
+    monkeypatch.setattr(production_intake, "prepare_source", source)
+    journal = tmp_path / "recepcion.json"
+    production_intake.prepare({**order, "additional_media": [second]}, journal)
+    receipt = json.loads(journal.read_text())
+    assert receipt["raw"] == order["media"]["asset_id"]
+    assert receipt["additional_sources"][0]["media"] == second
+    assert calls == [
+        (order["media"]["asset_id"], "intake-source.wav"),
+        (second["asset_id"], f"intake-source-{second['asset_id']}.wav"),
+    ]
 
 
 @pytest.mark.parametrize(("plan", "rounds"), [("pro", 2), ("ultra", 3), ("ilimitado", 3)])
@@ -173,6 +490,444 @@ def test_transcripcion_exige_marcas_absolutas_ordenadas(monkeypatch):
     result["words"][1]["start"] = 0.2
     with pytest.raises(ValueError):
         validate_transcript(result)
+
+
+def test_sofia_recibe_el_texto_transcrito_como_contexto_limitado(monkeypatch, tmp_path, order):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_sofia as sofia
+
+    text = "Las sansevieras necesitan poca agua. " * 1000
+    transcript_order = []
+
+    def transcribe(_receipt, _output, source=None):
+        transcript_order.append(source["media"]["asset_id"] if source else "principal")
+        return {"language": "es", "text": text, "words": ["palabra"]}
+
+    monkeypatch.setattr(sofia, "transcript_for", transcribe)
+    observed = {}
+    reply = {"enfoque": "Plantas", "alcance": "Reel", "pendiente": "Audiencia"}
+    meta = {"agentHarnessId": "codex", "model": "gpt-6.1-terra", "provider": "openai"}
+
+    def run(args, **_kwargs):
+        observed["prompt"] = args[args.index("--message") + 1]
+        result = {
+            "status": "ok",
+            "result": {"meta": {"agentMeta": meta}, "payloads": [{"text": json.dumps(reply)}]},
+        }
+        return type("Run", (), {"stdout": json.dumps(result).encode()})()
+
+    monkeypatch.setattr(sofia.subprocess, "run", run)
+    monkeypatch.setattr(sofia, "publish", lambda *_: None)
+    sofia.start_brief(
+        {"order": order, "duration_seconds": 90, "audio": {}}, tmp_path / "brief.json"
+    )
+    prompt = observed["prompt"]
+    assert "Las sansevieras necesitan poca agua" in prompt
+    facts = json.loads(prompt.split("Metadatos verificados: ", 1)[1])
+    assert len(facts["transcripcion"]["texto"]) == sofia.MAX_BRIEF_TRANSCRIPT
+    assert facts["transcripcion"]["texto_truncado"] is True
+    second = {**order["media"], "asset_id": str(uuid.uuid4())}
+    sofia.start_brief(
+        {
+            "order": {**order, "additional_media": [second]},
+            "duration_seconds": 90,
+            "audio": {},
+            "additional_sources": [{"media": second, "duration_seconds": 30, "audio": {}}],
+        },
+        tmp_path / "brief.json",
+    )
+    multi = json.loads(observed["prompt"].split("Metadatos verificados: ", 1)[1])
+    assert transcript_order == ["principal", second["asset_id"], "principal"]
+    assert multi["materiales_adicionales"][0]["id"] == second["asset_id"]
+    assert "Las sansevieras" in multi["materiales_adicionales"][0]["transcripcion"]["texto"]
+    assert (
+        len(multi["transcripcion"]["texto"])
+        + len(multi["materiales_adicionales"][0]["transcripcion"]["texto"])
+        == sofia.MAX_BRIEF_TRANSCRIPT
+    )
+
+
+def test_escaleta_multiple_conserva_identidad_y_tiempos_de_cada_fuente(handoff, order):
+    from production_valeria import VisualResponseFormatError, multi_reel_scenes
+
+    first, second = order["media"]["asset_id"], str(uuid.uuid4())
+    sources = {first: 80, second: 30}
+    items = [
+        {
+            "fuente": second,
+            "desde": 0,
+            "hasta": 10,
+            "rotulo": {
+                "texto": "Conoce nuestras plantas",
+                "desde": 0,
+                "hasta": 3,
+                "posicion": "superior",
+            },
+        },
+        {"fuente": first, "desde": 15, "hasta": 35},
+    ]
+    scenes, frames = multi_reel_scenes(items, sources, ad=True)
+    assert frames == 900
+    assert [(scene["source_id"], scene["source_start_frame"]) for scene in scenes] == [
+        (second, 0),
+        (first, 450),
+    ]
+    with pytest.raises(VisualResponseFormatError, match="desconocida"):
+        multi_reel_scenes([{**items[0], "fuente": str(uuid.uuid4())}, items[1]], sources, ad=True)
+    with pytest.raises(VisualResponseFormatError, match="fuera del material"):
+        multi_reel_scenes([items[0], {**items[1], "hasta": 81}], sources, ad=True)
+    with pytest.raises(VisualResponseFormatError, match="superponen"):
+        multi_reel_scenes(
+            [items[0], {**items[1], "fuente": second, "desde": 5, "hasta": 25}], sources, ad=True
+        )
+    longer = [{**items[0], "hasta": 30}, {**items[1], "desde": 0, "hasta": 80}]
+    assert multi_reel_scenes(longer, sources, long_form=True)[1] == 3300
+    with pytest.raises(VisualResponseFormatError, match="duración válida"):
+        multi_reel_scenes(longer, sources)
+    with pytest.raises(VisualResponseFormatError, match="anuncio"):
+        multi_reel_scenes(longer, sources, ad=True, long_form=True)
+
+
+def test_valeria_inspecciona_cada_fuente_en_lotes_separados(handoff, order, monkeypatch):
+    import production_valeria as director
+
+    second = {**order["media"], "asset_id": str(uuid.uuid4())}
+    selected = {**order, "additional_media": [second]}
+    receipt = {
+        "order": selected,
+        "raw": "primer-video",
+        "duration_seconds": 60,
+        "audio": None,
+        "additional_sources": [
+            {"media": second, "raw": "segundo-video", "duration_seconds": 40, "audio": None}
+        ],
+    }
+    calls = []
+
+    def sample(single, *, ad=False, transcript=None):
+        calls.append((single["order"]["media"]["asset_id"], single["raw"], ad, transcript))
+        return [(1.0, b"imagen")]
+
+    monkeypatch.setattr(director, "sample_images", sample)
+    transcripts = {second["asset_id"]: {"words": []}}
+    batches = director.sample_source_batches(receipt, ad=True, transcripts=transcripts)
+    assert [batch["source_id"] for batch in batches] == [
+        order["media"]["asset_id"],
+        second["asset_id"],
+    ]
+    assert calls == [
+        (order["media"]["asset_id"], "primer-video", True, None),
+        (second["asset_id"], "segundo-video", True, transcripts[second["asset_id"]]),
+    ]
+    with pytest.raises(ValueError, match="distintos"):
+        director.sample_source_batches({**receipt, "additional_sources": []})
+
+
+def test_analisis_visual_multiple_rechaza_muestras_no_examinadas(handoff, order, monkeypatch):
+    import production_valeria as director
+
+    second = str(uuid.uuid4())
+    batches = [
+        {
+            "source_id": order["media"]["asset_id"],
+            "duration_seconds": 20,
+            "images": [(2.0, b"primera")],
+        },
+        {"source_id": second, "duration_seconds": 30, "images": [(9.0, b"segunda")]},
+    ]
+    brief = {"objective": "Mostrar plantas", "audience": "Coleccionistas", "tone": "Cercano"}
+    calls = []
+
+    def analyze(request):
+        calls.append(request)
+        return {
+            "resumen": "Plantas en macetas",
+            "muestras": [{"segundo": (2.0, 9.0)[len(calls) - 1], "descripcion": "Planta visible"}],
+        }
+
+    monkeypatch.setattr(director, "run_visual", analyze)
+    result = director.analyze_source_batches(brief, batches, str(uuid.uuid4()))
+    assert [item["source_id"] for item in result] == [batch["source_id"] for batch in batches]
+    assert calls[0]["idempotencyKey"] != calls[1]["idempotencyKey"]
+    assert [len(call["attachments"]) for call in calls] == [1, 1]
+    with pytest.raises(director.VisualResponseFormatError, match="no coincide"):
+        director.source_observations(
+            {"resumen": "Vista", "muestras": [{"segundo": 7.0, "descripcion": "Detalle"}]},
+            batches[0],
+        )
+
+
+def test_escaleta_multiple_usa_todas_las_palabras_si_caben_en_el_contexto(
+    handoff, order, monkeypatch
+):
+    import production_valeria as director
+
+    first, second = order["media"]["asset_id"], str(uuid.uuid4())
+    batches = [{"source_id": asset, "images": [(2.0, b"muestra")]} for asset in (first, second)]
+    analyses = [
+        {
+            "source_id": asset,
+            "duracion_segundos": 24,
+            "resumen": "Plantas y maceteros",
+            "muestras": [{"segundo": 2, "descripcion": "Planta en primer plano"}],
+        }
+        for asset in (first, second)
+    ]
+    transcripts = {
+        asset: {
+            "words": [
+                {"start": i / 2, "end": (i + 1) / 2, "word": f"{label}{i}"} for i in range(40)
+            ]
+        }
+        for asset, label in ((first, "primera"), (second, "segunda"))
+    }
+    brief = {"objective": "Mostrar plantas", "audience": "Coleccionistas", "tone": "Cercano"}
+    request_id = str(uuid.uuid4())
+
+    def plan():
+        return director.multiple_plan_request(
+            [], brief, batches, analyses, request_id, transcripts=transcripts
+        )[0]
+
+    def facts(request):
+        message = request["message"]
+        return json.loads(message[message.index('{"objetivo"') :])["fuentes"]
+
+    complete = plan()
+    first_source, second_source = facts(complete)
+    assert first_source["transcripcion_completa"] and second_source["transcripcion_completa"]
+    assert first_source["palabras_con_tiempo"][-1] == [19.5, 20, "primera39"]
+    assert second_source["palabras_con_tiempo"][-1] == [19.5, 20, "segunda39"]
+
+    limit = len(director.visual_payload(complete)) - 500
+    monkeypatch.setattr(director, "MAX_VISUAL_BYTES", limit + 1000)
+    bounded = plan()
+    assert len(director.visual_payload(bounded)) <= limit
+    assert not all(source["transcripcion_completa"] for source in facts(bounded))
+    assert [source["id"] for source in facts(bounded)] == [first, second]
+
+
+def test_correccion_multiple_situa_defectos_y_conserva_tiempos_por_fuente(handoff, order):
+    import production_valeria as director
+
+    first, second = order["media"]["asset_id"], str(uuid.uuid4())
+    batches = [{"source_id": asset, "images": [(0, b"imagen")]} for asset in (first, second)]
+    analyses = [
+        {"source_id": asset, "duracion_segundos": 24, "resumen": "Planta", "muestras": []}
+        for asset in (first, second)
+    ]
+    brief = {"objective": "Mostrar plantas", "audience": "Coleccionistas", "tone": "Cercano"}
+    angles = [{"angulo": "Variedad"}, {"angulo": "Detalle"}, {"angulo": "Maceteros"}]
+    scenes = [
+        {
+            "source_id": first,
+            "source_start_frame": 15,
+            "source_end_frame": 465,
+            "label": {
+                "text": "Sansevierias",
+                "start_frame": 0,
+                "end_frame": 90,
+                "position": "panel",
+            },
+        },
+        {"source_id": second, "source_start_frame": 30, "source_end_frame": 480},
+    ]
+    defect = {"muestra": 2, "correccion": "Mover el rótulo fuera del producto"}
+    prior = {
+        "angulo": "Detalle",
+        "dictamen": {"defectos": [defect]},
+        "render": {"props": {"scenes": scenes}},
+        "muestras": [{"segundo": 1.5, "sha256": "a" * 64}, {"segundo": 5, "sha256": "b" * 64}],
+    }
+
+    request, _ = director.multiple_plan_request(
+        angles, brief, batches, analyses, str(uuid.uuid4()), prior=prior
+    )
+    message = request["message"]
+    previous = json.loads(message[message.index('{"objetivo"') :])["revision_previa"]
+    assert previous["angulo"] == 2
+    assert previous["defectos"] == [defect]
+    assert previous["segundos_por_muestra"] == [1.5, 5]
+    assert "sha256" not in previous
+    normalized, frames = director.multi_reel_scenes(previous["escenas"], {first: 24, second: 24})
+    assert normalized == scenes
+    assert frames == 900
+
+
+def test_escaleta_multiple_entrega_rutas_y_subtitulos_de_cada_fuente(handoff, order):
+    from production_valeria import ad_captions, make_edl
+
+    first, second = order["media"]["asset_id"], str(uuid.uuid4())
+    extra = {
+        **order["media"],
+        "asset_id": second,
+        "object_key": f"ingest/{order['order_id']}/{second}.mp4",
+    }
+    project = order["media"]["project_slug"]
+    order = {**order, "output_edit": "reel", "additional_media": [extra]}
+    receipt = {
+        "order": order,
+        "raw": f"proyectos/{project}/01_raw/{first}.mp4",
+        "duration_seconds": 60,
+        "audio": {"path": f"proyectos/{project}/03_assets/intake-source.wav"},
+        "additional_sources": [
+            {
+                "media": extra,
+                "raw": f"proyectos/{project}/01_raw/{second}.mp4",
+                "duration_seconds": 30,
+                "audio": {"path": f"proyectos/{project}/03_assets/intake-source-{second}.wav"},
+            }
+        ],
+    }
+    scenes = [
+        {
+            "fuente": second,
+            "desde": 0,
+            "hasta": 10,
+            "rotulo": {"texto": "Plantas", "desde": 0, "hasta": 3, "posicion": "superior"},
+        },
+        {"fuente": first, "desde": 0, "hasta": 20},
+    ]
+    answer = {
+        "angulo": 1,
+        "titulo": "Plantas",
+        "subtitulo": "Nuestra colección",
+        "observacion": "Tomas de ambas fuentes",
+        "apto_sin_cambios": True,
+        "escenas": scenes,
+    }
+    edl = make_edl(receipt, [{"angulo": "Colección"}] * 3, answer)
+    props = edl["render"]["props"]
+    assert [source["id"] for source in props["sources"]] == [first, second]
+    assert [scene["source_id"] for scene in props["scenes"]] == [second, first]
+    words = {
+        second: [{"start": 0.1, "end": 0.6, "word": "Segundo."}],
+        first: [{"start": 0.1, "end": 0.6, "word": "Primero."}],
+    }
+    captions = ad_captions(props["scenes"], words)
+    assert [cue["text"] for cue in captions] == ["Segundo.", "Primero."]
+    assert captions[1]["start_frame"] >= 300
+    receipt["additional_sources"][0]["raw"] = "../ajeno.mp4"
+    with pytest.raises(ValueError, match="Rutas"):
+        make_edl(receipt, [{"angulo": "Colección"}] * 3, answer)
+
+
+@pytest.mark.parametrize("edit", ["reel", "full"])
+def test_valeria_construye_escaleta_con_varios_videos(handoff, order, monkeypatch, tmp_path, edit):
+    import production_valeria as director
+
+    first, second = order["media"]["asset_id"], str(uuid.uuid4())
+    extra = {
+        **order["media"],
+        "asset_id": second,
+        "object_key": f"ingest/{order['order_id']}/{second}.mp4",
+    }
+    project = order["media"]["project_slug"]
+    order = {**order, "output_edit": edit, "additional_media": [extra]}
+    audio = {"bytes": 12, "sha256": "c" * 64}
+    receipt = {
+        "order": order,
+        "raw": f"proyectos/{project}/01_raw/{first}.mp4",
+        "duration_seconds": 60,
+        "audio": {**audio, "path": f"proyectos/{project}/03_assets/intake-source.wav"},
+        "additional_sources": [
+            {
+                "media": extra,
+                "raw": f"proyectos/{project}/01_raw/{second}.mp4",
+                "duration_seconds": 30,
+                "audio": {
+                    **audio,
+                    "path": f"proyectos/{project}/03_assets/intake-source-{second}.wav",
+                },
+            }
+        ],
+    }
+    brief = {"objective": "Mostrar plantas", "audience": "Personas", "tone": "Cercano"}
+    strategy = {
+        "order_id": order["order_id"],
+        "source_sha256": order["media"]["sha256"],
+        "brief_sha256": hashlib.sha256(director.canonical(brief)).hexdigest(),
+        "ejecucion": "isolated-agent-runtime",
+        "angulos": [
+            {"angulo": name, "gancho": "Inicio", "copy": "Mensaje", "cta": "Consultar"}
+            for name in ("Uno", "Dos", "Tres")
+        ],
+    }
+    batches = [
+        {"source_id": identity, "duration_seconds": 30, "images": [(1.0, b"foto")]}
+        for identity in (first, second)
+    ]
+    analyses = [
+        {
+            "source_id": batch["source_id"],
+            "duracion_segundos": 30,
+            "resumen": "Plantas",
+            "muestras": [{"segundo": 1.0, "descripcion": "Una maceta"}],
+        }
+        for batch in batches
+    ]
+    answer = {
+        "angulo": 1,
+        "titulo": "Plantas",
+        "subtitulo": "Colección",
+        "observacion": "Dos videos",
+        "apto_sin_cambios": True,
+        "escenas": [
+            {
+                "fuente": second,
+                "desde": 0,
+                "hasta": 10,
+                "rotulo": {"texto": "Plantas", "desde": 0, "hasta": 3, "posicion": "superior"},
+            },
+            {"fuente": first, "desde": 0, "hasta": 20},
+        ],
+    }
+    if edit == "full":
+        answer["escenas"][0]["hasta"] = 30
+        answer["escenas"][1]["hasta"] = 60
+    monkeypatch.setattr(director, "transcript_for", lambda *_: {"text": "Plantas", "words": []})
+    monkeypatch.setattr(director, "sample_source_batches", lambda *_args, **_kwargs: batches)
+    monkeypatch.setattr(director, "analyze_source_batches", lambda *_args, **_kwargs: analyses)
+    monkeypatch.setattr(director, "run_visual", lambda request: answer)
+    monkeypatch.setattr(director, "fingerprint", lambda _path: audio)
+    target = tmp_path / "edl.json"
+    director.process(receipt, strategy, brief, target, str(uuid.uuid4()))
+    edl = json.loads(target.read_bytes())["escaleta"]
+    assert [scene["source_id"] for scene in edl["render"]["props"]["scenes"]] == [second, first]
+    assert len(edl["render"]["props"]["sources"]) == 2
+    assert edl["render"]["props"]["duration_seconds"] == (90 if edit == "full" else 30)
+
+    # Un cambio de montaje solicitado tras la entrega debe reconocerse aunque
+    # el título y el subtítulo permanezcan iguales.
+    prior = {**edl, "dictamen": {"defectos": []}}
+    answer["escenas"].reverse()
+    revised_target = tmp_path / "revision.json"
+    director.process(
+        receipt,
+        strategy,
+        brief,
+        revised_target,
+        str(uuid.uuid4()),
+        prior=prior,
+        adjustment="Invierte el orden de los planos",
+        user_revision=True,
+    )
+    revised = json.loads(revised_target.read_bytes())["escaleta"]
+    assert revised["estado"] == "lista_para_stills"
+    assert [scene["source_id"] for scene in revised["render"]["props"]["scenes"]] == [first, second]
+
+    unchanged_target = tmp_path / "sin-cambios.json"
+    director.process(
+        receipt,
+        strategy,
+        brief,
+        unchanged_target,
+        str(uuid.uuid4()),
+        prior={**revised, "dictamen": {"defectos": []}},
+        adjustment="Invierte el orden de los planos",
+        user_revision=True,
+    )
+    assert json.loads(unchanged_target.read_bytes())["escaleta"]["estado"] == "requiere_revision"
 
 
 def test_mateo_exige_tres_angulos_y_coincidencia_de_titular(monkeypatch, order):
@@ -844,6 +1599,53 @@ def test_elena_aprueba_solo_con_reglas_duras_y_pruebas_visuales(monkeypatch):
         )
 
 
+def test_elena_reintenta_un_dictamen_sin_json_con_las_mismas_muestras(monkeypatch, tmp_path):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_elena as elena
+
+    metrics = {
+        "width": 1080,
+        "height": 1920,
+        "fps": 30.0,
+        "codec": "h264",
+        "color": "bt709",
+        "duration": 4.0,
+        "lufs": -14.0,
+        "peak": -11.2,
+    }
+    images = [(0, b"fotograma"), (2, b"otro fotograma"), (3, b"cierre")]
+    monkeypatch.setattr(elena, "decode", lambda *_args, **_options: (metrics, images))
+    requests = []
+
+    def run_visual(request):
+        requests.append(request)
+        if len(requests) == 1:
+            raise elena.VisualResponseFormatError("Respuesta visual sin JSON válido")
+        return {
+            "puntaje": 92,
+            "marca_free": "",
+            "observaciones": [{"muestra": 1, "detalle": "Rótulo legible"}],
+            "defectos": [],
+        }
+
+    monkeypatch.setattr(elena, "run_visual", run_visual)
+    request_id = str(uuid.uuid4())
+    reviewed = elena.review_video(
+        tmp_path / "master.mp4",
+        "a" * 64,
+        {"title": "Sansevierias", "subtitle": "De interior", "duration_seconds": 4.0},
+        1,
+        "Ilimitado",
+        "1080p",
+        request_id,
+    )
+    assert reviewed["dictamen"]["decision"] == "aprobado"
+    assert len(requests) == 2
+    assert requests[0]["idempotencyKey"] == request_id
+    assert requests[1]["idempotencyKey"] != request_id
+    assert requests[1]["attachments"] == requests[0]["attachments"]
+
+
 @pytest.mark.parametrize(
     ("plan", "marca", "resolution", "width", "height"),
     [
@@ -958,6 +1760,80 @@ def test_vista_previa_rechazada_bloquea_el_master(monkeypatch, tmp_path, order):
     record = json.loads(target.read_bytes())
     assert record["preview"] == preview
     assert "master" not in record
+
+
+def test_lucas_verifica_todas_las_fuentes_y_elena_puede_rechazar(monkeypatch, tmp_path, order):
+    import production_lucas as lucas
+    from production_lucas import run
+
+    first, second = order["media"]["asset_id"], str(uuid.uuid4())
+    project = order["media"]["project_slug"]
+    extra = {
+        **order["media"],
+        "asset_id": second,
+        "object_key": f"ingest/{order['order_id']}/{second}.mp4",
+    }
+    order = {**order, "output_edit": "reel", "additional_media": [extra]}
+    mark = {"sha256": order["media"]["sha256"], "bytes": order["media"]["bytes"]}
+    audio1 = f"proyectos/{project}/03_assets/intake-source.wav"
+    audio2 = f"proyectos/{project}/03_assets/intake-source-{second}.wav"
+    video1, video2 = (f"proyectos/{project}/01_raw/{item}.mp4" for item in (first, second))
+    receipt = {
+        "order": order,
+        "raw": video1,
+        "duration_seconds": 50,
+        "audio": {**mark, "path": audio1},
+        "additional_sources": [
+            {
+                "media": extra,
+                "raw": video2,
+                "duration_seconds": 30,
+                "audio": {**mark, "path": audio2},
+            }
+        ],
+    }
+    sources = [
+        {"id": first, "video_path": video1, "audio_path": audio1},
+        {"id": second, "video_path": video2, "audio_path": audio2},
+    ]
+    body = {
+        "project_id": project,
+        "job_id": order["order_id"] + "-v1",
+        "plan": "Free",
+        "composition": "AgencyVertical",
+        "format": "mp4",
+        "resolution": "1080p",
+        "props": {"sources": sources, "duration_seconds": 30, "scenes": [{"source_id": first}]},
+    }
+    edl = {
+        "order_id": order["order_id"],
+        "source_sha256": mark["sha256"],
+        "brief_sha256": "a" * 64,
+        "escaleta": {"estado": "lista_para_stills", "render": body},
+    }
+    checks, submissions = [], []
+    monkeypatch.setattr(lucas, "fingerprint", lambda path: checks.append(str(path)) or mark)
+    monkeypatch.setattr(
+        lucas,
+        "submit_with_receipt",
+        lambda kind, payload, *_args, **opts: (
+            submissions.append((kind, payload, opts["source"])) or {}
+        ),
+    )
+    monkeypatch.setattr(lucas, "verify_mp4", lambda *_: {"path": "vista"})
+
+    def reject(_order, _edl, _job, _asset, report):
+        result = {"dictamen": {"decision": "rechazado"}}
+        report.write_text(json.dumps(result), encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(lucas, "audit_preview", reject)
+    target = tmp_path / "resultado.json"
+    run(order, receipt, edl, "fixture", 1, target)
+    assert len(checks) == 4
+    assert len(submissions) == 1 and submissions[0][0] == "render"
+    assert [item["id"] for item in submissions[0][2]["materials"]] == [first, second]
+    assert "master" not in json.loads(target.read_bytes())
 
 
 def test_lucas_serializa_los_textos_como_utf8(monkeypatch):
@@ -1469,6 +2345,275 @@ def test_kit_exige_aprobacion_y_huella_del_master(monkeypatch, order):
     qa["dictamen"]["reglas_duras_incumplidas"] = ["Audio fuera de contrato"]
     with pytest.raises(ValueError):
         package(order["order_id"], master, render, qa, {})
+
+
+def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(handoff, order, tmp_path, monkeypatch):
+    import production_elena as reviewer
+    import production_lucas as editor
+    import production_revision as revisions
+    import production_valeria as director
+    from production_delivery import package
+    from production_revision import (
+        approved_base,
+        draft_revision,
+        load_claim_context,
+        publish_staged_revision,
+        render_and_review,
+        stage_approved_revision,
+    )
+
+    identity = order["order_id"]
+    brief = {"order_id": identity, "user_id": order["user_id"], "objective": "Plantas"}
+    brief_hash = hashlib.sha256(handoff.canonical(brief)).hexdigest()
+    direction = {
+        "order_id": identity,
+        "source_sha256": order["media"]["sha256"],
+        "brief_sha256": brief_hash,
+        "escaleta": {"estado": "lista_para_stills"},
+    }
+    direction_hash = hashlib.sha256(handoff.canonical(direction)).hexdigest()
+    master = b"video aprobado"
+    master_hash = hashlib.sha256(master).hexdigest()
+    render = {
+        "order_id": identity,
+        "source_sha256": order["media"]["sha256"],
+        "brief_sha256": brief_hash,
+        "direction_sha256": direction_hash,
+        "job_id": identity + "-v1",
+        "master": {"sha256": master_hash, "bytes": len(master)},
+    }
+    qa = {
+        "order_id": identity,
+        "job_id": render["job_id"],
+        "brief_sha256": brief_hash,
+        "direction_sha256": direction_hash,
+        "master_sha256": master_hash,
+        "mediciones": {"duration": 30},
+        "dictamen": {"decision": "aprobado", "puntaje": 94, "reglas_duras_incumplidas": []},
+    }
+    raw = package(identity, master, render, qa, brief)
+    path = tmp_path / "kit.zip"
+    path.write_bytes(raw)
+    claim = {
+        "id": str(uuid.uuid4()),
+        "base_kit_id": str(uuid.uuid4()),
+        "order_id": identity,
+        "user_id": order["user_id"],
+        "base_kit_sha256": hashlib.sha256(raw).hexdigest(),
+        "instructions": "Cambiar el ritmo",
+        "lease": str(uuid.uuid4()),
+    }
+    assert approved_base(claim, {"order": order}, direction, path)["review"] == qa
+    monkeypatch.setattr(revisions, "MEDIA", tmp_path)
+    context_dirs = {
+        name: tmp_path / name for name in ("journal", "strategy", "direction", "drafts")
+    }
+    for directory in context_dirs.values():
+        directory.mkdir()
+    (context_dirs["journal"] / f"{identity}.json").write_text(json.dumps({"order": order}))
+    (context_dirs["strategy"] / f"{identity}.json").write_text(json.dumps({"strategy": "test"}))
+    (context_dirs["direction"] / f"{identity}.json").write_text(json.dumps(direction))
+    stored_base = (
+        tmp_path
+        / "proyectos"
+        / order["media"]["project_slug"]
+        / "05_revision"
+        / f"kit-studio-{claim['base_kit_sha256']}.zip"
+    )
+    stored_base.parent.mkdir(parents=True)
+    stored_base.write_bytes(raw)
+    context = load_claim_context(claim, *context_dirs.values())
+    assert context["receipt"]["order"] == order and context["direction"] == direction
+    generated = []
+
+    def fake_process(*args, **kwargs):
+        generated.append((args, kwargs))
+        args[3].write_text(json.dumps(direction))
+
+    monkeypatch.setattr(director, "process", fake_process)
+    target = tmp_path / f"{claim['id']}.json"
+    draft_revision(claim, {"order": order}, {"strategy": "test"}, direction, path, target)
+    assert generated[0][1]["adjustment"] == "Cambiar el ritmo"
+    assert generated[0][1]["user_revision"] is True
+    assert generated[0][1]["prior"]["dictamen"] == qa["dictamen"]
+    assert (
+        draft_revision(claim, {"order": order}, {"strategy": "test"}, direction, path, target)
+        == direction
+    )
+    assert len(generated) == 1
+    with pytest.raises(ValueError, match="contenido distinto"):
+        draft_revision(
+            {**claim, "instructions": "Otro cambio"}, {"order": order}, {}, direction, path, target
+        )
+    render_dir, review_dir = tmp_path / "render", tmp_path / "review"
+    render_dir.mkdir()
+    review_dir.mkdir()
+    calls = []
+
+    def fake_render(_order, _receipt, edl, _token, _revision, dest, *, revision_id):
+        calls.append(("render", revision_id))
+        dest.write_text(
+            json.dumps(
+                {
+                    "order_id": order["order_id"],
+                    "source_sha256": order["media"]["sha256"],
+                    "brief_sha256": brief_hash,
+                    "job_id": f"{revision_id}-r",
+                    "direction_sha256": hashlib.sha256(handoff.canonical(edl)).hexdigest(),
+                    "master": {"sha256": "c" * 64},
+                }
+            )
+        )
+
+    def fake_audit(_order, _edl, digest, _request, dest, _rendered, _revision, *, revision_id):
+        calls.append(("review", revision_id, digest))
+        record = {
+            "order_id": order["order_id"],
+            "job_id": f"{revision_id}-r",
+            "brief_sha256": brief_hash,
+            "direction_sha256": direction_hash,
+            "master_sha256": digest,
+            "dictamen": {"decision": "aprobado"},
+        }
+        dest.write_text(json.dumps(record))
+        return record
+
+    monkeypatch.setattr(editor, "run", fake_render)
+    monkeypatch.setattr(reviewer, "audit", fake_audit)
+    result = render_and_review(
+        claim,
+        {"order": order},
+        direction,
+        path,
+        direction,
+        render_dir / target.name,
+        review_dir / target.name,
+        "token",
+    )
+    assert result["status"] == "aprobado"
+    assert calls == [("render", claim["id"]), ("review", claim["id"], "c" * 64)]
+    repeat = render_and_review(
+        claim,
+        {"order": order},
+        direction,
+        path,
+        direction,
+        render_dir / target.name,
+        review_dir / target.name,
+        "token",
+    )
+    assert repeat == result
+    assert calls.count(("review", claim["id"], "c" * 64)) == 1
+    forged = {**repeat["review"], "master_sha256": "f" * 64}
+    (review_dir / target.name).write_text(json.dumps(forged))
+    with pytest.raises(ValueError, match="dictamen no corresponde"):
+        render_and_review(
+            claim,
+            {"order": order},
+            direction,
+            path,
+            direction,
+            render_dir / target.name,
+            review_dir / target.name,
+            "token",
+        )
+    monkeypatch.setattr(revisions, "MEDIA", tmp_path)
+    import production_delivery as delivery
+
+    monkeypatch.setattr(delivery, "MEDIA", tmp_path)
+    new_job = f"{claim['id']}-r"
+    new_path = (
+        Path("proyectos")
+        / order["media"]["project_slug"]
+        / "06_renders"
+        / new_job
+        / "render"
+        / "master.mp4"
+    )
+    (tmp_path / new_path).parent.mkdir(parents=True)
+    (tmp_path / new_path).write_bytes(master)
+    new_render = {
+        **render,
+        "job_id": new_job,
+        "master": {"sha256": master_hash, "bytes": len(master), "path": new_path.as_posix()},
+    }
+    new_review = {**qa, "job_id": new_job}
+    staged = stage_approved_revision(
+        claim,
+        {"order": order},
+        direction,
+        path,
+        direction,
+        new_render,
+        new_review,
+        None,
+        tmp_path / "recibo",
+    )
+    assert (tmp_path / staged["path"]).is_file()
+    uploaded = (tmp_path / staged["path"]).read_bytes()
+    calls_published = []
+
+    def r2(method, _path, headers, body, **options):
+        if method == "PUT":
+            assert body.read() == uploaded
+            return 200, {}, b""
+        assert method == "GET"
+        return (
+            200,
+            {
+                "content-length": str(len(uploaded)),
+                "content-type": "application/zip",
+                "x-amz-meta-sha256": staged["sha256"],
+            },
+            options["read_body"](io.BytesIO(uploaded)),
+        )
+
+    def studio(manifest):
+        calls_published.append(manifest)
+        return {
+            "kit": {
+                "id": manifest["id"],
+                "order_id": manifest["orderId"],
+                "title": manifest["title"],
+                "bytes": manifest["bytes"],
+            }
+        }
+
+    published = publish_staged_revision(
+        claim,
+        {"order": order},
+        direction,
+        path,
+        direction,
+        new_render,
+        new_review,
+        staged,
+        "Revisión",
+        r2,
+        studio,
+    )
+    assert published["id"] == calls_published[0]["id"]
+    assert calls_published[0]["revisionId"] == claim["id"]
+    assert calls_published[0]["lease"] == claim["lease"]
+    with pytest.raises(ValueError, match="no tiene una aprobación"):
+        stage_approved_revision(
+            claim,
+            {"order": order},
+            direction,
+            path,
+            direction,
+            new_render,
+            {**new_review, "direction_sha256": "b" * 64},
+            None,
+            tmp_path / "recibo",
+        )
+    with pytest.raises(ValueError, match="no comparten"):
+        approved_base(claim, {"order": order}, {**direction, "escaleta": {}}, path)
+    with pytest.raises(ValueError, match="Solicitud"):
+        approved_base({**claim, "user_id": str(uuid.uuid4())}, {"order": order}, direction, path)
+    path.write_bytes(raw + b"alterado")
+    with pytest.raises(ValueError, match="entrega base cambió"):
+        approved_base(claim, {"order": order}, direction, path)
 
 
 def test_kit_en_nas_se_publica_una_vez_y_rechaza_un_master_cambiado(monkeypatch, order, tmp_path):

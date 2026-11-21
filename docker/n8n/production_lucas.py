@@ -25,11 +25,11 @@ from production_handoff import (
     revision_from_stem,
     validate,
 )
-from production_inbox import MEDIA, render_format, render_resolution
+from production_inbox import MEDIA, UUID, matches, render_resolution
 from production_intake import fingerprint
 from production_mateo import ORDER_ERRORS, lookup
-from production_sofia import JOURNAL, LIMIT
-from production_valeria import source_paths
+from production_sofia import INTAKE_LIMIT, JOURNAL, LIMIT
+from production_valeria import render_sources, source_paths
 
 VALERIA = Path("/var/lib/agency-production-valeria")
 
@@ -123,7 +123,48 @@ def verify_mp4(result, body):
     return master
 
 
-def run(order, receipt, edl, token, revision, target):
+def verified_inputs(order, receipt, props, brief_sha256):
+    if receipt["order"] != order:
+        raise ValueError("La ingesta no corresponde a la orden")
+    job = order["media"]
+    if order.get("additional_media"):
+        expected, _durations = render_sources(receipt)
+        if props.get("sources") != expected or "video_path" in props or "audio_path" in props:
+            raise ValueError("Las pistas no coinciden con la ingesta")
+        records = [
+            {"media": job, "raw": receipt["raw"], "audio": receipt["audio"]},
+            *receipt["additional_sources"],
+        ]
+        verified = []
+        for item, source in zip(records, expected, strict=True):
+            media, audio = item["media"], item["audio"]
+            if fingerprint(MEDIA / source["video_path"]) != {
+                k: media[k] for k in ("sha256", "bytes")
+            }:
+                raise ValueError("Las huellas de ingesta cambiaron")
+            if audio is not None and fingerprint(MEDIA / source["audio_path"]) != {
+                k: audio[k] for k in ("sha256", "bytes")
+            }:
+                raise ValueError("Las huellas de ingesta cambiaron")
+            verified.append(
+                {
+                    "id": source["id"],
+                    "video": media["sha256"],
+                    "audio": audio["sha256"] if audio else None,
+                }
+            )
+        return {"materials": verified, "brief": brief_sha256}
+    video, audio = source_paths(receipt)
+    if props.get("video_path") != video or props.get("audio_path") != audio or not audio:
+        raise ValueError("Las pistas no coinciden con la ingesta")
+    if fingerprint(MEDIA / video) != {k: job[k] for k in ("sha256", "bytes")} or fingerprint(
+        MEDIA / audio
+    ) != {k: receipt["audio"][k] for k in ("sha256", "bytes")}:
+        raise ValueError("Las huellas de ingesta cambiaron")
+    return {"video": job["sha256"], "audio": receipt["audio"]["sha256"], "brief": brief_sha256}
+
+
+def run(order, receipt, edl, token, revision, target, *, revision_id=None):
     job = order["media"]
     plan = render_plan(order)
     resolution = render_resolution(order)
@@ -151,29 +192,21 @@ def run(order, receipt, edl, token, revision, target):
         resolution,
     ):
         raise ValueError("Escaleta fuera del contrato del plan")
-    video, audio = source_paths(receipt)
     props = original["props"]
     reel = order.get("output_edit") == "reel"
-    if reel != ("scenes" in props):
+    if (reel or bool(order.get("additional_media"))) != ("scenes" in props):
         raise ValueError("La escaleta no corresponde al montaje solicitado")
-    if props["video_path"] != video or props["audio_path"] != audio:
-        raise ValueError("Las pistas no coinciden con la ingesta")
-    if fingerprint(MEDIA / video) != {k: job[k] for k in ("sha256", "bytes")} or fingerprint(
-        MEDIA / audio
-    ) != {k: receipt["audio"][k] for k in ("sha256", "bytes")}:
-        raise ValueError("Las huellas de ingesta cambiaron")
+    source = verified_inputs(order, receipt, props, edl["brief_sha256"])
     if type(revision) is not int or revision not in {1, 2, 3}:
         raise ValueError("Revisión de render inválida")
-    body = {**original, "job_id": f"{order['order_id']}-v{revision}"}
+    if revision_id is not None and not matches(UUID, revision_id):
+        raise ValueError("Identidad de revisión inválida")
+    job_id = f"{order['order_id']}-v{revision}" if revision_id is None else f"{revision_id}-r"
+    body = {**original, "job_id": job_id}
     count = int(props["duration_seconds"] * 30 + 0.5)
     if not 3 <= count <= 18000:
         raise ValueError("Duración fuera del contrato de render")
     frames = [0, count // 2, count - 1]
-    source = {
-        "video": job["sha256"],
-        "audio": receipt["audio"]["sha256"],
-        "brief": edl["brief_sha256"],
-    }
     record = {
         "order_id": order["order_id"],
         "source_sha256": job["sha256"],
@@ -213,9 +246,7 @@ def run(order, receipt, edl, token, revision, target):
         source=source,
     )
     master = verify_mp4(result, body)
-    direction = {}
-    if render_format(order) == "prores4444":
-        direction["direction_sha256"] = hashlib.sha256(canonical(edl)).hexdigest()
+    direction = {"direction_sha256": hashlib.sha256(canonical(edl)).hexdigest()}
     publish(
         target,
         canonical(
@@ -239,7 +270,7 @@ def render_pending(path, target, version, profile, token, dispatch):
     intake = JOURNAL / f"{identity}.json"
     if not intake.is_file():
         return False
-    receipt = json.loads(read_regular(intake, LIMIT))
+    receipt = json.loads(read_regular(intake, INTAKE_LIMIT))
     order = receipt["order"]
     validate(order, identity)
     if (
@@ -327,7 +358,7 @@ def main():
     target = args.output / (source if args.revision == 2 else fixture + "-v3.json")
     if target.exists():
         return
-    receipt = json.loads(read_regular(JOURNAL / source, LIMIT))
+    receipt = json.loads(read_regular(JOURNAL / source, INTAKE_LIMIT))
     order = receipt["order"]
     validate(order, fixture)
     edl = json.loads(read_regular(VALERIA / source, LIMIT))

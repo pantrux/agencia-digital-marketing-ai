@@ -2,8 +2,10 @@ import { finishGoogle, identity, logout, sessionLookup, startGoogle, type AuthEn
 import { handleBilling, retryWebhookEvents, type BillingEnv } from "./billing.js";
 import { brandRoute, handleBrands } from "./brands.js";
 import { handleSofiaChat, type ChatEnv } from "./chat.js";
+import { readConversation } from "./conversation.js";
+import { deliveryRevisionRoute, handleDeliveryRevisions, type DeliveryRevisionEnv } from "./delivery-revisions.js";
 import { expireAbandonedReservations, handleIngest, handlePartAccess, handleUploadCreation, partAccessTarget, uploadsConfigured, type IngestEnv } from "./ingest.js";
-import { dispatchOutbox, syncQueue, type JobEnv, type JobMessage } from "./jobs.js";
+import { dispatchOutbox, dispatchSourceOutbox, syncQueue, type JobEnv, type JobMessage } from "./jobs.js";
 import { handleKits, kitView, prepareKits, type KitRow } from "./kits.js";
 import { handleKitProducer, kitProducerPath, type KitProducerEnv } from "./kit-producer.js";
 import { handleManualAdjustment, manualAdjustmentRoute } from "./manual-adjustments.js";
@@ -13,6 +15,9 @@ import {
 } from "./orders.js";
 import { handleProductionDispatch, productionDispatchPath, type ProductionDispatchEnv } from "./production-dispatch.js";
 import { handleProductionBrief, productionBriefRoute } from "./production-brief.js";
+import { handleSourceSet, sourceSetRoute } from "./production-sources.js";
+import { handleReference, referenceRoute, type ReferenceEnv } from "./references.js";
+import { completeSourceUpload, createSourceUpload, listSourceParts, signSourcePart } from "./source-upload.js";
 import { response, HttpError, readJson, type ExecutionTasks } from "./platform.js";
 
 interface AnalyticsDataset {
@@ -24,7 +29,7 @@ interface HttpMetricsEnv {
   STUDIO_BROWSER_METRICS?: AnalyticsDataset;
 }
 
-type WorkerEnv = AuthEnv & IngestEnv & OrderEnv & JobEnv & BillingEnv & ChatEnv & KitProducerEnv & ProductionDispatchEnv & HttpMetricsEnv;
+type WorkerEnv = AuthEnv & IngestEnv & OrderEnv & JobEnv & BillingEnv & ChatEnv & KitProducerEnv & ProductionDispatchEnv & HttpMetricsEnv & ReferenceEnv & DeliveryRevisionEnv;
 
 const measuredRoutes = new Map([
   ["GET /api/auth/google", "auth_inicio"],
@@ -141,9 +146,34 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
     }
     const brief = productionBriefRoute.exec(path);
     if (brief && !url.search) return await handleProductionBrief(request, env, user.id, brief[1]!);
+    const reference = referenceRoute.exec(path);
+    if (reference && !url.search) return await handleReference(request, env, user.id, reference[1]!);
+    const deliveryRevision = deliveryRevisionRoute.exec(path);
+    if (deliveryRevision && !url.search) return await handleDeliveryRevisions(request, env, user.id, deliveryRevision[1]!);
+    const sourceSet = sourceSetRoute.exec(path);
+    if (sourceSet && !url.search) return await handleSourceSet(request, env, user.id, sourceSet[1]!);
+    const sourceUpload = /^\/api\/orders\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/sources\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/(upload|complete|parts(?:\/([1-9][0-9]?)\/sign)?)$/u.exec(path);
+    if (sourceUpload && !url.search) {
+      if (!uploadsConfigured(env)) throw new HttpError(503, "SUBIDA_NO_DISPONIBLE");
+      const [, orderId, sourceId, action, part] = sourceUpload;
+      if (request.method === "POST" && action === "upload") {
+        const result = await createSourceUpload(env, user.id, orderId!, sourceId!);
+        ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));
+        return result;
+      }
+      if (request.method === "GET" && action === "parts") return await listSourceParts(env, user.id, orderId!, sourceId!);
+      if (request.method === "POST" && part) return await signSourcePart(env, user.id, orderId!, sourceId!, Number(part));
+      if (request.method === "POST" && action === "complete") {
+        const result = await completeSourceUpload(request, env, user.id, orderId!, sourceId!);
+        ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));
+        return result;
+      }
+      throw new HttpError(405, "METODO_NO_PERMITIDO");
+    }
     const adjustment = manualAdjustmentRoute.exec(path);
     if (adjustment && !url.search) return await handleManualAdjustment(request, env, user.id, adjustment[1]!);
     if (request.method === "POST" && path === "/api/chat") return await handleSofiaChat(request, env, user.id);
+    if (request.method === "GET" && path === "/api/chat/history") return await readConversation(env, user.id, url.searchParams.get("order_id") ?? "");
     if (request.method === "POST" && path === "/api/orders") {
       if (!uploadsConfigured(env)) throw new HttpError(503, "SUBIDA_NO_DISPONIBLE");
       return await reserveOrder(request, user.id, env);
@@ -182,6 +212,7 @@ export default {
   },
   scheduled(_event: object, env: WorkerEnv, ctx: ExecutionTasks) {
     ctx.waitUntil(dispatchOutbox(env));
+    ctx.waitUntil(dispatchSourceOutbox(env));
     ctx.waitUntil(expireAbandonedReservations(env));
     ctx.waitUntil(retryWebhookEvents(env));
   },

@@ -1,4 +1,5 @@
 import { adDispatchFields } from "./ad-contacts.js";
+import { claimDeliveryRevision, failDeliveryRevision, renewDeliveryRevision } from "./delivery-revisions.js";
 import { validateSyncJob } from "../../../src/media/sync-contract.js";
 import { HttpError, readJson, response, type SqlDatabase } from "./platform.js";
 import type { OutputEdit, OutputFormat, OutputResolution } from "./orders.js";
@@ -7,11 +8,13 @@ export interface ProductionDispatchEnv {
   DB: SqlDatabase;
   BILLING_MODE: "sandbox" | "production";
   STUDIO_PRODUCTION_DISPATCH_TOKEN?: string;
+  STUDIO_DELIVERY_REVISION_ENABLED?: string;
 }
 
 type Claimed = { order_id: string; attempts: number; lease: string; available_at: number };
 type Work = { user_id: string; plan_id: string; upload_id: string; payload: string; sha256: string; bytes: number;
   project_slug: string; output_resolution: OutputResolution; output_format: OutputFormat; output_edit: OutputEdit };
+type SourceWork = Work & { source_id: string; position: number };
 export const productionDispatchPath = "/api/internal/production/dispatch";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const tokenPattern = /^[a-f0-9]{64}$/u;
@@ -52,7 +55,7 @@ async function claim(env: ProductionDispatchEnv, now: number): Promise<Response>
     JOIN upload_sessions s ON s.order_id=o.id AND s.user_id=o.user_id AND s.status='completed'
     WHERE o.id=? AND o.kind='production' AND o.status='processing' AND COALESCE(o.provider_mode,'production')=?`)
     .bind(taken.order_id, env.BILLING_MODE).first<Work>();
-  if (!work) throw new HttpError(409, "DESPACHO_ORIGEN_CAMBIO");
+  if (!work) return claimMultiple(env, taken);
   const media = validateSyncJob(JSON.parse(work.payload), { maxObjectBytes: 1024 ** 3 });
   if (media.job_id !== taken.order_id || media.sha256 !== work.sha256 || media.bytes !== work.bytes
     || media.project_slug !== work.project_slug) throw new HttpError(409, "DESPACHO_ORIGEN_CAMBIO");
@@ -61,6 +64,35 @@ async function claim(env: ProductionDispatchEnv, now: number): Promise<Response>
     mode: env.BILLING_MODE, media, ...(work.output_resolution === "4k" ? { output_resolution: "4k" } : {}),
     ...(work.output_format === "prores4444" ? { output_format: work.output_format } : {}),
     ...(work.output_edit === "reel" ? { output_edit: work.output_edit } : {}) } });
+}
+
+async function claimMultiple(env: ProductionDispatchEnv, taken: Claimed): Promise<Response> {
+  const db = env.DB.withSession("first-primary");
+  const rows = await db.prepare(`SELECT o.user_id,o.plan_id,o.project_slug,s.id AS upload_id,s.id AS source_id,s.position,
+    s.sha256,s.bytes,q.payload,o.output_resolution,o.output_format,o.output_edit
+    FROM orders o JOIN usage_ledger u ON u.order_id=o.id AND u.user_id=o.user_id AND u.status='consumed'
+    JOIN production_sources s ON s.order_id=o.id JOIN production_source_uploads upload ON upload.source_id=s.id AND upload.status='completed'
+    JOIN production_source_outbox q ON q.source_id=s.id AND q.synced_at IS NOT NULL
+    WHERE o.id=? AND o.kind='production' AND o.status='processing' AND COALESCE(o.provider_mode,'production')=?
+      AND NOT EXISTS (SELECT 1 FROM production_sources other LEFT JOIN production_source_uploads up ON up.source_id=other.id
+        LEFT JOIN production_source_outbox pending ON pending.source_id=other.id
+        WHERE other.order_id=o.id AND (up.status IS NULL OR up.status<>'completed' OR pending.synced_at IS NULL))
+    ORDER BY s.position`).bind(taken.order_id, env.BILLING_MODE).all<SourceWork>();
+  if (rows.results.length < 1 || rows.results.length > 32) throw new HttpError(409, "DESPACHO_ORIGEN_CAMBIO");
+  const first = rows.results[0]!;
+  const media = rows.results.map((row, position) => {
+    const job = validateSyncJob(JSON.parse(row.payload), { maxObjectBytes: 1024 ** 3 });
+    if (row.position !== position || row.user_id !== first.user_id || row.plan_id !== first.plan_id ||
+        job.job_id !== taken.order_id || job.asset_id !== row.source_id || job.sha256 !== row.sha256 ||
+        job.bytes !== row.bytes || job.project_slug !== row.project_slug) throw new HttpError(409, "DESPACHO_ORIGEN_CAMBIO");
+    return job;
+  });
+  return response({ job: { order_id: taken.order_id, attempt: taken.attempts, lease: taken.lease,
+    lease_expires_at: taken.available_at, user_id: first.user_id, plan_id: first.plan_id, upload_id: first.upload_id,
+    mode: env.BILLING_MODE, media: media[0], ...(media.length > 1 ? { additional_media: media.slice(1) } : {}),
+    ...(first.output_resolution === "4k" ? { output_resolution: "4k" } : {}),
+    ...(first.output_format === "prores4444" ? { output_format: first.output_format } : {}),
+    ...(first.output_edit === "reel" ? { output_edit: first.output_edit } : {}) } });
 }
 
 async function recordQualityOutcome(body: Record<string, unknown>, env: ProductionDispatchEnv, now: number): Promise<Response> {
@@ -76,7 +108,7 @@ async function recordQualityOutcome(body: Record<string, unknown>, env: Producti
   const scope = `o.id=? AND o.user_id=? AND o.kind='production' AND COALESCE(o.provider_mode,'production')=?
     AND EXISTS (SELECT 1 FROM production_briefs b
       JOIN production_dispatch d ON d.order_id=b.order_id AND d.received_at IS NOT NULL
-      JOIN upload_sessions s ON s.order_id=b.order_id AND s.user_id=b.user_id AND s.status='completed'
+      JOIN production_primary_sources s ON s.order_id=b.order_id AND s.user_id=b.user_id AND s.status='completed'
       JOIN usage_ledger u ON u.order_id=b.order_id AND u.user_id=b.user_id AND u.status='consumed'
       JOIN plan_quotas p ON p.plan_id=o.plan_id
       WHERE b.order_id=o.id AND b.user_id=o.user_id AND b.confirmed_at=? AND s.id=? AND s.sha256=?
@@ -146,7 +178,7 @@ async function recordManualAdjustment(body: Record<string, unknown>, env: Produc
   const subject = `EXISTS (SELECT 1 FROM orders o
     JOIN production_briefs b ON b.order_id=o.id AND b.user_id=o.user_id
     JOIN production_dispatch d ON d.order_id=o.id AND d.received_at IS NOT NULL
-    JOIN upload_sessions s ON s.order_id=o.id AND s.user_id=o.user_id AND s.status='completed'
+    JOIN production_primary_sources s ON s.order_id=o.id AND s.user_id=o.user_id AND s.status='completed'
     JOIN usage_ledger u ON u.order_id=o.id AND u.user_id=o.user_id AND u.status='consumed'
     WHERE o.id=a.order_id AND o.user_id=? AND o.kind='production' AND COALESCE(o.provider_mode,'production')=?
       AND b.confirmed_at=? AND s.id=? AND s.sha256=?)`;
@@ -173,6 +205,13 @@ export async function handleProductionDispatch(request: Request, env: Production
   const body = await readJson(request, 1024);
   const now = Math.floor(Date.now() / 1000);
   if (body.action === "claim" && Object.keys(body).length === 1) return claim(env, now);
+  if (body.action === "delivery_revision_claim" && Object.keys(body).length === 1) return claimDeliveryRevision(env, now);
+  if (body.action === "delivery_revision_renew" && Object.keys(body).sort().join(",") === "action,id,lease") {
+    return renewDeliveryRevision(env, body.id, body.lease, now);
+  }
+  if (body.action === "delivery_revision_failed" && Object.keys(body).sort().join(",") === "action,id,lease,stage") {
+    return failDeliveryRevision(env, body.id, body.lease, body.stage, now);
+  }
   if (body.action === "quality_rejected" || body.action === "quality_manual_review") return recordQualityOutcome(body, env, now);
   if (body.action === "manual_adjustment_result") return recordManualAdjustment(body, env, now);
   if (body.action === "manual_context" && Object.keys(body).length === 2 && matches(body.order_id, uuid, 36)) {

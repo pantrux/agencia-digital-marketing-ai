@@ -1,4 +1,5 @@
-import {mkdir, lstat, rename, writeFile} from 'node:fs/promises';
+import {copyFile, mkdir, lstat, rename, writeFile} from 'node:fs/promises';
+import {constants} from 'node:fs';
 import path from 'node:path';
 import {WorkerError, type RenderRequest} from './contracts.ts';
 import {hyperframesHtml} from './hyperframes-html.ts';
@@ -13,6 +14,7 @@ interface HyperframesOptions {
   ffmpeg: string;
   signal: AbortSignal;
   run: typeof runProcess;
+  preconformed?: true;
 }
 
 export function hyperframesCapture(frames: readonly number[], overlay: boolean, output: string): {args: string[]; files: string[]} {
@@ -39,7 +41,8 @@ export async function renderHyperframes(options: HyperframesOptions, frames: num
   await mkdir(project);
   await writeFile(path.join(project,'index.html'),hyperframesHtml(request,!overlay),{flag:'wx',signal});
   if (!overlay && videoSource && request.props.scenes) {
-    await run(ffmpeg,stageHyperframesPicture(videoSource,request.props.scenes,request.resolution,path.join(project,'picture.mp4')),
+    if (options.preconformed) await copyFile(videoSource,path.join(project,'picture.mp4'),constants.COPYFILE_EXCL);
+    else await run(ffmpeg,stageHyperframesPicture(videoSource,request.props.scenes,request.resolution,path.join(project,'picture.mp4')),
       {timeoutMs:120000,signal});
   }
   const cli = path.resolve(import.meta.dirname,'../node_modules/hyperframes/bin/hyperframes.mjs');

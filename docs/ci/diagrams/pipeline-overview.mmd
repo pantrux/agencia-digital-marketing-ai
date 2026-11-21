@@ -14,6 +14,7 @@ flowchart TB
     %% El recibo npm del renderer vincula los hashes de package.json, lock y reporte con umbral high.
     %% Las pruebas Node cubren bundle único concurrente, assets UUID y QA normalizada 0..1920 también en 4K.
     %% Studio comprueba el despacho de reels y el bloqueo del máster si la vista previa se rechaza.
+    %% Tipos y pruebas de carga múltiple instalan el lock del portal antes de los controles de raíz.
     %% HyperFrames usa la selección persistida en D1, el renderer Windows y la revisión audiovisual de Elena.
     %% El manifiesto declara Fase 7 con CD deshabilitado. Los siete controles deben pasar.
     %% La plantilla incluye GREPTILE_API_KEY como CHANGE_ME. La revisión local obtiene el valor de la bóveda.
@@ -45,6 +46,9 @@ flowchart TB
     LIMITE --> FASE5["Fase 5: cinco agentes, skills y cuatro MCP en OpenClaw"]
     FASE5 --> DAVINCI["Lucas verifica el MCP privado de DaVinci Resolve y entrega el render a Elena"]
     LIMITE -. "Aceptación operativa pendiente" .-> FASE6["Fase 6: portal, Worker, D1, ingress y Sofía"]
+    FASE6 -. "Verificar antes de activar" .-> CONVERSA["Conversación, referencias públicas y carga de varias fuentes"]
+    CONVERSA --> MULTIQA["Verificar transcripción, montaje y aprobación de Elena en entorno aislado"]
+    MULTIQA -. "Solo después de validar servicios" .-> REVISION["Revisiones de entrega con publicación inmutable"]
     LIMITE -. "Aceptación operativa pendiente" .-> FASE7["Fase 7: producción, entrega, reversión y auditoría de la bóveda"]
     PG4["PostgreSQL en la VM: PGDATA, Kitsu, n8n, SupoClip e Immich; perfil del respaldo diario"] -->|"Evidencia operativa"| FASE4
     PG1616["Imagen 16.16 fijada, aceptación SQL aislada y revisión de extensiones e índices"] --> PG4

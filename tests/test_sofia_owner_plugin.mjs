@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { chmod, lstat, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdtemp, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import plugin, {
-  admitOAuth, completeOwnerTurn, createOwnerService, parseTurn, requireAbsentSocket, scheduleOwnerWork,
+  admitOAuth, completeOwnerTurn, createOwnerService, parseTurn, readTranscript, requireAbsentSocket, scheduleOwnerWork,
 } from "../openclaw-agency-setup/sofia-broker/openclaw-owner-plugin/index.mjs";
 
 const KEY = Buffer.from("studio-fixture-only-1111222233334444");
@@ -211,14 +211,16 @@ test("elimina sólo el socket privado que queda tras morir el proceso", {
   }
 });
 
-test("admite un único actor Free con firma sobre los bytes canónicos", () => {
+test("admite cuentas y planes válidos con firma sobre los bytes canónicos", () => {
   const settings = { key: KEY, ownerActor: ACTOR };
   const parse = ({ raw, headers }) => parseTurn(raw, headers, settings);
   assert.deepEqual(parse(wire()), TURN);
+  const other = { ...TURN, actor_id: "b".repeat(64), plan_id: "ilimitado", billing_mode: "production" };
+  assert.deepEqual(parse(wire(other)), other);
   for (const [entry, expected] of [
-    [wire({ ...TURN, actor_id: "b".repeat(64) }), 403],
-    [wire({ ...TURN, plan_id: "pro" }), 403],
-    [wire({ ...TURN, billing_mode: "production" }), 403],
+    [wire({ ...TURN, actor_id: "invalido" }), 403],
+    [wire({ ...TURN, plan_id: "invalido" }), 403],
+    [wire({ ...TURN, billing_mode: "invalido" }), 403],
     [wire({ ...TURN, model: "gpt-other" }), 422],
     [wire({ ...TURN, message: "á".repeat(1025) }), 422],
     [wire({ ...TURN, request_id: "00000000-0000-0000-8000-000000000002" }), 422],
@@ -237,10 +239,60 @@ test("pide al SDK un turno Codex aislado con el OAuth exacto y entrada literal",
   assert.equal(calls.length, 1);
   const { systemPrompt, ...projection } = calls[0];
   assert.match(systemPrompt, /asesora audiovisual/u);
+  assert.match(systemPrompt, /transcripciones pueden estar pendientes, incompletas o truncadas/u);
+  assert.match(systemPrompt, /No afirmes haber visto las imágenes/u);
   assert.deepEqual(projection, {
     agentId: "agency-account", purpose: "agency-sofia-owner-pilot", maxTokens: 800, signal,
     execution: { mode: "isolated-agent-runtime", authProfileId: PROFILE, timeoutMs: 25000 },
     messages: [{ role: "user", content: '"/reset\\nTexto"' }],
+  });
+});
+
+test("lee únicamente la transcripción correspondiente a la orden", async () => {
+  const folder = await mkdtemp(join(tmpdir(), "sofia-transcripcion-"));
+  try {
+    const path = join(folder, `${TURN.order_id}.transcripcion.json`);
+    assert.equal(await readTranscript(TURN.order_id, folder), null);
+    await writeFile(path, JSON.stringify({ order_id: TURN.order_id, result: { text: "Plantas resistentes." } }));
+    assert.equal(await readTranscript(TURN.order_id, folder), "Plantas resistentes.");
+    await writeFile(path, JSON.stringify({ order_id: TURN.request_id, result: { text: "Otra orden" } }));
+    await assert.rejects(readTranscript(TURN.order_id, folder), { status: 503 });
+    await assert.rejects(readTranscript("../otra", folder), { status: 422 });
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
+test("reúne transcripciones de varios videos en el orden declarado y rechaza identidades ajenas", async () => {
+  const folder = await mkdtemp(join(tmpdir(), "sofia-multimedia-"));
+  const first = "33333333-3333-4333-8333-333333333333";
+  const second = "22222222-2222-4222-8222-222222222222";
+  try {
+    await writeFile(join(folder, `${TURN.order_id}.transcripcion.json`), JSON.stringify({
+      order_id: TURN.order_id, result: { text: "Video principal." },
+    }));
+    const file = (id) => join(folder, `${TURN.order_id}-${id}.transcripcion.json`);
+    const item = (id, position, text) => JSON.stringify({ order_id: TURN.order_id, source_id: id, position, result: { text } });
+    await writeFile(file(second), item(second, 2, "Tercer video."));
+    await writeFile(file(first), item(first, 1, "Segundo video."));
+    assert.equal(await readTranscript(TURN.order_id, folder),
+      "[Vídeo 1]\nVideo principal.\n\n[Vídeo 2]\nSegundo video.\n\n[Vídeo 3]\nTercer video.");
+    await writeFile(file(first), item(second, 1, "Identidad incorrecta."));
+    await assert.rejects(readTranscript(TURN.order_id, folder), { status: 503 });
+  } finally { await rm(folder, { recursive: true, force: true }); }
+});
+
+test("entrega a Sofía el mensaje y la transcripción de la orden", async () => {
+  const { api, calls } = fixture();
+  const signal = new AbortController().signal;
+  const read = async (orderId) => {
+    assert.equal(orderId, TURN.order_id);
+    return "La planta necesita poca agua.";
+  };
+  await completeOwnerTurn(api, PROFILE, undefined, read)(TURN.message, signal, TURN.order_id);
+  assert.deepEqual(JSON.parse(calls[0].messages[0].content), {
+    mensaje: TURN.message,
+    transcripcion: "La planta necesita poca agua.",
   });
 });
 
@@ -356,6 +408,57 @@ function send(socketPath, turn, path = PATH) {
     req.end(raw);
   });
 }
+
+test("un recibo en publicación o inválido no detiene los turnos de Sofía", {
+  skip: process.platform !== "linux",
+}, async () => {
+  const root = await mkdtemp(join(tmpdir(), "sofia-transcripcion-socket-"));
+  const socketPath = join(root, "sofia-owner.sock");
+  const receipt = join(root, TURN.order_id + ".transcripcion.json");
+  const publishingLink = join(root, ".orden-publicando");
+  const extraLink = join(root, ".otro-enlace");
+  const otherOrder = randomUUID();
+  const { api, calls } = fixture();
+  const complete = completeOwnerTurn(api, PROFILE, undefined, (id) => readTranscript(id, root));
+  const service = createOwnerService({ socketPath, key: Buffer.from(KEY) }, complete, () => admitOAuth(api, PROFILE));
+  const sendTurn = (order_id = TURN.order_id, message = TURN.message, path = PATH) =>
+    send(socketPath, { ...TURN, order_id, request_id: randomUUID(), message }, path);
+  try {
+    await service.start();
+    assert.equal((await sendTurn(otherOrder, "startup-readiness", READY_PATH)).status, 200);
+    await writeFile(receipt, JSON.stringify({ order_id: TURN.order_id, result: { text: "Plantas resistentes." } }));
+    await link(receipt, publishingLink);
+    assert.equal((await sendTurn()).status, 200);
+    assert.equal(JSON.parse(calls[0].messages[0].content), TURN.message);
+
+    await link(receipt, extraLink);
+    await assert.rejects(readTranscript(TURN.order_id, root), { status: 503 });
+    await unlink(extraLink);
+    await unlink(publishingLink);
+    assert.equal((await sendTurn()).status, 200);
+    assert.deepEqual(JSON.parse(calls[1].messages[0].content), {
+      mensaje: TURN.message, transcripcion: "Plantas resistentes.",
+    });
+
+    await writeFile(receipt, "{recibo inválido");
+    const invalid = await sendTurn();
+    assert.equal(invalid.status, 200);
+    assert.equal(JSON.parse(calls[2].messages[0].content), TURN.message);
+    assert.equal((await sendTurn(otherOrder)).status, 200);
+    assert.equal(calls.length, 4);
+
+    api.runtime.llm.complete = async () => {
+      throw Object.assign(new Error("timeout de ensayo"), { code: "LLM_COMPLETION_TIMEOUT" });
+    };
+    const failure = await sendTurn(otherOrder);
+    assert.equal(failure.status, 503);
+    assert.equal(JSON.parse(failure.raw).error, "SOFIA_OWNER_NATIVE_LLM_COMPLETION_TIMEOUT");
+    assert.equal((await sendTurn(otherOrder)).status, 429);
+  } finally {
+    await service.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("Unix 0600 verifica firma, excluye concurrencia y detiene admisión tras un fallo", {
   skip: typeof process.getuid !== "function",

@@ -19,18 +19,24 @@ def tunnel_origins():
     ]
 
 
-def server_config(host, sofia=False):
+def server_config(host, sofia=False, sync_v2=False):
     if host not in HOSTS:
         raise ValueError("Host fuera del alcance del relay.")
     proxy = f"""            proxy_set_header Host {host};
             proxy_pass https://192.168.0.8:9443;"""
     if host == HOSTS[0]:
         guard = (
-            'if ($request_uri !~ "^/v1/(sync|sofia/chat)$") { return 404; }'
+            'if ($request_uri !~ "^/(v1/sync|v2/sync|v1/sofia/chat)$") { return 404; }'
+            if sync_v2 and sofia
+            else 'if ($request_uri !~ "^/(v1/sync|v2/sync)$") { return 404; }'
+            if sync_v2
+            else 'if ($request_uri !~ "^/v1/(sync|sofia/chat)$") { return 404; }'
             if sofia
             else "if ($request_uri != /v1/sync) { return 404; }"
         )
         routes = [("/v1/sync", 4096, 45)]
+        if sync_v2:
+            routes.append(("/v2/sync", 4096, 45))
         if sofia:
             routes.append(("/v1/sofia/chat", 12288, 60))
         locations = f"        {guard}\n        location / {{ return 404; }}"
@@ -68,8 +74,8 @@ def server_config(host, sofia=False):
     }}"""
 
 
-def nginx_config(sofia=False):
-    servers = "\n\n".join(server_config(host, sofia) for host in HOSTS)
+def nginx_config(sofia=False, sync_v2=False):
+    servers = "\n\n".join(server_config(host, sofia, sync_v2) for host in HOSTS)
     return f"""daemon off;
 worker_processes 1;
 worker_shutdown_timeout 10s;
@@ -128,10 +134,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("format", choices=("nginx", "tunnel-origins"))
     parser.add_argument("--sofia", action="store_true")
+    parser.add_argument("--sync-v2", action="store_true")
     args = parser.parse_args()
     if args.format == "nginx":
         # Los mismos bytes, incluso al redirigir stdout desde Windows.
-        sys.stdout.buffer.write(nginx_config(args.sofia).encode("ascii"))
+        sys.stdout.buffer.write(nginx_config(args.sofia, args.sync_v2).encode("ascii"))
     else:
         output = json.dumps(tunnel_origins(), sort_keys=True, indent=2) + "\n"
         sys.stdout.buffer.write(output.encode("ascii"))

@@ -105,8 +105,7 @@ def extract_audio(input_args, fd, target):
         return expected
 
 
-def prepare(order, journal):
-    media = order["media"]
+def prepare_source(media, audio_name):
     project = MEDIA / "proyectos" / media["project_slug"]
     raw = project / "01_raw" / (media["asset_id"] + "." + media["extension"])
     if raw.resolve(strict=True) != raw:
@@ -153,18 +152,28 @@ def prepare(order, journal):
             if assets.resolve(strict=True) != assets or not assets.is_dir():
                 raise ValueError("Directorio de audio inválido")
             source.seek(0)
-            target = assets / "intake-source.wav"
+            target = assets / audio_name
             audio = {"path": str(target.relative_to(MEDIA)), **extract_audio(args, fd, target)}
         if identity(meta) != identity(os.fstat(fd)) or identity(meta) != identity(
             raw.stat(follow_symlinks=False)
         ):
             raise ValueError("El crudo cambió durante la preparación")
-    receipt = {
-        "order": order,
+    return {
+        "media": media,
         "raw": str(raw.relative_to(MEDIA)),
         "duration_seconds": duration,
         "audio": audio,
     }
+
+
+def prepare(order, journal):
+    first = prepare_source(order["media"], "intake-source.wav")
+    receipt = {"order": order, **{key: value for key, value in first.items() if key != "media"}}
+    if order.get("additional_media"):
+        receipt["additional_sources"] = [
+            prepare_source(media, f"intake-source-{media['asset_id']}.wav")
+            for media in order["additional_media"]
+        ]
     publish(journal, canonical(receipt) + b"\n")
 
 

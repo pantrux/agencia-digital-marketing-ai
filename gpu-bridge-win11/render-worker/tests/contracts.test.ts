@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -38,6 +38,34 @@ test('un reel conserva cortes y rótulos con extremos exclusivos en fotogramas',
   assert.throws(() => parseRender({...request(), props: {...props, scenes: [
     {...scenes[0], label: {...scenes[0]!.label, end_frame: 361}}, scenes[1],
   ]}}), WorkerError);
+});
+
+test('un montaje múltiple acredita fuente y ruta de cada escena', () => {
+  const first = '11111111-1111-4111-8111-111111111111', second = '22222222-2222-4222-8222-222222222222';
+  const sources = [
+    {id:first, video_path:`proyectos/sansevieras/01_raw/${first}.mp4`, audio_path:'proyectos/sansevieras/03_assets/intake-source.wav'},
+    {id:second, video_path:`proyectos/sansevieras/01_raw/${second}.mov`, audio_path:`proyectos/sansevieras/03_assets/intake-source-${second}.wav`},
+  ];
+  const scenes = [
+    {source_id:second, source_start_frame:0, source_end_frame:300, label:{text:'Gancho',start_frame:0,end_frame:90,position:'top'}},
+    {source_id:first, source_start_frame:0, source_end_frame:600},
+  ];
+  const props = {title:'Montaje', duration_seconds:30, sources, scenes};
+  const parsed = parseRender({...request(), props});
+  assert.deepEqual(parsed.props.sources, sources);
+  assert.deepEqual(parsed.props.scenes, scenes);
+  const panel = {...scenes[0]!,label:{...scenes[0]!.label,position:'panel'}};
+  assert.equal(parseRender({...request(),props:{...props,scenes:[panel,scenes[1]]}}).props.scenes?.[0]?.label?.position,'panel');
+  const longScenes = [
+    {source_id:first,source_start_frame:0,source_end_frame:1800,label:{text:'Inicio',start_frame:0,end_frame:90,position:'top'}},
+    {source_id:second,source_start_frame:0,source_end_frame:1800},
+  ];
+  assert.equal(parseRender({...request(),props:{...props,duration_seconds:120,scenes:longScenes}}).durationInFrames,3600);
+  assert.throws(() => parseRender({...request(),props:{...props,duration_seconds:121,scenes:longScenes}}),WorkerError);
+  assert.throws(() => parseRender({...request(), props:{...props, sources:[sources[0], {...sources[1],video_path:sources[0]!.video_path}]}}), WorkerError);
+  assert.throws(() => parseRender({...request(), props:{...props, scenes:[{...scenes[0],source_id:first}, {...scenes[1],source_id:first}]}}), WorkerError);
+  assert.throws(() => parseRender({...request(), props:{...props, sources:[sources[0], {...sources[1],audio_path:'proyectos/otra/03_assets/voz.wav'}]}}), WorkerError);
+  assert.throws(() => parseRender({...request(), props:{...props, video_path:sources[0]!.video_path}}), WorkerError);
 });
 
 test('el anuncio reordena la fuente y programa los cambios de subtítulo y CTA', () => {
@@ -140,6 +168,11 @@ test('el CTA social conserva sólo el destino elegido y agenda cada fotograma an
   const props = {...request().props,duration_seconds:30,video_path:'proyectos/sansevieras/01_raw/crudo.mp4',scenes,ad};
   const value = parseRender({...request(),props});
   assert.deepEqual(value.props.ad?.destination,destination);
+  const graphic = parseRender({...request(),plan:'Ilimitado',format:'prores4444',
+    props:{...props,video_path:undefined,ad:{...ad,engine:'hyperframes'}}});
+  assert.equal(graphic.transparent,true);
+  assert.deepEqual(graphic.props.ad?.destination,destination);
+  assert.throws(() => parseRender({...request(),plan:'Pro',format:'prores4444',props:{...props,video_path:undefined}}),WorkerError);
   assert.equal(parseRender({...request(),props:{...props,ad:{...ad,engine:'hyperframes'}}}).props.ad?.engine,'hyperframes');
   assert.throws(() => parseRender({...request(),props:{...props,ad:{...ad,engine:'remote'}}}),WorkerError);
   const alternateAudio = [{...scenes[0],audio_source_start_frame:120},scenes[1]];
@@ -178,5 +211,30 @@ test('publica las capturas de HyperFrames con los nombres que verifica Lucas', a
       },
     },[0,450,899],false);
     assert.deepEqual(result.files.map(file => path.basename(file)),['still-0.png','still-450.png','still-899.png']);
+  } finally {await rm(workspace,{recursive:true,force:true});}
+});
+
+test('HyperFrames produce la secuencia sin imagen de fondo para la gráfica ProRes', async () => {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), 'studio-hyperframes-alfa-'));
+  try {
+    const props = {...request().props, duration_seconds:30,
+      scenes:[{source_start_frame:0,source_end_frame:450,label:{text:'Gancho',start_frame:0,end_frame:90,position:'top'}},
+        {source_start_frame:450,source_end_frame:900}],
+      ad:{engine:'hyperframes',cta:'Escríbenos',brand:'Vivero',captions:[{start_frame:1,end_frame:30,text:'Plantas'}]}};
+    const graphic = parseRender({...request(),plan:'Ilimitado',format:'prores4444',props});
+    const result = await renderHyperframes({request:graphic,workspace,videoSource:null,browser:'chrome',ffmpeg:'ffmpeg',
+      signal:AbortSignal.timeout(15000),run:async (_tool,args,options) => {
+        assert.ok(options.hyperframes);
+        const html = await readFile(path.join(options.hyperframes.project,'index.html'),'utf8');
+        assert.ok(!html.includes('<video'));
+        assert.ok(args.includes('png-sequence'));
+        const output = args.at(-1)!;
+        await mkdir(output);
+        for (let frame=1; frame<=900; frame++) await writeFile(path.join(output,`frame_${String(frame).padStart(6,'0')}.png`),Buffer.alloc(64));
+        return {stdout:'',stderr:''};
+      }},Array.from({length:900},(_,index)=>index),true);
+    assert.equal(result.frameCount,900);
+    assert.equal(path.basename(result.files[0]!), 'frame_000001.png');
+    assert.equal(path.basename(result.files[899]!), 'frame_000900.png');
   } finally {await rm(workspace,{recursive:true,force:true});}
 });

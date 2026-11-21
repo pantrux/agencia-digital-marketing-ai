@@ -157,6 +157,8 @@ Para activar la recepción de másteres y kits largos en Kitsu, aplica `docker/k
 
 Ejecutar los controles según los componentes presentes. Los tipos del Worker se incluyen en `npm run typecheck` de raíz y sus pruebas en `npm test`. Las pruebas de migraciones usan SQLite local y las de ingreso y Sofía usan datos sintéticos. Mantener las credenciales de producción fuera de la comprobación.
 
+Las pruebas de carga múltiple importan el módulo de carga del portal. Por ello, antes de los tipos o pruebas de raíz hay que instalar también su lock: `npm ci --ignore-scripts --no-audit --prefix cloudflare-saas/studio-portal-web`. Los controles 3 y 4 de GitHub lo hacen de forma independiente. La experiencia conversacional requiere además las migraciones `0022`–`0026`, el Worker de referencias aislado y consumidores compatibles; los pasos y la verificación previa a activación se describen en [operación de Studio](../../operations/STUDIO-EXPERIENCIA-CONVERSACIONAL.md).
+
 El control de infraestructura ejecuta la misma comprobación de D1 desde una carpeta temporal. Wrangler aplica las migraciones ordenadas sobre la base ficticia y un segundo pase coteja que el registro de migraciones siga idéntico. Ambos pases verifican integridad y claves foráneas. [Migraciones locales de D1](https://developers.cloudflare.com/d1/wrangler-commands/#d1-migrations-apply)
 
 Para habilitar el montaje por escenas, comprobar el despacho de `output_edit` y el rechazo de vista previa antes del máster. Aplicar la migración `0018_production_edit.sql` y verificar el receptor, los agentes y el puente antes de publicar el selector del portal.

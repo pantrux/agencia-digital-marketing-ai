@@ -29,7 +29,9 @@ test("Mateo usa el runtime aislado y sólo el perfil OAuth admitido", async () =
     } },
   } };
   const signal = new AbortController().signal;
-  assert.equal(await completeOwnerTurn(api, profile, policy)("brief", signal), "Tres ángulos");
+  const leerTranscripcion = () => { throw new Error("El contexto de Sofía no corresponde a Mateo"); };
+  const orden = "00000000-0000-4000-8000-000000000001";
+  assert.equal(await completeOwnerTurn(api, profile, policy, leerTranscripcion)("brief", signal, orden), "Tres ángulos");
   assert.deepEqual(calls[0].execution, { mode: "isolated-agent-runtime", authProfileId: profile, timeoutMs: 40000 });
   assert.equal(calls[0].agentId, policy.agent);
   assert.equal(calls[0].systemPrompt, policy.prompt);

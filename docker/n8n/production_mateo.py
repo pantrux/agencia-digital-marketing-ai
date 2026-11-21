@@ -18,7 +18,7 @@ from pathlib import Path
 
 from production_handoff import canonical, eligible, load_profile, publish, read_regular, validate
 from production_inbox import UUID, matches
-from production_sofia import JOURNAL, LIMIT
+from production_sofia import INTAKE_LIMIT, JOURNAL, LIMIT
 
 ENDPOINT = "https://studio.e-scale.cl/api/internal/production/dispatch"
 SOFIA = Path("/var/lib/agency-production-sofia")
@@ -268,7 +268,7 @@ def process_pending(profile, token, key, output):
             if previous and previous[1] > int(time.time()):
                 continue
             try:
-                receipt = json.loads(read_regular(path, LIMIT))
+                receipt = json.loads(read_regular(path, INTAKE_LIMIT))
                 order = receipt["order"]
                 validate(order, path.stem)
                 if not eligible(order, profile) or (brief := lookup(order, token)) is None:

@@ -1,10 +1,10 @@
 import React from 'react';
 import {AbsoluteFill, Easing, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {AD_ENDCARD_FRAME, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, TITLE_FADE_FRAMES, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
+import {AD_ENDCARD_FRAME, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, TITLE_FADE_FRAMES, TITLE_PANEL_FRACTION, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
 import {graphicLabelTiming, sceneLength, socialFadeProgress} from '../src/timeline.ts';
 import {SocialEndcard} from './SocialEndcard.tsx';
 
-export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; scenes?: EditScene[]; ad?: ScriptedAd}
+export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; video_is_montage?: boolean; scenes?: EditScene[]; ad?: ScriptedAd}
 const videoStyle = {width: '100%', height: '100%', objectFit: 'cover'} as const;
 
 function cutVideo(file: string, scenes: EditScene[]) {
@@ -40,7 +40,7 @@ export const Reel: React.FC<ReelProps> = (props) => {
     : {left:82,right:155,bottom:330,textAlign:'center' as const};
   // Todo movimiento depende del fotograma; no se utiliza reloj ni azar.
   return <AbsoluteFill style={{backgroundColor: props.transparent ? undefined : props.background, color: '#fff', fontFamily: 'Arial, sans-serif'}}>
-    {props.video_file && (props.scenes
+    {props.video_file && (props.scenes && !props.video_is_montage
       ? cutVideo(props.video_file, props.scenes)
       : <OffthreadVideo src={staticFile(props.video_file)} transparent={props.transparent} muted style={videoStyle} />)}
     {!props.scenes && !(props.transparent && !props.overlay_only) && <AbsoluteFill style={{background: 'linear-gradient(180deg,rgba(0,0,0,.45),transparent 55%,rgba(0,0,0,.8))'}} />}
@@ -50,7 +50,11 @@ export const Reel: React.FC<ReelProps> = (props) => {
       <h1 style={{fontSize: 76, lineHeight: 1.1, margin: 0, overflowWrap: 'anywhere'}}>{props.title}</h1>
       {props.subtitle && <p style={{fontSize: props.subtitle_size === 'large' ? 64 : 50, lineHeight: 1.25, margin: '20px 0 0', overflowWrap: 'anywhere'}}>{props.subtitle}</p>}
     </div>}
-    {label && <div style={{position: 'absolute', ...(hook ? {right:122,maxWidth:380} : {left:60,maxWidth:900}),
+    {label?.position === 'panel' && <div style={{position:'absolute',left:100,right:100,top:60,
+      height:1920*TITLE_PANEL_FRACTION-120,display:'grid',placeItems:'center',textAlign:'center',
+      fontSize:label.text.length > 56 ? 46 : label.size === 'large' && label.text.length <= 35 ? 74 : 58,
+      lineHeight:1.15,fontWeight:700,overflowWrap:'anywhere'}}>{label.text}</div>}
+    {label && label.position !== 'panel' && <div style={{position: 'absolute', ...(hook ? {right:122,maxWidth:380} : {left:60,maxWidth:900}),
       width: 'max-content', boxSizing: 'border-box',
       ...(label.position === 'top' ? {top: hook ? 120 : social ? 205 : 200} : {bottom: props.ad ? 520 : 480}),
       backgroundColor: social ? 'rgba(16,32,24,.88)' : '#141714', borderLeft: `8px solid ${props.accent}`,

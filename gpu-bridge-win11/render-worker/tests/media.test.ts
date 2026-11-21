@@ -1,10 +1,123 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {alphaMaskArgs, alphaMaskSummary, audioPass, cutSceneAudio, correctMp4Audio, encodeNvenc, encodeOutput, measureAudio, overlayInputSupported, overlayPacketTimingSupported, parseLoudness, parseProbe, audioAccepted, outputAccepted, outputViolations} from '../src/media.ts';
+import {spawnSync} from 'node:child_process';
+import {mkdtempSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {alphaMaskArgs, alphaMaskSummary, audioPass, cutSceneAudio, cutMultiSourceAudio, multiSourceVideoInputs, correctMp4Audio, encodeNvenc, encodeOutput, encodeProresFragment, measureAudio, overlayInputSupported, overlayPacketTimingSupported, parseLoudness, parseProbe, audioAccepted, outputAccepted, outputViolations} from '../src/media.ts';
 import {parseRender} from '../src/contracts.ts';
 import {graphicFrames, graphicLabel} from '../src/timeline.ts';
 
 const measured = {integrated_lufs: -21, true_peak_dbtp: -4, range_lu: 2, threshold_lufs: -31, offset_lu: 0.01};
+
+test('codifica una secuencia numerada desde uno en ProRes y conserva alfa real',
+  {skip: spawnSync('ffmpeg', ['-version']).status !== 0}, () => {
+    const dir = mkdtempSync(join(tmpdir(), 'studio-prores-alpha-'));
+    try {
+      const pattern = join(dir, 'frame_%06d.png'), output = join(dir, 'graphics.mov');
+      const images = spawnSync('ffmpeg', ['-v','error','-f','lavfi','-i','nullsrc=s=64x64:r=30',
+        '-vf','format=rgba,colorchannelmixer=aa=0,drawbox=x=0:y=0:w=32:h=64:color=red@1:t=fill:replace=1',
+        '-frames:v','2','-threads','1','-start_number','1',pattern]);
+      assert.equal(images.status, 0, images.stderr.toString());
+      const encoded = spawnSync('ffmpeg', encodeProresFragment(pattern, output, 2, 1));
+      assert.equal(encoded.status, 0, encoded.stderr.toString());
+      const alpha = spawnSync('ffmpeg', ['-v','error','-i',output,'-vf','alphaextract',
+        '-frames:v','2','-pix_fmt','gray','-f','rawvideo','-'], {maxBuffer:65536});
+      assert.equal(alpha.status, 0, alpha.stderr.toString());
+      assert.equal(alpha.stdout.length, 64 * 64 * 2);
+      for (let frame=0; frame<2; frame++) {
+        const pixels = alpha.stdout.subarray(frame * 4096, (frame + 1) * 4096);
+        assert.ok(pixels.some(value => value < 10), 'debe conservar áreas transparentes');
+        assert.ok(pixels.some(value => value > 245), 'debe conservar áreas opacas');
+      }
+    } finally {rmSync(dir, {recursive:true, force:true});}
+  });
+
+test('concatena audio real de dos fuentes y conserva su orden', {skip: spawnSync('ffmpeg', ['-version']).status !== 0}, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'studio-audio-'));
+  try {
+    const first = join(dir, 'primero.wav'), second = join(dir, 'segundo.wav'), output = join(dir, 'montaje.wav');
+    for (const [frequency, file] of [[400, first], [800, second]] as const) {
+      const generated = spawnSync('ffmpeg', ['-v','error','-f','lavfi','-i',`sine=frequency=${frequency}:sample_rate=48000:duration=2`, '-y',file]);
+      assert.equal(generated.status, 0, generated.stderr.toString());
+    }
+    const scenes = [{source_id:'b',source_start_frame:0,source_end_frame:30}, {source_id:'a',source_start_frame:0,source_end_frame:30}];
+    const rendered = spawnSync('ffmpeg', cutMultiSourceAudio(new Map([['a', first], ['b', second]]), output, scenes));
+    assert.equal(rendered.status, 0, rendered.stderr.toString());
+    const decoded = spawnSync('ffmpeg', ['-v','error','-i',output,'-ac','1','-f','f32le','-'], {maxBuffer: 1024 * 1024});
+    assert.equal(decoded.status, 0, decoded.stderr.toString());
+    assert.equal(decoded.stdout.length, 2 * 48000 * 4);
+    const crossings = (offset: number) => {
+      let count = 0, previous = decoded.stdout.readFloatLE(offset * 4);
+      for (let i = offset + 1; i < offset + 48000; i += 1) {
+        const next = decoded.stdout.readFloatLE(i * 4);
+        if (previous < 0 && next >= 0) count += 1;
+        previous = next;
+      }
+      return count;
+    };
+    assert.ok(crossings(0) > 750 && crossings(0) < 850);
+    assert.ok(crossings(48000) > 350 && crossings(48000) < 450);
+    const withSilence = join(dir, 'silencio.wav');
+    const silent = spawnSync('ffmpeg', cutMultiSourceAudio(new Map([['a', first], ['b', null]]), withSilence, scenes));
+    assert.equal(silent.status, 0, silent.stderr.toString());
+    const samples = spawnSync('ffmpeg', ['-v','error','-i',withSilence,'-ac','1','-f','f32le','-'], {maxBuffer: 1024 * 1024});
+    assert.equal(samples.status, 0, samples.stderr.toString());
+    assert.ok(samples.stdout.subarray(0, 48000 * 4).every(byte => byte === 0));
+    assert.ok(samples.stdout.subarray(48000 * 4).some(byte => byte !== 0));
+    assert.throws(() => cutMultiSourceAudio(new Map([['a',first]]), output, scenes));
+  } finally { rmSync(dir, {recursive:true, force:true}); }
+});
+
+test('une video real de fuentes con geometrías distintas en el orden elegido', {skip: spawnSync('ffmpeg', ['-version']).status !== 0}, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'studio-video-'));
+  try {
+    const red = join(dir, 'rojo.mkv'), blue = join(dir, 'azul.mkv');
+    for (const [color, size, file] of [['red','320x180',red], ['blue','180x320',blue]] as const) {
+      const result = spawnSync('ffmpeg', ['-v','error','-f','lavfi','-i',`color=c=${color}:s=${size}:r=30:d=1`, '-c:v','ffv1','-y',file]);
+      assert.equal(result.status, 0, result.stderr.toString());
+    }
+    const scenes = [
+      {source_id:'b',source_start_frame:0,source_end_frame:15,
+        label:{text:'Plantas',start_frame:0,end_frame:15,position:'panel' as const}},
+      {source_id:'a',source_start_frame:0,source_end_frame:15},
+    ];
+    const montage = multiSourceVideoInputs(new Map([['a',red], ['b',blue]]), scenes, 180, 320);
+    const rendered = spawnSync('ffmpeg', ['-v','error','-filter_complex_threads','1',...montage.videoInputs,
+      '-filter_complex',montage.cuts.join(';'),'-map','[montaje]','-pix_fmt','rgb24','-f','rawvideo','-'], {maxBuffer: 8 * 1024 * 1024});
+    assert.equal(rendered.status, 0, rendered.stderr.toString());
+    const frameBytes = 180 * 320 * 3;
+    assert.equal(rendered.stdout.length, frameBytes * 30);
+    const margin = (10 * 180 + 90) * 3;
+    const center = (180 * 180 + 90) * 3;
+    const panel = rendered.stdout.subarray(margin, margin + 3);
+    const first = rendered.stdout.subarray(center, center + 3);
+    const last = rendered.stdout.subarray(15 * frameBytes, 15 * frameBytes + 3);
+    assert.ok(panel.every(channel => channel < 30), 'el panel debe quedar fuera de la imagen');
+    assert.ok(first[2]! > 200 && first[0]! < 30);
+    assert.ok(last[0]! > 200 && last[2]! < 30);
+    assert.throws(() => multiSourceVideoInputs(new Map([['a',red]]), scenes, 180, 320));
+  } finally { rmSync(dir, {recursive:true, force:true}); }
+});
+
+test('procesa más de doce escenas de varias fuentes en audio y video', {skip: spawnSync('ffmpeg', ['-version']).status !== 0}, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'studio-escenas-largas-'));
+  try {
+    const video = join(dir, 'source.mkv'), audio = join(dir, 'source.wav');
+    const picture = spawnSync('ffmpeg', ['-v','error','-f','lavfi','-i','color=c=red:s=32x32:r=30:d=1','-c:v','ffv1',video]);
+    assert.equal(picture.status, 0, picture.stderr.toString());
+    const sound = spawnSync('ffmpeg', ['-v','error','-f','lavfi','-i','sine=frequency=400:sample_rate=48000:duration=1',audio]);
+    assert.equal(sound.status, 0, sound.stderr.toString());
+    const scenes = Array.from({length: 13}, (_, i) => ({source_id: i % 2 ? 'a' : 'b', source_start_frame: 0, source_end_frame: 15}));
+    const montage = multiSourceVideoInputs(new Map([['a',video], ['b',video]]), scenes, 32, 32);
+    const rendered = spawnSync('ffmpeg', ['-v','error','-filter_complex_threads','1',...montage.videoInputs,
+      '-filter_complex',montage.cuts.join(';'),'-map','[montaje]','-f','null','-']);
+    assert.equal(rendered.status, 0, rendered.stderr.toString());
+    const mixed = spawnSync('ffmpeg', cutMultiSourceAudio(new Map([['a',audio], ['b',audio]]), join(dir, 'mixed.wav'), scenes));
+    assert.equal(mixed.status, 0, mixed.stderr.toString());
+    assert.throws(() => multiSourceVideoInputs(new Map([['a',video], ['b',video]]), [...scenes, ...scenes, ...scenes], 32, 32));
+  } finally { rmSync(dir, {recursive:true, force:true}); }
+});
 
 test('los cortes mantienen la sincronía de audio y los rótulos desaparecen en su límite', () => {
   const scenes = [

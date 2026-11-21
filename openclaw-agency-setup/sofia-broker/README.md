@@ -1,6 +1,6 @@
 # Piloto privado del chat de Sofía
 
-El Worker habilita el chat en `BILLING_MODE=sandbox` para un único `SOFIA_OWNER_USER_ID`, el UUID que D1 asignó al titular tras su inicio de sesión. Antes de firmar, lee de D1 una orden Free que pertenezca a ese usuario, tenga una carga completada y cumpla los estados de producción y cuota esperados. Envía un identificador opaco derivado del UUID mediante HMAC; la orden y el modo `sandbox` forman parte del cuerpo firmado.
+El Worker verifica en D1 que la orden pertenezca a la cuenta autenticada y al entorno activo, tenga una carga completada y cumpla los estados de producción y cuota esperados. Envía un identificador opaco derivado del UUID mediante HMAC junto con la orden, el plan y el entorno. El broker acepta únicamente solicitudes firmadas por el Worker, conserva el aislamiento por actor y orden y transmite el plan y el entorno firmados al plugin.
 
 | Servicio | Dirección | Operación |
 | --- | --- | --- |
@@ -8,7 +8,7 @@ El Worker habilita el chat en `BILLING_MODE=sandbox` para un único `SOFIA_OWNER
 | Broker | `127.0.0.1:3107` | `POST /v1/sofia/chat` |
 | Plugin de OpenClaw | `/run/user/1000/agency-sofia-owner/sofia-owner.sock` | `POST /v1/sofia/owner-turn` dentro del socket Unix |
 
-El broker revalida firma, titular, plan y modo antes de reservar un turno en SQLite. Envía al socket una solicitud firmada con una clave distinta y comprueba la firma y los identificadores de la respuesta antes de guardarla. El plugin llama al harness Codex con el perfil OAuth ya administrado por OpenClaw. Cada turno usa un contexto efímero sin herramientas. El [plugin y su contrato de socket](openclaw-owner-plugin/README.md) describen su verificación de modelo, runtime y perfil.
+El broker revalida firma, identidad opaca, plan y modo antes de reservar un turno en SQLite. Envía al socket una solicitud firmada con una clave distinta y comprueba la firma y los identificadores de la respuesta antes de guardarla. El plugin llama al harness Codex con el perfil OAuth ya administrado por OpenClaw. Cada turno usa un contexto efímero sin herramientas, con el diálogo reciente y la transcripción disponible de la orden. El [plugin y su contrato de socket](openclaw-owner-plugin/README.md) describen su verificación de modelo, runtime y perfil.
 
 ## Ensayo local
 
