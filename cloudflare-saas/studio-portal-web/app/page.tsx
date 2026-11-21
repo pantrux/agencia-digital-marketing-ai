@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { observeBrowserTimings } from "./browser-timing";
 import { quotaNotice } from "./quota";
+import { maxEditStyleLength, readSofiaStyles } from "./sofia-styles";
 import { uploadVideo, uploadVideos, type OutputEdit, type OutputFormat, type OutputResolution } from "./upload";
 
 type Person = { email: string; display_name: string | null };
@@ -198,7 +199,7 @@ function ConfirmBrief({ order, suggestion }: { order: string; suggestion: {id:st
         <textarea id="brief-objective" rows={2} required maxLength={800} value={fields.objective} disabled={pending}
           onChange={(event) => setDraft({ ...draft, objective: event.currentTarget.value })} />
         <label htmlFor="brief-style">Estilo de edición elegido (opcional)</label>
-        <textarea id="brief-style" rows={3} maxLength={500} value={creativeDirection} disabled={pending}
+        <textarea id="brief-style" rows={3} maxLength={maxEditStyleLength} value={creativeDirection} disabled={pending}
           placeholder="Describe el estilo que elegiste: ritmo, música, subtítulos y animaciones."
           onChange={(event) => setCreativeDirection(event.currentTarget.value)} />
         <label htmlFor="brief-audience">Audiencia</label>
@@ -509,6 +510,8 @@ export default function Home() {
   const [ordersCheckedAt, setOrdersCheckedAt] = useState(0);
   const hasActiveProduction = orders.some(awaitingDelivery);
   const selectedState = orders.find((order) => order.id === selected)?.status;
+  const selectedConversation = conversations[selected] ?? [];
+  const canEditBrief = orders.some((order) => order.id === selected && awaitingDelivery(order) && !order.brief_confirmed_at);
   const renewalNotice = plan?.production_available ? quotaNotice(plan) : null;
   const unlimited = plan?.plan_id === "ilimitado";
   useEffect(() => {
@@ -960,31 +963,51 @@ export default function Home() {
               && <ManualAdjustment key={`manual-${selected}`} order={selected} onResumed={refreshAfterAdjustment} />}
             <div className="chat-history" role="log" aria-label="Conversación con Sofía" aria-live="polite">
               {!selected && <p>Inicia una producción o selecciona un proyecto para conversar con Sofía.</p>}
-              {selected && !conversations[selected]?.length && <p>Cuéntale a Sofía qué quieres lograr. Pueden definir el enfoque, la audiencia y el estilo.</p>}
-              {!!conversations[selected]?.length && <p className="chat-hint">Para elegir una propuesta específica, selecciona su texto y luego pulsa «Usar como estilo de edición».</p>}
-              {(conversations[selected] ?? []).map((turn) => <div key={turn.id} className={`chat-turn ${turn.role}`}>
-                <strong>{turn.role === "sofia" ? "Sofía" : "Tú"}</strong><p>{turn.text}</p>
-                {orders.some((order) => order.id === selected && awaitingDelivery(order) && !order.brief_confirmed_at) &&
-                  <><button type="button" onClick={(event) => {
-                    const container = event.currentTarget.closest(".chat-turn");
-                    const selection = window.getSelection();
-                    const text = selection && container?.contains(selection.anchorNode) && container.contains(selection.focusNode)
-                      ? selection.toString().trim() || turn.text : turn.text;
-                    if (text.length > 800) { setError("El texto supera 800 caracteres. Selecciona una parte más breve para el objetivo."); return; }
-                    setError(""); setBriefSuggestion({order:selected, id:crypto.randomUUID(), text, target:"objective"});
-                  }}>
-                    Copiar al objetivo del brief
-                  </button><button type="button" onClick={(event) => {
-                    const container = event.currentTarget.closest(".chat-turn");
-                    const selection = window.getSelection();
-                    const text = selection && container?.contains(selection.anchorNode) && container.contains(selection.focusNode)
-                      ? selection.toString().trim() || turn.text : turn.text;
-                    if (text.length > 500) { setError("El texto supera 500 caracteres. Selecciona la propuesta de estilo que quieres usar."); return; }
-                    setError(""); setBriefSuggestion({order:selected, id:crypto.randomUUID(), text, target:"style"});
-                  }}>
-                    Usar como estilo de edición
-                  </button></>}
-              </div>)}
+              {selected && !selectedConversation.length && <p>Cuéntale a Sofía qué quieres lograr. Pueden definir el enfoque, la audiencia y el estilo.</p>}
+              {selectedConversation.map((turn, index) => {
+                const previous = selectedConversation[index - 1];
+                const styles = canEditBrief && turn.role === "sofia" && previous?.role === "usuario"
+                  ? readSofiaStyles(previous.text, turn.text) : null;
+                if (styles) return <div key={turn.id} className="chat-turn sofia">
+                  <strong>Sofía</strong>
+                  {styles.intro && <p>{styles.intro}</p>}
+                  <div className="chat-style-options" role="group" aria-label="Estilos de edición propuestos">
+                    {styles.choices.map(({ title, detail }, option) => <button key={option} className="chat-style" type="button" onClick={() => {
+                      const text = title && detail ? `${title}: ${detail}` : title || detail;
+                      setError("");
+                      setBriefSuggestion({ order: selected, id: crypto.randomUUID(), text, target: "style" });
+                    }}>
+                      {title && <span className="chat-style-title">{title}</span>}
+                      {detail && <span>{detail}</span>}
+                      <span className="chat-style-action">Usar este estilo</span>
+                    </button>)}
+                  </div>
+                  {styles.outro && <p>{styles.outro}</p>}
+                </div>;
+                return <div key={turn.id} className={`chat-turn ${turn.role}`}>
+                  <strong>{turn.role === "sofia" ? "Sofía" : "Tú"}</strong><p>{turn.text}</p>
+                  {canEditBrief &&
+                    <><button type="button" onClick={(event) => {
+                      const container = event.currentTarget.closest(".chat-turn");
+                      const selection = window.getSelection();
+                      const text = selection && container?.contains(selection.anchorNode) && container.contains(selection.focusNode)
+                        ? selection.toString().trim() || turn.text : turn.text;
+                      if (text.length > 800) { setError("El texto supera 800 caracteres. Selecciona una parte más breve para el objetivo."); return; }
+                      setError(""); setBriefSuggestion({order:selected, id:crypto.randomUUID(), text, target:"objective"});
+                    }}>
+                      Copiar al objetivo del brief
+                    </button><button type="button" onClick={(event) => {
+                      const container = event.currentTarget.closest(".chat-turn");
+                      const selection = window.getSelection();
+                      const text = selection && container?.contains(selection.anchorNode) && container.contains(selection.focusNode)
+                        ? selection.toString().trim() || turn.text : turn.text;
+                      if (text.length > maxEditStyleLength) { setError("El texto supera 500 caracteres. Selecciona una parte más breve para el estilo."); return; }
+                      setError(""); setBriefSuggestion({order:selected, id:crypto.randomUUID(), text, target:"style"});
+                    }}>
+                      Usar como estilo de edición
+                    </button></>}
+                </div>;
+              })}
               {orders.find((order) => order.id === selected)?.status === "completed" &&
                 kits.filter((kit) => kit.order_id === selected).map((kit) => <div className="chat-turn sofia" key={kit.id}>
                   <strong>Entrega aprobada</strong>
@@ -1001,7 +1024,7 @@ export default function Home() {
             </div>
             {selected && <div className="chat-suggestions" aria-label="Ideas para conversar con Sofía">
               <button type="button" disabled={chatPending} onClick={() => void sendQuestion(
-                "Propón tres estilos de edición distintos para esta producción, incluyendo ritmo, música, subtítulos y motion graphics. Explícame cómo se vería cada uno y pregúntame cuál prefiero.",
+                "Propón tres estilos de edición distintos para esta producción. Usa una lista del 1 al 3 con un título breve en negrita y una descripción corta que reúna ritmo, música, subtítulos y gráficos animados. Pregúntame cuál prefiero después de la lista.",
               )}>Explorar tres estilos</button>
               <button type="button" disabled={chatPending} onClick={() => void sendQuestion(
                 "Ayúdame a definir el objetivo, la audiencia, el tono y el llamado a la acción de este vídeo. Hazme preguntas de una en una.",

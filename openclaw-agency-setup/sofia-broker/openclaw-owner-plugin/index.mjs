@@ -326,7 +326,7 @@ export function completeOwnerTurn(api, oauthProfileId, policy = SOFIA, transcrip
     if (typeof llm?.complete !== "function") throw inferenceFailure(new TypeError("complete is not a function"), "LLM_SURFACE");
     let pending;
     try {
-      const transcript = orderId ? await transcriptReader(orderId) : null;
+      const transcript = policy.id === SOFIA.id && orderId ? await transcriptReader(orderId) : null;
       const content = transcript ? { mensaje: message, transcripcion: transcript } : message;
       pending = llm.complete({
         agentId: policy.agent, systemPrompt: policy.prompt, purpose: policy.id,

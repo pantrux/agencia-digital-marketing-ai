@@ -71,6 +71,11 @@ progress { width: 100%; accent-color: var(--green); }
 .chat-turn.usuario { align-self: flex-end; background: #35452c; }
 .chat-turn strong { font-size: .8rem; color: var(--green); }
 .chat-turn p { margin: .35rem 0 0; white-space: pre-wrap; color: var(--ink); line-height: 1.5; }
+.chat-style-options { display: grid; gap: .5rem; margin-block: .75rem; }
+.chat-style { display: grid; gap: .3rem; padding: .7rem .85rem; text-align: left; color: var(--ink); background: var(--panel); border: 1px solid #646858; border-radius: 5px; }
+.chat-style:hover { border-color: var(--green); }
+.chat-style-title { font: 1.3rem var(--serif); }
+.chat-style-action { color: var(--green); font-size: .8rem; font-weight: 700; }
 .chat-turn video { display: block; max-width: min(100%, 360px); max-height: 28rem; margin: .7rem 0; background: #000; border-radius: .5rem; }
 .chat-suggestions { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
 .chat-suggestions button { color: var(--ink); background: transparent; border: 1px solid #646858; border-radius: 2rem; padding: .5rem .8rem; }
