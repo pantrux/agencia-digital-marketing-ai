@@ -294,7 +294,6 @@ def run_pending(profile, token, dispatch, output):
     state.mkdir(mode=0o700, exist_ok=True)
     if state.resolve(strict=True) != state:
         raise ValueError("Directorio de reintentos de render inválido")
-    started = time.monotonic()
     deferred_error = None
     with closing(sqlite3.connect(state / "lucas.sqlite3")) as db:
         db.execute(
@@ -316,6 +315,7 @@ def run_pending(profile, token, dispatch, output):
                 continue
             if previous and previous[1] > int(time.time()):
                 continue
+            started = time.monotonic()
             try:
                 rendered = render_pending(path, target, version, profile, token, dispatch)
             except (*ORDER_ERRORS, subprocess.SubprocessError) as error:

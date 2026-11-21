@@ -251,7 +251,6 @@ def process_pending(profile, token, key, output):
     state.mkdir(mode=0o700, exist_ok=True)
     if state.resolve(strict=True) != state:
         raise ValueError("Directorio de reintentos inválido")
-    started = time.monotonic()
     deferred_error = None
     with closing(sqlite3.connect(state / "mateo.sqlite3")) as db:
         db.execute(
@@ -269,6 +268,7 @@ def process_pending(profile, token, key, output):
             ).fetchone()
             if previous and previous[1] > int(time.time()):
                 continue
+            started = time.monotonic()
             try:
                 receipt = json.loads(read_regular(path, INTAKE_LIMIT))
                 order = receipt["order"]
