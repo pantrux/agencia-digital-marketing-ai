@@ -43,12 +43,11 @@ const browserRoutes = new Set(["auth_me", "panel", "multipart_inicio", "multipar
 const sourceUploadRoute = /^\/api\/orders\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/sources\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/(upload|complete|parts(?:\/([1-9][0-9]?)\/sign)?)$/u;
 type BrowserSample = [string, number, number, boolean];
 
-function observeMultipart(env: WorkerEnv, route: "multipart_inicio_etapas" | "multifuente_inicio_etapas",
-  testAccount = false): MultipartObserver | undefined {
+function observeMultipart(env: WorkerEnv, route: "multipart_inicio_etapas" | "multifuente_inicio_etapas"): MultipartObserver | undefined {
   const metrics = env.STUDIO_HTTP_METRICS;
   if (!metrics) return undefined;
   return (preparation, storage, confirmation, fromTestSession = false) => {
-    const cohort = env.PUBLIC_ORIGIN === "https://studio.e-scale.cl" && !testAccount && !fromTestSession
+    const cohort = env.PUBLIC_ORIGIN === "https://studio.e-scale.cl" && !fromTestSession
       ? (env.BILLING_MODE === "production" ? "produccion" : "piloto") : "ensayo";
     try {
       metrics.writeDataPoint({ indexes: [route], blobs: [cohort],
@@ -148,6 +147,14 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
     if (request.method === "POST" && path === "/api/uploads") {
       return await handleUploadCreation(request, env, onUploadCommitted, observeMultipart(env, "multipart_inicio_etapas"));
     }
+    const sourceUpload = !url.search ? sourceUploadRoute.exec(path) : null;
+    if (request.method === "POST" && sourceUpload?.[3] === "upload") {
+      const owner = await sessionLookup(request, env);
+      const result = await createSourceUpload(env, owner, sourceUpload[1]!, sourceUpload[2]!,
+        observeMultipart(env, "multifuente_inicio_etapas"));
+      ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));
+      return result;
+    }
     const user = await identity(request, env);
     if (path === "/api/metrics/ttfb" && request.method === "POST") {
       return await recordBrowserTimings(request, env, user.email.toLowerCase().endsWith(".invalid"));
@@ -171,16 +178,9 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
     if (deliveryRevision && !url.search) return await handleDeliveryRevisions(request, env, user.id, deliveryRevision[1]!);
     const sourceSet = sourceSetRoute.exec(path);
     if (sourceSet && !url.search) return await handleSourceSet(request, env, user.id, sourceSet[1]!);
-    const sourceUpload = sourceUploadRoute.exec(path);
-    if (sourceUpload && !url.search) {
+    if (sourceUpload) {
       if (!uploadsConfigured(env)) throw new HttpError(503, "SUBIDA_NO_DISPONIBLE");
       const [, orderId, sourceId, action, part] = sourceUpload;
-      if (request.method === "POST" && action === "upload") {
-        const measured = observeMultipart(env, "multifuente_inicio_etapas", user.email.toLowerCase().endsWith(".invalid"));
-        const result = await createSourceUpload(env, user.id, orderId!, sourceId!, measured);
-        ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));
-        return result;
-      }
       if (request.method === "GET" && action === "parts") return await listSourceParts(env, user.id, orderId!, sourceId!);
       if (request.method === "POST" && part) return await signSourcePart(env, user.id, orderId!, sourceId!, Number(part));
       if (request.method === "POST" && action === "complete") {

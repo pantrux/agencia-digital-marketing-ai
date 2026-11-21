@@ -1080,7 +1080,10 @@ describe("Ingesta R2 multipart", () => {
       const source = db.prepare("SELECT id FROM production_sources WHERE order_id=?").get(order) as { id: string };
       const { bucket } = mockMedia(new Uint8Array(7));
       const writeDataPoint = vi.fn<(point: { indexes: string[] }) => void>();
-      const env = { DB: sqliteAdapter(db), MEDIA: bucket, PUBLIC_ORIGIN: origin, BILLING_MODE: mode,
+      const adapter = sqliteAdapter(db);
+      const batch = vi.spyOn(adapter, "batch");
+      const separate = vi.spyOn(adapter, "withSession");
+      const env = { DB: adapter, MEDIA: bucket, PUBLIC_ORIGIN: origin, BILLING_MODE: mode,
         STUDIO_JWT_SESSION_SECRET: secret, STUDIO_HTTP_METRICS: { writeDataPoint },
         R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
         R2_SECRET_ACCESS_KEY: credentials.secretAccessKey,
@@ -1090,15 +1093,26 @@ describe("Ingesta R2 multipart", () => {
       }), env, { waitUntil: vi.fn() });
       const first = await send();
       expect(first.status).toBe(200);
-      expect(await first.json()).toMatchObject({ id: source.id, newlyOpened: true });
+      const opened = await first.json();
+      expect(opened).toMatchObject({ id: source.id, newlyOpened: true });
+      expect(batch).toHaveBeenCalledTimes(2);
+      expect(batch.mock.calls[0]?.[0]).toHaveLength(2);
+      batch.mockClear();
       const replay = await send();
       expect(replay.status).toBe(200);
-      expect(await replay.json()).not.toHaveProperty("newlyOpened");
+      const restored = await replay.json();
+      expect(restored).not.toHaveProperty("newlyOpened");
+      expect({ ...restored, newlyOpened: true }).toEqual(opened);
+      expect(batch).toHaveBeenCalledTimes(1);
+      expect(separate).not.toHaveBeenCalled();
       const totals = writeDataPoint.mock.calls.filter(([point]) => point.indexes[0] === "multifuente_inicio");
       expect(totals).toHaveLength(2);
       expect(writeDataPoint.mock.calls.filter(([point]) => point.indexes[0] === "multifuente_inicio_etapas"))
         .toEqual([[{ indexes: ["multifuente_inicio_etapas"], blobs: [cohort],
           doubles: [expect.any(Number), 200, expect.any(Number), expect.any(Number), expect.any(Number)] }]]);
+      db.exec("UPDATE sessions SET revoked_at=unixepoch() WHERE user_id='user'");
+      expect((await send()).status).toBe(401);
+      expect(bucket.createMultipartUpload).toHaveBeenCalledTimes(1);
     } finally { db.close(); }
   });
 
@@ -1261,7 +1275,7 @@ describe("Ingesta R2 multipart", () => {
       expect(opened.status).toBe("open");
       expect(await (await createSourceUpload(env, "user", order, opened.id, observe)).json())
         .toMatchObject({ id: opened.id, uploadId: opened.uploadId, status: "open" });
-      expect(observe.mock.calls).toEqual([[expect.any(Number), expect.any(Number), expect.any(Number)]]);
+      expect(observe.mock.calls).toEqual([[expect.any(Number), expect.any(Number), expect.any(Number), false]]);
       await expect(signSourcePart(env, "otro", order, opened.id, 1)).rejects.toMatchObject({ status: 404 });
       await expect(signSourcePart(env, "user", order, opened.id, 2)).rejects.toMatchObject({ status: 405 });
       const signed = await (await signSourcePart(env, "user", order, opened.id, 1)).json() as { url: string; headers: object };
