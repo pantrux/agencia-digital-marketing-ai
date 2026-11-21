@@ -1434,6 +1434,53 @@ def test_elena_aprueba_solo_con_reglas_duras_y_pruebas_visuales(monkeypatch):
         )
 
 
+def test_elena_reintenta_un_dictamen_sin_json_con_las_mismas_muestras(monkeypatch, tmp_path):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_elena as elena
+
+    metrics = {
+        "width": 1080,
+        "height": 1920,
+        "fps": 30.0,
+        "codec": "h264",
+        "color": "bt709",
+        "duration": 4.0,
+        "lufs": -14.0,
+        "peak": -11.2,
+    }
+    images = [(0, b"fotograma"), (2, b"otro fotograma"), (3, b"cierre")]
+    monkeypatch.setattr(elena, "decode", lambda *_args, **_options: (metrics, images))
+    requests = []
+
+    def run_visual(request):
+        requests.append(request)
+        if len(requests) == 1:
+            raise elena.VisualResponseFormatError("Respuesta visual sin JSON válido")
+        return {
+            "puntaje": 92,
+            "marca_free": "",
+            "observaciones": [{"muestra": 1, "detalle": "Rótulo legible"}],
+            "defectos": [],
+        }
+
+    monkeypatch.setattr(elena, "run_visual", run_visual)
+    request_id = str(uuid.uuid4())
+    reviewed = elena.review_video(
+        tmp_path / "master.mp4",
+        "a" * 64,
+        {"title": "Sansevierias", "subtitle": "De interior", "duration_seconds": 4.0},
+        1,
+        "Ilimitado",
+        "1080p",
+        request_id,
+    )
+    assert reviewed["dictamen"]["decision"] == "aprobado"
+    assert len(requests) == 2
+    assert requests[0]["idempotencyKey"] == request_id
+    assert requests[1]["idempotencyKey"] != request_id
+    assert requests[1]["attachments"] == requests[0]["attachments"]
+
+
 @pytest.mark.parametrize(
     ("plan", "marca", "resolution", "width", "height"),
     [

@@ -34,7 +34,13 @@ from production_inbox import MEDIA, UUID, matches, render_resolution
 from production_intake import identity
 from production_mateo import dispatch_request, lookup
 from production_sofia import INTAKE_LIMIT, JOURNAL, LIMIT, MAX_TRANSCRIPT, MCP, validate_transcript
-from production_valeria import AD_MUSIC_ID, MAX_JPEG, run_visual, visual_request
+from production_valeria import (
+    AD_MUSIC_ID,
+    MAX_JPEG,
+    VisualResponseFormatError,
+    run_visual,
+    visual_request,
+)
 
 AD_MUSIC_CREDIT = (
     "Carefree — Kevin MacLeod (incompetech.com), CC BY 4.0. Fragmento editado y mezclado. "
@@ -502,14 +508,25 @@ def review_video(
         )
     if synthetic:
         instructions += "Considera que el crudo es una demostración técnica con barras de color. "
-    review = run_visual(
-        visual_request(
-            "agency-critic",
-            instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
-            images,
-            request_id,
-        )
+    request = visual_request(
+        "agency-critic",
+        instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
+        images,
+        request_id,
     )
+    try:
+        review = run_visual(request)
+    except VisualResponseFormatError:
+        # Repetir con otro ID evita reutilizar la respuesta anterior del Gateway.
+        corrected = {
+            **request,
+            "idempotencyKey": str(uuid.uuid5(uuid.UUID(request_id), "elena:corregir-formato:v1")),
+            "message": (
+                "Emite el dictamen como un único objeto JSON completo, sin Markdown ni comentarios. "
+                + request["message"]
+            ),
+        }
+        review = run_visual(corrected)
     qa = make_verdict(
         review, metrics, duration, plan=plan, resolution=resolution, samples=len(images)
     )
