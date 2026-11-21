@@ -18,7 +18,8 @@ LoadCredential=gpu:/etc/agency-production-handoff/gpu-render-token
 LoadCredential=r2:/etc/agency-production-handoff/publication-r2.json
 LoadCredential=hmac:/etc/agency-production-handoff/publication-hmac
 ExecStart=/usr/bin/python3 -E -s -B /usr/local/lib/agency-production-handoff/production_revision.py %d/profile %d/dispatch %d/gpu %d/r2 %d/hmac /var/lib/agency-production-revisions
-TimeoutStartSec=75min
+# Cada ronda puede renderizar una vista previa, generar fotogramas y renderizar el máster.
+TimeoutStartSec=4h
 ProtectSystem=full
 PrivateDevices=yes
 PrivateTmp=yes

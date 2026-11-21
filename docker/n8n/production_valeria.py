@@ -578,6 +578,27 @@ def verdict(response):
         raise VisualResponseFormatError("Respuesta visual sin JSON válido") from None
 
 
+def review_findings(prior):
+    verdict = prior["dictamen"]
+    return {
+        "defectos": verdict.get("defectos", []),
+        "reglas_duras_incumplidas": verdict.get("reglas_duras_incumplidas", []),
+        "puntaje": verdict.get("puntaje"),
+    }
+
+
+def requested_revision_guidance(prior):
+    if prior["dictamen"].get("decision") == "rechazado":
+        return (
+            "Elena rechazó la versión previa. Corrige sus observaciones y las reglas incumplidas "
+            "sin perder la solicitud del titular. Cambia el ángulo si el titular lo solicita. "
+        )
+    return (
+        "La versión previa fue aprobada. Aplica la nueva solicitud del titular, "
+        "conservando lo que no necesite cambiar. Puedes cambiar el ángulo si lo solicita. "
+    )
+
+
 def plan_request(
     angles,
     brief,
@@ -681,7 +702,7 @@ def plan_request(
             "titulo": props["title"],
             "subtitulo": props["subtitle"],
             "subtitulo_ampliado": props.get("subtitle_size") == "large",
-            "defectos": prior["dictamen"].get("defectos", []),
+            **review_findings(prior),
         }
         if reel:
             facts["revision_previa"]["escenas_en_fotogramas"] = props["scenes"]
@@ -689,8 +710,7 @@ def plan_request(
                 sample["segundo"] for sample in prior.get("muestras", [])
             ]
             instructions += (
-                "La versión previa fue aprobada. Aplica la nueva solicitud del titular, "
-                "conservando lo que no necesite cambiar. Puedes cambiar el ángulo si lo solicita. "
+                requested_revision_guidance(prior)
                 if user_revision
                 else " Conserva el ángulo y corrige específicamente los cortes o rótulos observados"
                 " por Elena. Convierte los fotogramas de la revisión anterior a segundos"
@@ -698,8 +718,7 @@ def plan_request(
             )
         else:
             instructions += (
-                "La versión previa fue aprobada. Aplica la nueva solicitud del titular, "
-                "conservando lo que no necesite cambiar. Puedes cambiar el ángulo si lo solicita. "
+                requested_revision_guidance(prior)
                 if user_revision
                 else "En esta revisión automática, conserva el ángulo previo y "
                 "corrige título y subtítulo según el dictamen de Elena. Si el subtítulo requiere "
@@ -943,7 +962,7 @@ def multiple_plan_request(
             raise ValueError("El ángulo previo no corresponde a la estrategia")
         facts["revision_previa"] = {
             "angulo": number,
-            "defectos": prior["dictamen"].get("defectos", []),
+            **review_findings(prior),
             "segundos_por_muestra": [sample["segundo"] for sample in prior.get("muestras", [])],
             "escenas": previous_multiple_scenes(prior["render"]["props"]["scenes"]),
         }
@@ -994,7 +1013,7 @@ def multiple_plan_request(
             "El render reservará un margen superior y mostrará la toma completa debajo. "
         )
     if prior is not None and user_revision:
-        prompt += "La versión previa fue aprobada; aplica la solicitud del titular y conserva lo no afectado. "
+        prompt += requested_revision_guidance(prior)
     elif prior is not None:
         prompt += (
             "Conserva el número de ángulo anterior y corrige los defectos de Elena. "

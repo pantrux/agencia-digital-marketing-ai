@@ -13,6 +13,7 @@ from pathlib import Path
 
 from production_delivery import MAX_KIT, digest_stream, open_media
 from production_handoff import (
+    QA_ROUNDS,
     canonical,
     eligible,
     load_profile,
@@ -200,7 +201,7 @@ def approved_base(claim, receipt, direction, kit_path):
     return {"brief": brief, "render": render, "review": review, "direction": direction}
 
 
-def draft_revision(claim, receipt, strategy, direction, kit_path, target):
+def draft_revision(claim, receipt, strategy, direction, kit_path, target, *, rejected=None):
     """Solicita una escaleta nueva sin alterar la escaleta ni el kit aprobados."""
     from production_valeria import process
 
@@ -219,12 +220,18 @@ def draft_revision(claim, receipt, strategy, direction, kit_path, target):
         "brief_sha256": hashlib.sha256(canonical(base["brief"])).hexdigest(),
         "strategy_sha256": hashlib.sha256(canonical(strategy)).hexdigest(),
     }
+    if rejected is not None:
+        intent["rejected_sha256"] = hashlib.sha256(canonical(rejected)).hexdigest()
     publish(target.parent / f".{claim['id']}.intent.json", canonical(intent) + b"\n")
-    prior = {
-        **base["direction"]["escaleta"],
-        "dictamen": base["review"]["dictamen"],
-        "muestras": base["review"].get("muestras", []),
-    }
+    prior = (
+        rejected
+        if rejected is not None
+        else {
+            **base["direction"]["escaleta"],
+            "dictamen": base["review"]["dictamen"],
+            "muestras": base["review"].get("muestras", []),
+        }
+    )
     request_id = str(uuid.uuid5(uuid.UUID(claim["id"]), "direccion-revision-v1"))
     if not target.exists():
         process(
@@ -270,9 +277,22 @@ def render_and_review(
         raise ValueError("La nueva escaleta no corresponde a la entrega base")
     run(receipt["order"], receipt, draft, token, 1, render_target, revision_id=identity)
     rendered = json.loads(read_regular(render_target, METADATA_LIMIT))
-    if "master" not in rendered:
-        return {"status": "needs_review"}
     direction_hash = hashlib.sha256(canonical(draft)).hexdigest()
+    if "master" not in rendered:
+        raw = read_regular(render_target.with_suffix(".preview-review.receipt"), METADATA_LIMIT)
+        review = json.loads(raw)
+        if (
+            hashlib.sha256(raw).hexdigest() != rendered.get("preview_review_sha256")
+            or review.get("order_id") != claim["order_id"]
+            or review.get("job_id") != f"{identity}-r"
+            or review.get("brief_sha256") != draft["brief_sha256"]
+            or review.get("direction_sha256") != direction_hash
+            or review.get("master_sha256") != rendered.get("preview", {}).get("sha256")
+            or review.get("fase") != "vista_previa"
+            or review.get("dictamen", {}).get("decision") != "rechazado"
+        ):
+            raise ValueError("El dictamen de vista previa no corresponde a la revisión")
+        return {"status": "rechazado", "review": review}
     if (
         rendered.get("order_id") != claim["order_id"]
         or rendered.get("source_sha256") != receipt["order"]["media"]["sha256"]
@@ -363,14 +383,26 @@ def stage_approved_revision(
 
 
 def publish_staged_revision(
-    claim, receipt, direction, kit_path, draft, rendered, review, staged, title, r2, studio
+    claim,
+    receipt,
+    direction,
+    kit_path,
+    draft,
+    rendered,
+    review,
+    staged,
+    title,
+    r2,
+    studio,
+    *,
+    attempt=1,
 ):
     """Publica de forma idempotente la versión aprobada usando el productor firmado."""
     from production_publish import MAX_PRORES, deliver
 
     base = approved_base(claim, receipt, direction, kit_path)
     order = receipt["order"]
-    job = f"{claim['id']}-r"
+    job = f"{revision_attempt_id(claim['id'], attempt)}-r"
     direction_hash = hashlib.sha256(canonical(draft)).hexdigest()
     verdict = review.get("dictamen", {})
     duration = review.get("mediciones", {}).get("duration")
@@ -462,6 +494,14 @@ def publish_staged_revision(
         return deliver(kit, manifest, r2, studio, graphic=graphic)
 
 
+def revision_attempt_id(identity, attempt):
+    """Deriva una identidad estable de render por ronda de la misma solicitud."""
+    if attempt == 1:
+        return identity
+    digest = hashlib.sha256(f"{identity}:revision-interna:{attempt}".encode()).digest()
+    return str(uuid.UUID(bytes=digest[:16], version=4))
+
+
 def process_claim(
     claim, receipt, strategy, direction, kit_path, folders, token, gpu, r2, studio, renew, title
 ):
@@ -471,25 +511,37 @@ def process_claim(
     identity = claim.get("id")
     if not matches(UUID, identity) or not matches(UUID, claim.get("lease")):
         raise ValueError("Reserva de revisión inválida")
-    targets = {}
-    for name, folder in folders.items():
-        directory = Path(folder)
-        if directory.resolve(strict=True) != directory or not directory.is_dir():
+    folders = {name: Path(folder) for name, folder in folders.items()}
+    for directory in folders.values():
+        if not directory.is_dir() or directory.resolve(strict=True) != directory:
             raise ValueError("Directorio de revisión inválido")
-        targets[name] = directory / f"{identity}.json"
-    renew(claim)
-    draft = draft_revision(claim, receipt, strategy, direction, kit_path, targets["draft"])
-    if draft["escaleta"]["estado"] != "lista_para_stills":
-        return {"status": "needs_review", "stage": "direction"}
-    renew(claim)
-    result = render_and_review(
-        claim, receipt, direction, kit_path, draft, targets["render"], targets["review"], gpu
-    )
-    if result["status"] != "aprobado":
+    rejected = None
+    for attempt in range(1, QA_ROUNDS[receipt["order"]["plan_id"]] + 1):
+        attempt_id = revision_attempt_id(identity, attempt)
+        current = {**claim, "id": attempt_id}
+        targets = {name: directory / f"{attempt_id}.json" for name, directory in folders.items()}
+        renew(claim)
+        draft = draft_revision(
+            current, receipt, strategy, direction, kit_path, targets["draft"], rejected=rejected
+        )
+        if draft["escaleta"]["estado"] != "lista_para_stills":
+            return {"status": "needs_review", "stage": "direction"}
+        renew(claim)
+        result = render_and_review(
+            current, receipt, direction, kit_path, draft, targets["render"], targets["review"], gpu
+        )
+        if result["status"] == "aprobado":
+            break
+        rejected = {
+            **draft["escaleta"],
+            "dictamen": result["review"]["dictamen"],
+            "muestras": result["review"].get("muestras", []),
+        }
+    else:
         return {"status": "needs_review", "stage": "quality"}
     renew(claim)
     staged = stage_approved_revision(
-        claim,
+        current,
         receipt,
         direction,
         kit_path,
@@ -512,6 +564,7 @@ def process_claim(
         title,
         r2,
         studio,
+        attempt=attempt,
     )
     return {"status": "completed", "kit": kit}
 

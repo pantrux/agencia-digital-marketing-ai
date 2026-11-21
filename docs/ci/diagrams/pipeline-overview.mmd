@@ -49,6 +49,11 @@ flowchart TB
     FASE6 -. "Verificar antes de activar" .-> CONVERSA["Conversación, referencias públicas y carga de varias fuentes"]
     CONVERSA --> MULTIQA["Verificar transcripción, montaje y aprobación de Elena en entorno aislado"]
     MULTIQA -. "Solo después de validar servicios" .-> REVISION["Revisiones de entrega con publicación inmutable"]
+    REVISION --> REVQA{"¿Elena aprobó el render?"}
+    REVQA -->|"Sí"| VERSION["Publicar la versión aprobada y conservar la anterior"]
+    REVQA -->|"No, con rondas disponibles"| ITERA["Valeria corrige con el dictamen y Lucas vuelve a renderizar"]
+    ITERA --> REVQA
+    REVQA -->|"No, con rondas agotadas"| REVPAUSA["Conservar la entrega aprobada anterior y mostrar el estado"]
     LIMITE -. "Aceptación operativa pendiente" .-> FASE7["Fase 7: producción, entrega, reversión y auditoría de la bóveda"]
     PG4["PostgreSQL en la VM: PGDATA, Kitsu, n8n, SupoClip e Immich; perfil del respaldo diario"] -->|"Evidencia operativa"| FASE4
     PG1616["Imagen 16.16 fijada, aceptación SQL aislada y revisión de extensiones e índices"] --> PG4

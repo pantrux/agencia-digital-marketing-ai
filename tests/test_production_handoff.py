@@ -172,32 +172,57 @@ def test_publicacion_admite_recibo_de_ingesta_multiple_grande(
         )
 
 
-def test_orquestador_de_revision_no_publica_si_calidad_rechaza(handoff, monkeypatch, tmp_path):
+@pytest.mark.parametrize("ronda_aprobada", (2, None))
+def test_revision_itera_sin_publicar_un_rechazo(handoff, monkeypatch, tmp_path, ronda_aprobada):
     import production_revision as revision
 
     folders = {name: tmp_path / name for name in ("draft", "render", "review")}
     for folder in folders.values():
         folder.mkdir()
     claim = {"id": str(uuid.uuid4()), "lease": str(uuid.uuid4())}
-    calls = []
-    monkeypatch.setattr(
-        revision, "draft_revision", lambda *_: {"escaleta": {"estado": "lista_para_stills"}}
-    )
+    receipt = {"order": {"plan_id": "ilimitado"}}
+    attempts = []
+    publication = []
+    feedback = {"dictamen": {"decision": "rechazado", "defectos": ["Rótulo sobre el producto"]}}
+    draft = {"escaleta": {"estado": "lista_para_stills"}}
 
-    def rejected_review(*args):
+    def prepare(current, _, strategy, direction, path, target, *, rejected):
+        assert target.stem == current["id"]
+        if attempts:
+            assert rejected == {**draft["escaleta"], **feedback, "muestras": []}
+        else:
+            assert rejected is None
+        attempts.append(uuid.UUID(current["id"]))
+        return draft
+
+    def review(current, *args):
+        assert current["id"] == str(attempts[-1])
         assert args[-1] == "gpu-token"
-        return {"status": "rechazado"}
+        if len(attempts) == ronda_aprobada:
+            return {"status": "aprobado", "render": {}, "review": {}}
+        return {"status": "rechazado", "review": feedback}
 
-    monkeypatch.setattr(revision, "render_and_review", rejected_review)
-    monkeypatch.setattr(revision, "stage_approved_revision", lambda *_: calls.append("stage"))
-    monkeypatch.setattr(revision, "publish_staged_revision", lambda *_: calls.append("publish"))
+    def stage(current, *args):
+        assert current["id"] == str(attempts[-1])
+        assert len(attempts) == ronda_aprobada
+        return {"path": "kit"}
 
-    def renew(_):
-        calls.append("renew")
+    def publish(original, *args, attempt):
+        assert original == claim and attempt == ronda_aprobada
+        publication.append(attempt)
+        return {"id": "kit"}
+
+    def renew(original):
+        assert original == claim
+
+    monkeypatch.setattr(revision, "draft_revision", prepare)
+    monkeypatch.setattr(revision, "render_and_review", review)
+    monkeypatch.setattr(revision, "stage_approved_revision", stage)
+    monkeypatch.setattr(revision, "publish_staged_revision", publish)
 
     result = revision.process_claim(
         claim,
-        {},
+        receipt,
         {},
         {},
         tmp_path,
@@ -209,18 +234,15 @@ def test_orquestador_de_revision_no_publica_si_calidad_rechaza(handoff, monkeypa
         renew,
         "Reel",
     )
-    assert result == {"status": "needs_review", "stage": "quality"}
-    assert calls == ["renew", "renew"]
-    monkeypatch.setattr(
-        revision, "render_and_review", lambda *_: {"status": "aprobado", "render": {}, "review": {}}
-    )
-    monkeypatch.setattr(revision, "stage_approved_revision", lambda *_: {"path": "kit"})
-    monkeypatch.setattr(revision, "publish_staged_revision", lambda *_: {"id": "kit"})
-    calls.clear()
-    assert revision.process_claim(
-        claim, {}, {}, {}, tmp_path, folders, "token", None, None, None, renew, "Reel"
-    ) == {"status": "completed", "kit": {"id": "kit"}}
-    assert calls == ["renew"] * 4
+    assert len(attempts) == len(set(attempts)) == (ronda_aprobada or 3)
+    assert attempts[0] == uuid.UUID(claim["id"])
+    assert all(item.version == 4 for item in attempts)
+    if ronda_aprobada is None:
+        assert result == {"status": "needs_review", "stage": "quality"}
+        assert publication == []
+    else:
+        assert result == {"status": "completed", "kit": {"id": "kit"}}
+        assert publication == [ronda_aprobada]
 
 
 def test_servicio_de_revision_reclama_y_registra_rechazo(handoff, order, monkeypatch, tmp_path):
@@ -263,6 +285,66 @@ def test_servicio_de_revision_reclama_y_registra_rechazo(handoff, order, monkeyp
         "lease": claim["lease"],
         "stage": "quality",
     }
+
+
+def test_revision_releva_el_dictamen_de_una_vista_previa_verificada(
+    handoff, order, monkeypatch, tmp_path
+):
+    import production_elena as reviewer
+    import production_lucas as editor
+    import production_revision as revision
+
+    order = {**order, "output_edit": "reel"}
+    identity = str(uuid.uuid4())
+    claim = {"id": identity, "order_id": order["order_id"]}
+    brief = {"objective": "Probar un título nuevo"}
+    draft = {
+        "order_id": order["order_id"],
+        "source_sha256": order["media"]["sha256"],
+        "brief_sha256": hashlib.sha256(handoff.canonical(brief)).hexdigest(),
+        "escaleta": {
+            "estado": "lista_para_stills",
+            "angulo": "Detalle",
+            "render": {
+                "project_id": order["media"]["project_slug"],
+                "job_id": f"{order['order_id']}-v1",
+                "plan": "Free",
+                "composition": "AgencyVertical",
+                "format": "mp4",
+                "resolution": "1080p",
+                "props": {"scenes": [], "duration_seconds": 30},
+            },
+        },
+    }
+    render = tmp_path / f"{identity}.json"
+    review_dir = tmp_path / "review"
+    review_dir.mkdir()
+
+    def preview_only(kind, body, *_, **__):
+        assert kind == "render" and body["job_id"] == f"{identity}-r-preview"
+        return {"sha256": "c" * 64, "path": "vista-previa.mp4"}
+
+    receipt = render.with_suffix(".preview-review.receipt")
+    monkeypatch.setattr(revision, "approved_base", lambda *_: {"brief": brief})
+    monkeypatch.setattr(editor, "verified_inputs", lambda *_: {})
+    monkeypatch.setattr(editor, "submit_with_receipt", preview_only)
+    monkeypatch.setattr(editor, "verify_mp4", lambda result, _: result)
+    monkeypatch.setattr(
+        reviewer,
+        "review_video",
+        lambda *_: {
+            "dictamen": {"decision": "rechazado", "defectos": ["Rótulo sobre el producto"]}
+        },
+    )
+    args = (claim, {"order": order}, {}, tmp_path, draft, render, review_dir / render.name, "gpu")
+    result = revision.render_and_review(*args)
+    raw = receipt.read_bytes()
+    assert result == {"status": "rechazado", "review": json.loads(raw)}
+    assert result["review"]["fase"] == "vista_previa"
+    monkeypatch.setattr(editor, "run", lambda *_, **__: None)
+    receipt.write_bytes(raw.replace(b"rechazado", b"aprobado"))
+    with pytest.raises(ValueError, match="dictamen de vista previa"):
+        revision.render_and_review(*args)
 
 
 def test_entrega_rechaza_dictamen_de_otra_escaleta(handoff, order, monkeypatch, tmp_path):
@@ -752,6 +834,32 @@ def test_correccion_multiple_situa_defectos_y_conserva_tiempos_por_fuente(handof
     normalized, frames = director.multi_reel_scenes(previous["escenas"], {first: 24, second: 24})
     assert normalized == scenes
     assert frames == 900
+    prior["dictamen"].update(
+        {
+            "decision": "rechazado",
+            "puntaje": 75,
+            "reglas_duras_incumplidas": ["Audio fuera del intervalo de sonoridad"],
+        }
+    )
+    request, _ = director.multiple_plan_request(
+        angles,
+        brief,
+        batches,
+        analyses,
+        str(uuid.uuid4()),
+        prior=prior,
+        adjustment="Usa el ángulo inicial",
+        user_revision=True,
+    )
+    message = request["message"]
+    facts = json.loads(message[message.index('{"objetivo"') :])
+    assert "Elena rechazó la versión previa" in message
+    assert "Cambia el ángulo si el titular lo solicita" in message
+    assert facts["ajuste_del_titular"] == "Usa el ángulo inicial"
+    assert facts["revision_previa"]["reglas_duras_incumplidas"] == [
+        "Audio fuera del intervalo de sonoridad"
+    ]
+    assert facts["revision_previa"]["puntaje"] == 75
 
 
 def test_escaleta_multiple_entrega_rutas_y_subtitulos_de_cada_fuente(handoff, order):
@@ -2347,7 +2455,10 @@ def test_kit_exige_aprobacion_y_huella_del_master(monkeypatch, order):
         package(order["order_id"], master, render, qa, {})
 
 
-def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(handoff, order, tmp_path, monkeypatch):
+@pytest.mark.parametrize("round_number", (1, 2))
+def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(
+    handoff, order, tmp_path, monkeypatch, round_number
+):
     import production_elena as reviewer
     import production_lucas as editor
     import production_revision as revisions
@@ -2441,6 +2552,19 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(handoff, order, tmp
         == direction
     )
     assert len(generated) == 1
+    attempt_id = revisions.revision_attempt_id(claim["id"], 2)
+    rejected = {**direction["escaleta"], "dictamen": {"decision": "rechazado"}}
+    draft_revision(
+        {**claim, "id": attempt_id},
+        {"order": order},
+        {"strategy": "test"},
+        direction,
+        path,
+        tmp_path / f"{attempt_id}.json",
+        rejected=rejected,
+    )
+    assert generated[-1][1]["user_revision"] is True
+    assert generated[-1][1]["prior"] == rejected
     with pytest.raises(ValueError, match="contenido distinto"):
         draft_revision(
             {**claim, "instructions": "Otro cambio"}, {"order": order}, {}, direction, path, target
@@ -2521,7 +2645,9 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(handoff, order, tmp
     import production_delivery as delivery
 
     monkeypatch.setattr(delivery, "MEDIA", tmp_path)
-    new_job = f"{claim['id']}-r"
+    attempt_id = revisions.revision_attempt_id(claim["id"], round_number)
+    attempt_claim = {**claim, "id": attempt_id}
+    new_job = f"{attempt_id}-r"
     new_path = (
         Path("proyectos")
         / order["media"]["project_slug"]
@@ -2539,7 +2665,7 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(handoff, order, tmp
     }
     new_review = {**qa, "job_id": new_job}
     staged = stage_approved_revision(
-        claim,
+        attempt_claim,
         {"order": order},
         direction,
         path,
@@ -2591,13 +2717,17 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(handoff, order, tmp
         "Revisión",
         r2,
         studio,
+        attempt=round_number,
     )
     assert published["id"] == calls_published[0]["id"]
     assert calls_published[0]["revisionId"] == claim["id"]
     assert calls_published[0]["lease"] == claim["lease"]
+    (context_dirs["drafts"] / f"{attempt_id}.json").write_text(json.dumps(direction))
+    next_claim = {**claim, "base_kit_id": published["id"], "base_kit_sha256": staged["sha256"]}
+    assert load_claim_context(next_claim, *context_dirs.values())["direction"] == direction
     with pytest.raises(ValueError, match="no tiene una aprobación"):
         stage_approved_revision(
-            claim,
+            attempt_claim,
             {"order": order},
             direction,
             path,
