@@ -77,14 +77,23 @@ test('une video real de fuentes con geometrías distintas en el orden elegido', 
       const result = spawnSync('ffmpeg', ['-v','error','-f','lavfi','-i',`color=c=${color}:s=${size}:r=30:d=1`, '-c:v','ffv1','-y',file]);
       assert.equal(result.status, 0, result.stderr.toString());
     }
-    const scenes = [{source_id:'b',source_start_frame:0,source_end_frame:15}, {source_id:'a',source_start_frame:0,source_end_frame:15}];
+    const scenes = [
+      {source_id:'b',source_start_frame:0,source_end_frame:15,
+        label:{text:'Plantas',start_frame:0,end_frame:15,position:'panel' as const}},
+      {source_id:'a',source_start_frame:0,source_end_frame:15},
+    ];
     const montage = multiSourceVideoInputs(new Map([['a',red], ['b',blue]]), scenes, 180, 320);
     const rendered = spawnSync('ffmpeg', ['-v','error','-filter_complex_threads','1',...montage.videoInputs,
       '-filter_complex',montage.cuts.join(';'),'-map','[montaje]','-pix_fmt','rgb24','-f','rawvideo','-'], {maxBuffer: 8 * 1024 * 1024});
     assert.equal(rendered.status, 0, rendered.stderr.toString());
     const frameBytes = 180 * 320 * 3;
     assert.equal(rendered.stdout.length, frameBytes * 30);
-    const first = rendered.stdout.subarray(0, 3), last = rendered.stdout.subarray(15 * frameBytes, 15 * frameBytes + 3);
+    const margin = (10 * 180 + 90) * 3;
+    const center = (180 * 180 + 90) * 3;
+    const panel = rendered.stdout.subarray(margin, margin + 3);
+    const first = rendered.stdout.subarray(center, center + 3);
+    const last = rendered.stdout.subarray(15 * frameBytes, 15 * frameBytes + 3);
+    assert.ok(panel.every(channel => channel < 30), 'el panel debe quedar fuera de la imagen');
     assert.ok(first[2]! > 200 && first[0]! < 30);
     assert.ok(last[0]! > 200 && last[2]! < 30);
     assert.throws(() => multiSourceVideoInputs(new Map([['a',red]]), scenes, 180, 320));

@@ -101,7 +101,7 @@ def render_sources(receipt):
     return sources, durations
 
 
-def scene_label(label, length):
+def scene_label(label, length, *, allow_panel=False):
     if type(label) is not dict or label.keys() - {"tamano"} != {
         "texto",
         "desde",
@@ -110,12 +110,16 @@ def scene_label(label, length):
     }:
         raise VisualResponseFormatError("Rótulo inválido")
     title, position = label["texto"], label["posicion"]
+    orientations = {"superior": "top", "inferior": "bottom"}
+    if allow_panel:
+        orientations["panel_superior"] = "panel"
     if (
         type(title) is not str
         or not title.strip()
         or re.search(r"[\x00-\x1f\x7f\ud800-\udfff]", title)
         or len(title.encode("utf-16-le")) // 2 > 80
-        or position not in ("superior", "inferior")
+        or type(position) is not str
+        or position not in orientations
         or label.get("tamano", "normal") not in ("normal", "grande")
     ):
         raise VisualResponseFormatError("Texto o posición de rótulo inválidos")
@@ -132,7 +136,7 @@ def scene_label(label, length):
         "text": title.strip(),
         "start_frame": first,
         "end_frame": last,
-        "position": "top" if position == "superior" else "bottom",
+        "position": orientations[position],
         **({"size": "large"} if label.get("tamano") == "grande" else {}),
     }
 
@@ -219,7 +223,7 @@ def multi_reel_scenes(items, sources, *, ad=False, long_form=False):
         intervals.setdefault(identity, []).append((start, end))
         scene = {"source_id": identity, "source_start_frame": start, "source_end_frame": end}
         if "rotulo" in item:
-            scene["label"] = scene_label(item["rotulo"], end - start)
+            scene["label"] = scene_label(item["rotulo"], end - start, allow_panel=not ad)
         scenes.append(scene)
         total += end - start
     minimum, maximum = (30, 18000) if long_form else (900, 1350)
@@ -869,7 +873,9 @@ def previous_multiple_scenes(scenes):
                 "texto": label["text"],
                 "desde": label["start_frame"] / 30,
                 "hasta": label["end_frame"] / 30,
-                "posicion": "superior" if label["position"] == "top" else "inferior",
+                "posicion": {"top": "superior", "bottom": "inferior", "panel": "panel_superior"}[
+                    label["position"]
+                ],
                 **({"tamano": "grande"} if label.get("size") == "large" else {}),
             }
         previous.append(item)
@@ -981,6 +987,11 @@ def multiple_plan_request(
             "Para este anuncio usa 2 a 12 escenas y exactamente 30 segundos. La primera tiene "
             "un gancho con rótulo desde 0 a 0,5 segundos hasta al menos el segundo 2. "
             "Reserva los últimos cuatro segundos para el CTA confirmado. "
+        )
+    else:
+        prompt += (
+            "Para colocar un rótulo fuera de la imagen, usa posicion=panel_superior. "
+            "El render reservará un margen superior y mostrará la toma completa debajo. "
         )
     if prior is not None and user_revision:
         prompt += "La versión previa fue aprobada; aplica la solicitud del titular y conserva lo no afectado. "

@@ -54,6 +54,8 @@ test('un montaje múltiple acredita fuente y ruta de cada escena', () => {
   const parsed = parseRender({...request(), props});
   assert.deepEqual(parsed.props.sources, sources);
   assert.deepEqual(parsed.props.scenes, scenes);
+  const panel = {...scenes[0]!,label:{...scenes[0]!.label,position:'panel'}};
+  assert.equal(parseRender({...request(),props:{...props,scenes:[panel,scenes[1]]}}).props.scenes?.[0]?.label?.position,'panel');
   const longScenes = [
     {source_id:first,source_start_frame:0,source_end_frame:1800,label:{text:'Inicio',start_frame:0,end_frame:90,position:'top'}},
     {source_id:second,source_start_frame:0,source_end_frame:1800},

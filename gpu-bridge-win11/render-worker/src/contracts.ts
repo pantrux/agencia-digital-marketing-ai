@@ -9,7 +9,8 @@ export class WorkerError extends Error {
 export type Plan = 'Free' | 'Pro' | 'Ultra' | 'Ilimitado';
 export type Resolution = '1080p' | '4k';
 export type OutputFormat = 'mp4' | 'prores4444';
-export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom'; size?: 'large'}
+export interface SceneLabel {text: string; start_frame: number; end_frame: number; position: 'top' | 'bottom' | 'panel'; size?: 'large'}
+export const TITLE_PANEL_FRACTION = 0.25;
 export interface AdCaption {start_frame: number; end_frame: number; text: string; position?: 'top' | 'left' | 'right'}
 export const AD_MUSIC_ID = 'carefree-usuan1400037' as const;
 export type SocialChannel = 'facebook' | 'instagram' | 'whatsapp';
@@ -105,12 +106,14 @@ function editScenes(value: unknown, count: number, ad: boolean, sourceIds?: Read
     const label = text(caption.text, '', 80);
     const labelStart = frameNumber(caption.start_frame, 0, end - start - 15);
     const labelEnd = frameNumber(caption.end_frame, labelStart + 15, Math.min(end - start, labelStart + 180));
-    if (!label.trim() || (caption.position !== 'top' && caption.position !== 'bottom')) {
+    const position = caption.position;
+    if (!label.trim() || (position !== 'top' && position !== 'bottom' &&
+        !(position === 'panel' && sourceIds && !ad))) {
       invalid('El rótulo requiere texto y posición.');
     }
     if (caption.size !== undefined && caption.size !== 'large') invalid('El tamaño del rótulo no está permitido.');
     labels += 1;
-    return {...scene, label: {text: label, start_frame: labelStart, end_frame: labelEnd, position: caption.position,
+    return {...scene, label: {text: label, start_frame: labelStart, end_frame: labelEnd, position,
       ...(caption.size === 'large' ? {size: caption.size} : {})}};
   });
   if (ad) {

@@ -655,7 +655,12 @@ def test_correccion_multiple_situa_defectos_y_conserva_tiempos_por_fuente(handof
             "source_id": first,
             "source_start_frame": 15,
             "source_end_frame": 465,
-            "label": {"text": "Sansevierias", "start_frame": 0, "end_frame": 90, "position": "top"},
+            "label": {
+                "text": "Sansevierias",
+                "start_frame": 0,
+                "end_frame": 90,
+                "position": "panel",
+            },
         },
         {"source_id": second, "source_start_frame": 30, "source_end_frame": 480},
     ]

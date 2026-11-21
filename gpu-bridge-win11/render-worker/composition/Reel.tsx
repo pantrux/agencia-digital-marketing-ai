@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill, Easing, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {AD_ENDCARD_FRAME, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, TITLE_FADE_FRAMES, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
+import {AD_ENDCARD_FRAME, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, TITLE_FADE_FRAMES, TITLE_PANEL_FRACTION, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
 import {graphicLabelTiming, sceneLength, socialFadeProgress} from '../src/timeline.ts';
 import {SocialEndcard} from './SocialEndcard.tsx';
 
@@ -50,7 +50,11 @@ export const Reel: React.FC<ReelProps> = (props) => {
       <h1 style={{fontSize: 76, lineHeight: 1.1, margin: 0, overflowWrap: 'anywhere'}}>{props.title}</h1>
       {props.subtitle && <p style={{fontSize: props.subtitle_size === 'large' ? 64 : 50, lineHeight: 1.25, margin: '20px 0 0', overflowWrap: 'anywhere'}}>{props.subtitle}</p>}
     </div>}
-    {label && <div style={{position: 'absolute', ...(hook ? {right:122,maxWidth:380} : {left:60,maxWidth:900}),
+    {label?.position === 'panel' && <div style={{position:'absolute',left:100,right:100,top:60,
+      height:1920*TITLE_PANEL_FRACTION-120,display:'grid',placeItems:'center',textAlign:'center',
+      fontSize:label.text.length > 56 ? 46 : label.size === 'large' && label.text.length <= 35 ? 74 : 58,
+      lineHeight:1.15,fontWeight:700,overflowWrap:'anywhere'}}>{label.text}</div>}
+    {label && label.position !== 'panel' && <div style={{position: 'absolute', ...(hook ? {right:122,maxWidth:380} : {left:60,maxWidth:900}),
       width: 'max-content', boxSizing: 'border-box',
       ...(label.position === 'top' ? {top: hook ? 120 : social ? 205 : 200} : {bottom: props.ad ? 520 : 480}),
       backgroundColor: social ? 'rgba(16,32,24,.88)' : '#141714', borderLeft: `8px solid ${props.accent}`,

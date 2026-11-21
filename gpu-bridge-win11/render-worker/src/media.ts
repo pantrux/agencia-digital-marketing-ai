@@ -1,4 +1,4 @@
-import {AD_FRAMES, SOCIAL_FADE_FRAME} from './contracts.ts';
+import {AD_FRAMES, SOCIAL_FADE_FRAME, TITLE_PANEL_FRACTION} from './contracts.ts';
 import {MAX_SEGMENT_SECONDS, outputDimensions, TITLE_FADE_FRAMES, WorkerError, type EditScene, type MultiSourceScene, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
 
 export interface Loudness {integrated_lufs: number; true_peak_dbtp: number; range_lu: number; threshold_lufs: number; offset_lu: number}
@@ -216,7 +216,12 @@ export function multiSourceVideoInputs(inputs: ReadonlyMap<string, string>, scen
         end > MAX_SEGMENT_SECONDS * 30) return bad();
     const seek = Math.max(0, Math.floor(start / 30) - 1);
     videoInputs.push('-threads','2','-ss',String(seek),'-i',input);
-    return `[${index}:v]fps=30:start_time=0,trim=start_frame=${start - seek * 30}:end_frame=${end - seek * 30},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=bilinear:out_color_matrix=bt709:out_range=tv,crop=${width}:${height},setsar=1,format=yuv420p,settb=1/30[plano${index}]`;
+    const reserve = scene.label?.position === 'panel' ? Math.floor(height * TITLE_PANEL_FRACTION / 2) * 2 : 0;
+    const scaleFilter = `scale=${width}:${height - reserve}:force_original_aspect_ratio=${reserve ? 'decrease' : 'increase'}:force_divisible_by=2:flags=bilinear:out_color_matrix=bt709:out_range=tv`;
+    const fit = reserve
+      ? `pad=${width}:${height}:trunc((ow-iw)/4)*2:${reserve}+trunc((oh-${reserve}-ih)/4)*2:black`
+      : `crop=${width}:${height}`;
+    return `[${index}:v]fps=30:start_time=0,trim=start_frame=${start - seek * 30}:end_frame=${end - seek * 30},setpts=PTS-STARTPTS,${scaleFilter},${fit},setsar=1,format=yuv420p,settb=1/30[plano${index}]`;
   });
   const links = scenes.map((_, index) => `[plano${index}]`).join('');
   cuts.push(`${links}concat=n=${scenes.length}:v=1:a=0,settb=1/30,setpts=N,${limitedBt709}[montaje]`);
