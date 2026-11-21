@@ -107,6 +107,8 @@ class Turn:
     order: str
     request: str
     message: str
+    billing_mode: str = "sandbox"
+    plan_id: str = "free"
 
     @property
     def key(self) -> tuple[str, str, str]:
@@ -129,7 +131,12 @@ def signed_turn(raw: bytes) -> Turn:
     }
     if set(fields) != expected or fields["agent_id"] != AGENT:
         raise Rejected(422)
-    if fields["billing_mode"] != "sandbox" or fields["plan_id"] != "free":
+    if fields["billing_mode"] not in ("sandbox", "production") or fields["plan_id"] not in (
+        "free",
+        "pro",
+        "ultra",
+        "ilimitado",
+    ):
         raise Rejected(403)
     actor, order, request, message = (
         fields["actor_id"],
@@ -141,7 +148,7 @@ def signed_turn(raw: bytes) -> Turn:
         raise Rejected(422)
     if not valid_text(message, INPUT_LIMIT):
         raise Rejected(422)
-    return Turn(actor, order, request, message)
+    return Turn(actor, order, request, message, fields["billing_mode"], fields["plan_id"])
 
 
 class Ledger:
@@ -286,8 +293,6 @@ class Sofia:
         if not hmac.compare_digest(expected, signature):
             raise Rejected(401)
         turn = signed_turn(raw)
-        if not hmac.compare_digest(turn.actor, self.owner):
-            raise Rejected(403)
         try:
             reply = self.ledger.reserve(turn, fingerprint, now)
             if reply is None:
@@ -363,8 +368,8 @@ class OwnerUnix:
                 "actor_id": turn.actor,
                 "order_id": turn.order,
                 "request_id": turn.request,
-                "billing_mode": "sandbox",
-                "plan_id": "free",
+                "billing_mode": turn.billing_mode,
+                "plan_id": turn.plan_id,
                 "message": turn.message,
             }
         )

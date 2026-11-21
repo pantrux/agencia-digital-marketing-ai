@@ -20,7 +20,7 @@ from xml.etree import ElementTree
 from production_delivery import MAX_KIT, digest_stream, load_assignments, open_media
 from production_handoff import canonical, eligible, load_profile, publish, read_regular, validate
 from production_inbox import MEDIA, UUID, matches, render_format
-from production_sofia import JOURNAL, LIMIT
+from production_sofia import INTAKE_LIMIT, JOURNAL, LIMIT
 
 DELIVERY = Path("/var/lib/agency-production-delivery")
 ENDPOINT = "/api/internal/kits/publish"
@@ -290,6 +290,11 @@ def studio_request(key, manifest):
     if "proresBytes" in manifest:
         version = "v3"
         values.extend((manifest["proresBytes"], manifest["proresSha256"]))
+    if "revisionId" in manifest:
+        if "durationMs" not in manifest or "lease" not in manifest:
+            raise ValueError("La revisión requiere duración y reserva")
+        version = "v5" if "proresBytes" in manifest else "v4"
+        values.extend((manifest["revisionId"], manifest["lease"]))
     doc = ["studio-kit-" + version, "POST", ENDPOINT, "sandbox", stamp, values]
     wire = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode()
     signature = hmac.digest(key, wire, "sha256").hex()
@@ -439,7 +444,7 @@ def publish_assigned(profile, identity, info, path, output, r2_keys, signing_key
         raise ValueError("Recibo de Kitsu fuera de la orden")
     if pending and (local["id"], local["project"]) != (info["id"], info["project"]):
         raise ValueError("El recibo de Kitsu no coincide con la asignación")
-    intake = json.loads(read_regular(JOURNAL / path.name, LIMIT))["order"]
+    intake = json.loads(read_regular(JOURNAL / path.name, INTAKE_LIMIT))["order"]
     validate(intake, identity)
     if not eligible(intake, profile):
         raise ValueError("La orden no corresponde al piloto")

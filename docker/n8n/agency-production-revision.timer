@@ -1,0 +1,11 @@
+[Unit]
+Description=Consulta periódica de revisiones audiovisuales
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+AccuracySec=10s
+Unit=agency-production-revision.service
+
+[Install]
+WantedBy=timers.target

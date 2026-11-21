@@ -181,6 +181,35 @@ class LinuxLedgerTests(unittest.TestCase):
         with self.operation() as operation:
             self.assertEqual(operation.reserve().state, "pending")
 
+    def test_conjunto_usa_identidades_de_fuente_independientes_sin_alterar_v1(self):
+        multi = LEDGER.Ledger(self.state, self.proof, multi_source=True)
+        multi.initialize()
+        first = job()
+        second = dict(first)
+        second["asset_id"] = "33333333-3333-4333-8333-333333333333"
+        second["object_key"] = f"ingest/{second['job_id']}/{second['asset_id']}.mp4"
+        with self.operation(multi, first) as operation:
+            operation.reserve()
+            operation.complete(publication())
+        with self.operation(multi, second) as operation:
+            self.assertTrue(operation.reserve().is_new)
+            operation.complete(
+                publication(
+                    asset_id=second["asset_id"],
+                    relative_path=f"proyectos/proyecto_01/01_raw/{second['asset_id']}.mp4",
+                )
+            )
+        with self.operation(multi, first) as operation:
+            self.assertEqual(operation.reserve().state, "completed")
+        modified = {**second, "bytes": 4}
+        with self.operation(multi, modified) as operation:
+            with self.assertRaises(LEDGER.LedgerError):
+                operation.reserve()
+        with self.operation() as operation:
+            self.assertTrue(operation.reserve().is_new)
+        self.ledger.check()
+        multi.check()
+
     def test_complete_sin_reserva_y_uso_fuera_contexto_rechazados(self):
         with self.operation() as operation:
             with self.assertRaises(LEDGER.LedgerError):

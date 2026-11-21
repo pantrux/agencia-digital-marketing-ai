@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from ingress.origin_relay import nginx_config
 from ingress.phase6_ingress import InputError, inventory, main, plan, render
 
 
@@ -96,6 +97,32 @@ def test_machine_api_is_exact_at_both_hops(values):
             assert "proxy_set_header timestamp" not in config
             assert "proxy_set_header signature" not in config
     assert "/healthz" not in npm + waf
+
+
+@pytest.mark.parametrize("sofia", [True, False])
+def test_sync_multiple_es_opcional_y_acotado_en_cada_salto(values, sofia):
+    if not sofia:
+        values["sofia_tls"] = None
+    baseline = render(values)
+    assert "/v2/sync" not in baseline["sites"]["api-studio.e-scale.cl"]["npm"]["advanced_config"]
+    candidate = render(values, sync_v2=True)
+    site = candidate["sites"]["api-studio.e-scale.cl"]
+    relay = nginx_config(sofia=sofia, sync_v2=True)
+    assert "location = /v2/sync" in relay
+    assert "location = /v2/sync" in site["npm"]["advanced_config"]
+    for config in (
+        relay,
+        site["npm"]["advanced_config"],
+        candidate["bunkerweb_includes"]["sync-v2.conf"],
+    ):
+        assert "$request_method != POST" in config
+        assert "client_max_body_size 4096;" in config
+        assert "$http_transfer_encoding" in config
+        assert '$content_length = ""' in config
+    suffix = "_2" if sofia else "_1"
+    assert site["bunkerweb"]["settings"][f"REVERSE_PROXY_URL{suffix}"] == "= /v2/sync"
+    assert "proxy_pass http://192.168.0.85:3010;" in site["npm"]["advanced_config"]
+    assert "/v2/sync" not in nginx_config(sofia=sofia)
 
 
 def test_origin_relay_requires_client_certificate_at_all_three_hosts(values):

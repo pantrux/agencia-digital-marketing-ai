@@ -1,0 +1,8 @@
+{
+  "name": "studio-reference-worker",
+  "main": "./src/index.ts",
+  "compatibility_date": "2026-11-14",
+  "workers_dev": false,
+  "preview_urls": false,
+  "compatibility_flags": ["global_fetch_strictly_public"]
+}

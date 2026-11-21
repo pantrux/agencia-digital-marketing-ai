@@ -3,14 +3,14 @@ import {constants, createReadStream} from 'node:fs';
 import {createHash, createHmac, timingSafeEqual} from 'node:crypto';
 import path from 'node:path';
 import {performance} from 'node:perf_hooks';
-import {AD_MUSIC_ID, parseStills, TITLE_FADE_FRAMES, WorkerError, type RenderRequest, type StillsRequest, type InspectRequest} from './contracts.ts';
+import {AD_MUSIC_ID, parseStills, TITLE_FADE_FRAMES, WorkerError, type RenderRequest, type StillsRequest, type InspectRequest, type MultiSourceScene} from './contracts.ts';
 import {type RuntimeConfig, verifyBinary} from './config.ts';
 import {type Backend, type Health} from './server.ts';
 import {NasPaths} from './nas.ts';
 import {ScratchSpace} from './scratch.ts';
 import {runProcess} from './process.ts';
 import {renderScene} from './remotion.ts';
-import {alphaMaskArgs, alphaMaskSummary, audioAccepted, correctMp4Audio, cutSceneAudio, mixAdAudio, encodeOutput, encodeProresFragment, measureAudio, muxProresFragments, outputViolations, overlayInputSupported, overlayPacketTimingSupported, packetProbeArgs, parseLoudness, parseProbe, probeArgs, ebur128Args, parseEbur128, stageHyperframesPicture, videoFrameCount, type MediaInfo} from './media.ts';
+import {alphaMaskArgs, alphaMaskSummary, audioAccepted, correctMp4Audio, cutSceneAudio, cutMultiSourceAudio, mixAdAudio, encodeOutput, encodeProresFragment, measureAudio, muxProresFragments, outputViolations, overlayInputSupported, overlayPacketTimingSupported, packetProbeArgs, parseLoudness, parseProbe, probeArgs, ebur128Args, parseEbur128, stageHyperframesPicture, stageMultiSourcePicture, videoFrameCount, type MediaInfo} from './media.ts';
 import {contactSheet, normalizedRuler} from './qa.ts';
 import {graphicFrames, graphicLabel} from './timeline.ts';
 import {renderHyperframes} from './hyperframes.ts';
@@ -129,14 +129,14 @@ export class RenderBackend implements Backend {
     if (!info.video_codec || info.width < 1 || info.height < 1) throw new WorkerError(422, 'VIDEO_INVALIDO', 'La composición requiere un vídeo válido.');
     return {source, probe};
   }
-  async #scene(request: RenderRequest, work: string, frames: number[] | null, signal: AbortSignal, videoSource: string | null, overlay?: true) {
+  async #scene(request: RenderRequest, work: string, frames: number[] | null, signal: AbortSignal, videoSource: string | null, overlay?: true, preconformed?: true) {
     signal.throwIfAborted();
     if (request.props.ad?.engine === 'hyperframes') {
       if (!frames) throw new WorkerError(422,'HYPERFRAMES_FOTOGRAMAS_AUSENTES','HyperFrames requiere fotogramas concretos.');
       return renderHyperframes({request,workspace:work,browser:this.config.browser,ffmpeg:this.config.ffmpeg,
-        videoSource,signal,run:this.deps.run},frames,Boolean(overlay));
+        videoSource,signal,run:this.deps.run,...(preconformed && {preconformed})},frames,Boolean(overlay));
     }
-    return this.deps.scene({request, scratch: work, cacheRoot: this.scratch.root, browser: this.config.browser, videoSource, signal, ...(overlay && {overlay})}, frames);
+    return this.deps.scene({request, scratch: work, cacheRoot: this.scratch.root, browser: this.config.browser, videoSource, signal, ...(overlay && {overlay}), ...(preconformed && {preconformed})}, frames);
   }
   async #copyArtifacts(output: {absolute: string; relative: string}, files: string[]): Promise<Artifact[]> {
     const results: Artifact[] = [];
@@ -189,7 +189,8 @@ export class RenderBackend implements Backend {
     this.#inProgress.add(jobKey);
     let folder: Awaited<ReturnType<NasPaths['stageOutput']>> | undefined;
     try {
-      const inputs = [request.props.video_path, request.props.audio_path];
+      const inputs = [request.props.video_path, request.props.audio_path,
+        ...(request.props.sources?.flatMap(source => [source.video_path, source.audio_path]) ?? [])];
       const sources: (string | null)[] = [];
       for (const relative of inputs) {
         sources.push(relative ? await sha256File(await this.nas.input(relative, request.project_id), signal) : null);
@@ -264,15 +265,38 @@ export class RenderBackend implements Backend {
       const frameBytes = pixels * 4 + 1024 ** 2;
       const outputs = request.format === 'prores4444' ? request.durationInFrames * pixels * 16 : 4 * 1024 ** 3;
       const scenes = request.props.scenes;
+      const sources = request.props.sources;
+      const multiScenes = sources ? scenes as MultiSourceScene[] : undefined;
       const sceneProres = Boolean(scenes && request.transparent);
-      if (!request.props.audio_path) throw new WorkerError(422, 'AUDIO_AUSENTE', 'El render final requiere una pista de audio.');
-      const sourceAudio = await this.nas.input(request.props.audio_path, request.project_id);
+      if (!request.props.audio_path && !sources) throw new WorkerError(422, 'AUDIO_AUSENTE', 'El render final requiere una pista de audio.');
+      const sourceAudio = request.props.audio_path ? await this.nas.input(request.props.audio_path, request.project_id) : undefined;
+      const multiVideo = new Map<string, string>(), multiAudio = new Map<string, string | null>();
+      if (sources && multiScenes) for (const source of sources) {
+        const videoFile = await this.nas.input(source.video_path, request.project_id);
+        const info = await this.#probe(videoFile, bounded);
+        const cuts = multiScenes.filter(scene => scene.source_id === source.id);
+        if (!info.video_codec || info.color_transfer === 'smpte2084' || info.color_transfer === 'arib-std-b67' ||
+            cuts.some(scene => scene.source_end_frame / 30 > info.duration_seconds + 0.001)) {
+          throw new WorkerError(422, 'FUENTE_REEL_INVALIDA', 'Los cortes requieren vídeo SDR y deben quedar dentro de cada fuente.');
+        }
+        multiVideo.set(source.id, videoFile);
+        const audioFile = source.audio_path ? await this.nas.input(source.audio_path, request.project_id) : null;
+        if (audioFile) {
+          const audioInfo = await this.#probe(audioFile, bounded);
+          if (!audioInfo.has_audio || cuts.some(scene => ((scene.audio_source_start_frame ?? scene.source_start_frame) +
+              scene.source_end_frame - scene.source_start_frame) / 30 > audioInfo.duration_seconds + 0.001)) {
+            throw new WorkerError(422, 'ESCENAS_FUERA_DEL_AUDIO', 'El audio debe cubrir los cortes seleccionados.');
+          }
+        }
+        multiAudio.set(source.id, audioFile);
+      }
       const ad = request.props.ad;
       const speech = path.join(work, 'speech.wav');
-      const audio = path.join(work, 'audio' + (scenes ? '.wav' : path.extname(sourceAudio)));
-      await this.scratch.ensureSpace(scenes ? Math.ceil(duration) * 288000 * (ad ? 2 : 1) + 1024 ** 2 : (await stat(sourceAudio)).size);
-      if (scenes) await this.deps.run(this.config.ffmpeg, cutSceneAudio(sourceAudio, ad ? speech : audio, scenes), {timeoutMs: 120000, signal: bounded});
-      else await copyFile(sourceAudio, audio, constants.COPYFILE_EXCL);
+      const audio = path.join(work, 'audio' + (scenes ? '.wav' : path.extname(sourceAudio!)));
+      await this.scratch.ensureSpace(scenes ? Math.ceil(duration) * 288000 * (ad ? 2 : 1) + 1024 ** 2 : (await stat(sourceAudio!)).size);
+      if (multiScenes) await this.deps.run(this.config.ffmpeg, cutMultiSourceAudio(multiAudio, ad ? speech : audio, multiScenes), {timeoutMs: 120000, signal: bounded});
+      else if (scenes) await this.deps.run(this.config.ffmpeg, cutSceneAudio(sourceAudio!, ad ? speech : audio, scenes), {timeoutMs: 120000, signal: bounded});
+      else await copyFile(sourceAudio!, audio, constants.COPYFILE_EXCL);
       const audioInfo = await this.#probe(ad ? speech : audio, bounded);
       if (!audioInfo.has_audio) throw new WorkerError(422, 'AUDIO_AUSENTE', 'La pista no contiene audio.');
       if (scenes && Math.abs(audioInfo.duration_seconds - duration) > 0.02) {
@@ -289,6 +313,17 @@ export class RenderBackend implements Backend {
       const videoBytes = video ? (await stat(video.source)).size : 0;
       let sourceVideo: string | undefined;
       let normalizeVideo = false;
+      if (multiScenes && !request.transparent) {
+        await this.scratch.ensureSpace(512 * 1024 ** 2);
+        const conform = path.join(work, 'montaje-multiple.mp4');
+        await this.deps.run(this.config.ffmpeg, stageMultiSourcePicture(multiVideo, multiScenes, request.resolution, conform),
+          {timeoutMs: 1200000, signal: bounded});
+        if (videoFrameCount(await this.#readProbe(conform, bounded)) !== request.durationInFrames) {
+          throw new WorkerError(502, 'MONTAJE_INCOMPLETO', 'El montaje no conserva todos sus fotogramas.');
+        }
+        sourceVideo = conform;
+        normalizeVideo = true;
+      }
       const overlayMode = video && overlayInputSupported(video.probe, request);
       if (video && scenes) {
         const info = parseProbe(video.probe);
@@ -308,7 +343,7 @@ export class RenderBackend implements Backend {
         }
       }
       const usesHyperframes = ad?.engine === 'hyperframes';
-      if (usesHyperframes && scenes && sourceVideo) {
+      if (usesHyperframes && scenes && sourceVideo && !multiScenes) {
         await this.scratch.ensureSpace(512 * 1024 ** 2);
         const conform = path.join(work, 'montaje.mp4');
         await this.deps.run(this.config.ffmpeg, stageHyperframesPicture(sourceVideo, scenes, request.resolution, conform),
@@ -330,14 +365,22 @@ export class RenderBackend implements Backend {
       }
       else if (staticProres) await this.scratch.ensureSpace((TITLE_FADE_FRAMES + 1) * frameBytes * 2);
       else if (!sourceVideo) await this.scratch.ensureSpace(videoBytes + request.durationInFrames * frameBytes + outputs);
-      const scene = await this.#scene(request, work, layerFrames, bounded, sourceVideo ? null : video?.source ?? null, sourceVideo ? true : undefined);
+      const scene = await this.#scene(request, work, layerFrames, bounded, sourceVideo ? null : video?.source ?? null,
+        sourceVideo || (usesHyperframes && request.transparent) ? true : undefined);
       const encodeStarted = performance.now();
       if (scene.frameCount !== (layerFrames?.length ?? request.durationInFrames)
         || scene.files.length !== (layerFrames?.length ?? 1)) throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'La composición no produjo todos los fotogramas.');
       const framePattern = scenes && layerFrames && !sceneProres
         ? await timelineImages(work, layerFrames, scene.files, request.durationInFrames, bounded)
         : layerFrames ? path.join(work, 'frames', 'still-%d.png') : scene.files[0]!;
-      const proresList = sceneProres && layerFrames
+      let proresList: string | null;
+      if (sceneProres && usesHyperframes) {
+        const fragment = path.join(work, 'prores-animado.mov');
+        await this.deps.run(this.config.ffmpeg, encodeProresFragment(
+          path.join(work, 'frames-hyperframes', 'frame_%06d.png'), fragment, request.durationInFrames, 1,
+        ), {timeoutMs:1200000, signal:bounded});
+        proresList = await this.#writeProresList(work, [{file:fragment, repeat:1}], request.durationInFrames, bounded);
+      } else proresList = sceneProres && layerFrames
         ? await this.#prepareSceneProres(work, layerFrames, scene.files, request.durationInFrames, bounded)
         : staticProres
         ? await this.#prepareStaticProres(work, framePattern, scene.files.at(-1)!, request.durationInFrames, bounded)
@@ -353,7 +396,7 @@ export class RenderBackend implements Backend {
           ? correctMp4Audio(previousOutput, audio, output, request.durationInFrames, duration, measured, peak)
           : proresList
           ? muxProresFragments(proresList, audio, output, request.durationInFrames, duration, measured, peak)
-          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, usesHyperframes ? undefined : scenes, ad ? AD_MUSIC_ID : undefined, Boolean(ad?.destination) && !usesHyperframes);
+          : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, usesHyperframes || multiScenes ? undefined : scenes, ad ? AD_MUSIC_ID : undefined, Boolean(ad?.destination) && !usesHyperframes);
         await this.deps.run(this.config.ffmpeg, encode, {timeoutMs: 1200000, signal: bounded});
         const outputProbe = await this.#readProbe(output, bounded);
         if ((sourceVideo || proresList || correctingMp4 || scenes) && videoFrameCount(outputProbe) !== request.durationInFrames) {
@@ -394,7 +437,28 @@ export class RenderBackend implements Backend {
     return this.#withReceipt(request, 'stills', signal, publish => this.#job(signal, async (work, bounded) => {
       await this.scratch.ensureSpace(4 * 1024 ** 3);
       const video = await this.#videoInput(request, bounded);
-      const scene = await this.#scene(request, work, request.frames, bounded, video?.source ?? null);
+      let source = video?.source ?? null;
+      if (request.props.sources && request.props.scenes && !request.transparent) {
+        const paths = new Map<string, string>();
+        const scenes = request.props.scenes as MultiSourceScene[];
+        for (const item of request.props.sources) {
+          const file = await this.nas.input(item.video_path, request.project_id);
+          const media = await this.#probe(file, bounded);
+          if (!media.video_codec || media.color_transfer === 'smpte2084' || media.color_transfer === 'arib-std-b67' ||
+              scenes.some(scene => scene.source_id === item.id && scene.source_end_frame / 30 > media.duration_seconds + 0.001)) {
+            throw new WorkerError(422, 'FUENTE_REEL_INVALIDA', 'Los cortes requieren vídeo SDR y deben quedar dentro de cada fuente.');
+          }
+          paths.set(item.id, file);
+        }
+        source = path.join(work, 'vista-previa-multiple.mp4');
+        await this.deps.run(this.config.ffmpeg, stageMultiSourcePicture(paths, scenes, request.resolution, source),
+          {timeoutMs:1200000,signal:bounded});
+        if (videoFrameCount(await this.#readProbe(source, bounded)) !== request.durationInFrames) {
+          throw new WorkerError(502, 'MONTAJE_INCOMPLETO', 'La vista previa no conserva todos sus fotogramas.');
+        }
+      }
+      const scene = await this.#scene(request, work, request.frames, bounded, source, undefined,
+        request.props.sources && source ? true : undefined);
       if (scene.frameCount !== request.frames.length || scene.files.length !== request.frames.length) throw new WorkerError(502, 'CAPTURAS_INCOMPLETAS', 'La composición no produjo todas las capturas solicitadas.');
       const alpha = [];
       if (request.transparent) for (const [index, file] of scene.files.entries()) alpha.push(await this.#alpha(file, work, `still-${index}`, 0, bounded));

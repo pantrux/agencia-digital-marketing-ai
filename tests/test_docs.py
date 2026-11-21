@@ -30,6 +30,7 @@ class PruebasDocumentacion(unittest.TestCase):
             "docs/specs/FASE-4-APLICACIONES-Y-BACKUPS.md",
             "docs/specs/FASE-5-OPENCLAW-Y-MCP.md",
             "docs/specs/FASE-6-CLOUDFLARE-Y-PORTAL.md",
+            "docs/operations/STUDIO-EXPERIENCIA-CONVERSACIONAL.md",
             "docker/README-phase4-runtime.md",
             "docker/README-r2-service.md",
             "docker/immich-ml-auth/README.md",

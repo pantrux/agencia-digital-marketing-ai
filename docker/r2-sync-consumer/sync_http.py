@@ -133,9 +133,9 @@ def read_request(connection):
         raise RequestError(400, "BAD_REQUEST")
     if any(len(headers.get(name, [])) > 1 for name in ("content-length", "timestamp", "signature")):
         raise RequestError(400, "BAD_REQUEST")
-    if path not in ("/v1/sync", "/healthz"):
+    if path not in ("/v1/sync", "/v2/sync", "/healthz"):
         raise RequestError(404, "NOT_FOUND")
-    if method != ("POST" if path == "/v1/sync" else "GET"):
+    if method != ("GET" if path == "/healthz" else "POST"):
         raise RequestError(405, "METHOD_NOT_ALLOWED")
     lengths = headers.get("content-length", [])
     if path == "/healthz":
@@ -180,11 +180,18 @@ def send_json(connection, status, value, *, retry=False):
 
 class SyncService:
     def __init__(
-        self, runtime, *, supervisor=None, ledger=None, now_seconds=lambda: int(time.time())
+        self,
+        runtime,
+        *,
+        supervisor=None,
+        ledger=None,
+        source_ledger=None,
+        now_seconds=lambda: int(time.time()),
     ):
         self.runtime = runtime
         self.supervisor = supervisor if supervisor is not None else R.WorkerSupervisor(runtime)
         self.ledger = ledger if ledger is not None else runtime.ledger()
+        self.source_ledger = source_ledger
         self.now_seconds = now_seconds
         self._lock = threading.Lock()
         self._active = None
@@ -206,9 +213,10 @@ class SyncService:
         except Exception:
             return 503, {"ready": False, "busy": False}
 
-    def sync(self, body, timestamp, signature):
+    def sync(self, body, timestamp, signature, *, version="v1"):
         try:
-            verified = R.verify_request(
+            verifier = R.verify_source_request if version == "v2" else R.verify_request
+            verified = verifier(
                 body,
                 timestamp,
                 signature,
@@ -218,7 +226,12 @@ class SyncService:
             )
         except R.ProtocolError:
             raise R.RuntimeErrorCode("UNAUTHORIZED") from None
-        key = (verified.job.job_id, verified.fingerprint)
+        identity = (
+            verified.job.job_id
+            if version == "v1"
+            else verified.job.job_id + ":" + verified.job.asset_id
+        )
+        key = (version + ":" + identity, verified.fingerprint)
         with self._lock:
             for known in (self._active, self._result and self._result[0]):
                 if known is not None and known[0] == key[0] and known != key:
@@ -234,7 +247,11 @@ class SyncService:
             if self._active is not None or self.supervisor.busy or self.supervisor.cancel.is_set():
                 raise R.RuntimeErrorCode("BUSY")
             try:
-                self.ledger.check()
+                (
+                    self.source_ledger or self.runtime.ledger(multi_source=True)
+                    if version == "v2"
+                    else self.ledger
+                ).check()
             except R.LedgerError as error:
                 raise R.RuntimeErrorCode(
                     "BUSY" if error.code == "LOCK_TIMEOUT" else "FAILED"
@@ -284,7 +301,11 @@ def handle_connection(connection, service, *, read_seconds=10):
             status, value = service.health()
             send_json(connection, status, value)
         else:
-            status, value = service.sync(body, timestamp, signature)
+            status, value = (
+                service.sync(body, timestamp, signature, version="v2")
+                if path == "/v2/sync"
+                else service.sync(body, timestamp, signature)
+            )
             send_json(connection, status, value)
     except RequestError as error:
         if not deadline.expired:

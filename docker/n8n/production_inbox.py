@@ -15,9 +15,9 @@ from pathlib import Path
 UUID = re.compile(r"[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}")
 SHA = re.compile(r"[a-f0-9]{64}")
 MEDIA = Path("/mnt/producciones")
-MAX_BODY = 4096
+MAX_BODY = 32768
 ORDER_FIELDS = {"order_id", "user_id", "plan_id", "upload_id", "mode", "media"}
-OPTIONAL_ORDER_FIELDS = {"output_resolution", "output_format", "output_edit"}
+OPTIONAL_ORDER_FIELDS = {"output_resolution", "output_format", "output_edit", "additional_media"}
 
 
 def matches(pattern, value):
@@ -61,6 +61,20 @@ def verify_order(request):
     if request.get("output_edit", "full") not in ("full", "reel"):
         raise ValueError("Montaje inválido")
     job = request["media"]
+    extra = request.get("additional_media")
+    if extra is not None and (type(extra) is not list or not 1 <= len(extra) <= 31):
+        raise ValueError("Materiales adicionales inválidos")
+    jobs = [job, *(extra or [])]
+    seen = set()
+    for item in jobs:
+        verify_media(item, request["order_id"])
+        if item["asset_id"] in seen:
+            raise ValueError("Material duplicado")
+        seen.add(item["asset_id"])
+    return job
+
+
+def verify_media(job, order):
     if type(job) is not dict or set(job) != {
         "job_id",
         "asset_id",
@@ -71,7 +85,6 @@ def verify_order(request):
         "object_key",
     }:
         raise ValueError("Medio inválido")
-    order = request["order_id"]
     if (
         job["job_id"] != order
         or not matches(UUID, job["asset_id"])
@@ -83,7 +96,6 @@ def verify_order(request):
         or job["object_key"] != f"ingest/{order}/{job['asset_id']}.{job['extension']}"
     ):
         raise ValueError("Medio inválido")
-    return job
 
 
 def source_matches(job):
@@ -145,7 +157,7 @@ def receive(db, request):
         if previous[0] != canonical:
             raise ValueError("Orden en conflicto")
         return
-    if not source_matches(job):
+    if not all(source_matches(item) for item in [job, *request.get("additional_media", [])]):
         raise ValueError("Crudo distinto del confirmado")
     db.execute(
         "INSERT OR IGNORE INTO inbox(order_id,payload,received_at) VALUES(?,?,unixepoch())",

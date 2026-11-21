@@ -51,7 +51,7 @@ def load_profile(path):
 
 
 def provision(profile, encoded):
-    from sync_protocol import verify_request
+    from sync_protocol import verify_request, verify_source_request
     from sync_provision import ProjectsProof, ensure_project
     from sync_storage import RootProof, SyncStorage
 
@@ -63,7 +63,10 @@ def provision(profile, encoded):
     body = base64.b64decode(envelope["body"], validate=True)
     key = read_file(Path(profile["hmac_file"]), os.getuid(), {0o400, 0o600}, 128)
     maximum = profile["max_object_bytes"]
-    verified = verify_request(
+    verifier = (
+        verify_source_request if str(envelope["signature"]).startswith("v2=") else verify_request
+    )
+    verified = verifier(
         body, envelope["timestamp"], envelope["signature"], key, maximum, lambda: int(time.time())
     )
     media_root = profile["media_root"]

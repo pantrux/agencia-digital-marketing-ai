@@ -45,7 +45,7 @@ export async function handleProductionBrief(request: Request, env: BriefEnv, use
   const ready = row.status === "processing" && row.received === 1;
   const brandFields = row.brand_id && row.brand_name && row.brand_audience !== null && row.brand_tone !== null
     ? { brand: { id: row.brand_id, display_name: row.brand_name, audience: row.brand_audience, tone: row.brand_tone } } : {};
-  const adAvailable = row.output_edit === "reel" && row.output_format === "mp4";
+  const adAvailable = row.output_edit === "reel";
   if (request.method === "GET") return response({ brief: confirmed(row), ready, ...brandFields, ...(adAvailable ? { ad_available: true } : {}) });
   const body = await readJson(request, 8192);
   if (Object.keys(body).some(key => !["objective", "audience", "tone", "ad_cta", "ad_brand", "ad_contacts", "ad_engine"].includes(key))) throw new HttpError(422, "BRIEF_INVALIDO");

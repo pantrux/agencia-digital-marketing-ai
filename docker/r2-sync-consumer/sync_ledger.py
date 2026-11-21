@@ -23,6 +23,9 @@ else:
 
 OWNER = "agencia-digital-marketing-ai:r2-sync-ledger:v1"
 DB_NAME = "sync-ledger.sqlite3"
+SOURCE_DB_NAME = "sync-source-ledger.sqlite3"
+SOURCE_OWNER = "agencia-digital-marketing-ai:r2-sync-ledger:v2"
+SOURCE_APPLICATION_ID = 0x4153594F
 LOCK_NAME = ".sync-ledger.lock"
 MAX_DB_BYTES = 64 * 1024 * 1024
 MAX_WAIT_SECONDS = 5.0
@@ -280,7 +283,7 @@ class _Locked:
         self.root.validate()
         for descriptor, name, identity, limit in (
             (self.lock_fd, LOCK_NAME, self.lock_identity, len(LOCK_BYTES)),
-            (self.db_fd, DB_NAME, None, self.ledger.max_db_bytes),
+            (self.db_fd, self.ledger.db_name, None, self.ledger.max_db_bytes),
         ):
             if descriptor is None:
                 continue
@@ -297,7 +300,9 @@ class _Locked:
             raise LedgerError("LOCK_AJENO")
         for suffix in ("-wal", "-shm", "-journal"):
             try:
-                info = os.stat(DB_NAME + suffix, dir_fd=self.root.fd, follow_symlinks=False)
+                info = os.stat(
+                    self.ledger.db_name + suffix, dir_fd=self.root.fd, follow_symlinks=False
+                )
             except FileNotFoundError:
                 continue
             if suffix != "-journal":
@@ -308,7 +313,9 @@ class _Locked:
         flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
         if create:
             flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
-        self.db_fd = _fd(self.stack, os.open(DB_NAME, flags, 0o600, dir_fd=self.root.fd))
+        self.db_fd = _fd(
+            self.stack, os.open(self.ledger.db_name, flags, 0o600, dir_fd=self.root.fd)
+        )
         self.validate()
 
 
@@ -320,9 +327,10 @@ class Reservation:
 
 
 class Ledger:
-    def __init__(self, root, proof: RootProof, *, max_db_bytes=MAX_DB_BYTES):
+    def __init__(self, root, proof: RootProof, *, max_db_bytes=MAX_DB_BYTES, multi_source=False):
         if (
             type(proof) is not RootProof
+            or type(multi_source) is not bool
             or type(max_db_bytes) is not int
             or not 4 * PAGE_SIZE <= max_db_bytes <= MAX_DB_BYTES
         ):
@@ -339,6 +347,10 @@ class Ledger:
         if fcntl is None:
             raise LedgerError("REQUIERE_LINUX")
         self.root, self.proof, self.max_db_bytes = path, proof, max_db_bytes
+        self.multi_source = multi_source
+        self.db_name = SOURCE_DB_NAME if multi_source else DB_NAME
+        self.owner = SOURCE_OWNER if multi_source else OWNER
+        self.application_id = SOURCE_APPLICATION_ID if multi_source else APPLICATION_ID
         try:
             with ExitStack() as stack:
                 _Root(self, stack)
@@ -350,7 +362,7 @@ class Ledger:
         with ExitStack() as stack:
             try:
                 root = _Root(self, stack)
-                if create and os.path.lexists(os.path.join(self.root, DB_NAME)):
+                if create and os.path.lexists(os.path.join(self.root, self.db_name)):
                     raise LedgerError("DB_YA_EXISTE")
                 state = _Locked(
                     self,
@@ -372,7 +384,7 @@ class Ledger:
         from pathlib import Path
 
         connection = sqlite3.connect(
-            Path(self.root, DB_NAME).as_uri() + "?mode=rw",
+            Path(self.root, self.db_name).as_uri() + "?mode=rw",
             uri=True,
             timeout=BUSY_SECONDS,
             isolation_level=None,
@@ -429,8 +441,8 @@ class Ledger:
                     connection.execute("BEGIN IMMEDIATE")
                     connection.execute(META_SQL)
                     connection.execute(JOBS_SQL)
-                    connection.execute("INSERT INTO ledger_meta VALUES (1,1,?)", (OWNER,))
-                    connection.execute(f"PRAGMA application_id={APPLICATION_ID}")
+                    connection.execute("INSERT INTO ledger_meta VALUES (1,1,?)", (self.owner,))
+                    connection.execute(f"PRAGMA application_id={self.application_id}")
                     connection.execute("PRAGMA user_version=1")
                     state.validate()
                     connection.execute("COMMIT")
@@ -449,8 +461,9 @@ class Ledger:
         if (
             schema != {"ledger_meta": META_SQL, "jobs": JOBS_SQL}
             or connection.execute("SELECT id,schema_version,owner FROM ledger_meta").fetchall()
-            != [(1, 1, OWNER)]
-            or connection.execute("PRAGMA application_id").fetchone() != (APPLICATION_ID,)
+            != [(1, 1, getattr(self, "owner", OWNER))]
+            or connection.execute("PRAGMA application_id").fetchone()
+            != (getattr(self, "application_id", APPLICATION_ID),)
             or connection.execute("PRAGMA user_version").fetchone() != (1,)
             or connection.execute("PRAGMA quick_check(1)").fetchall() != [("ok",)]
         ):
@@ -475,7 +488,7 @@ class Ledger:
                 operation = None
                 try:
                     self._schema(connection)
-                    operation = _Operation(state, connection, job, fingerprint)
+                    operation = _Operation(state, connection, job, fingerprint, self.multi_source)
                     yield operation
                     state.validate()
                 finally:
@@ -487,7 +500,7 @@ class Ledger:
 
 
 class _Operation:
-    def __init__(self, state, connection, job, fingerprint):
+    def __init__(self, state, connection, job, fingerprint, multi_source=False):
         self.state, self.connection, self.job, self.fingerprint = (
             state,
             connection,
@@ -495,6 +508,7 @@ class _Operation:
             fingerprint,
         )
         self.active = True
+        self.ledger_key = f"{job.job_id}:{job.asset_id}" if multi_source else job.job_id
         self.reservation = None
         self.recovery = False
         self.reconciled = None
@@ -524,12 +538,12 @@ class _Operation:
             return self.reservation
         with self._transaction():
             row = self.connection.execute(
-                "SELECT fingerprint,state,receipt FROM jobs WHERE job_id=?", (self.job.job_id,)
+                "SELECT fingerprint,state,receipt FROM jobs WHERE job_id=?", (self.ledger_key,)
             ).fetchone()
             if row is None:
                 self.connection.execute(
                     "INSERT INTO jobs VALUES (?,?,'pending',NULL)",
-                    (self.job.job_id, self.fingerprint),
+                    (self.ledger_key, self.fingerprint),
                 )
                 result = Reservation("pending", True, None)
             else:
@@ -570,7 +584,7 @@ class _Operation:
         with self._transaction():
             changed = self.connection.execute(
                 "UPDATE jobs SET state='completed',receipt=? WHERE job_id=? AND fingerprint=? AND state='pending' AND receipt IS NULL",
-                (serialized, self.job.job_id, self.fingerprint),
+                (serialized, self.ledger_key, self.fingerprint),
             ).rowcount
             if changed != 1:
                 raise LedgerError("TRANSICION_CONFLICTIVA")

@@ -1,5 +1,5 @@
 import {AD_FRAMES, SOCIAL_FADE_FRAME} from './contracts.ts';
-import {MAX_SEGMENT_SECONDS, outputDimensions, TITLE_FADE_FRAMES, WorkerError, type EditScene, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
+import {MAX_SEGMENT_SECONDS, outputDimensions, TITLE_FADE_FRAMES, WorkerError, type EditScene, type MultiSourceScene, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
 
 export interface Loudness {integrated_lufs: number; true_peak_dbtp: number; range_lu: number; threshold_lufs: number; offset_lu: number}
 export interface MediaInfo {duration_seconds: number; width: number; height: number; fps: number; video_codec: string | null; video_profile: string | null; codec_tag: string | null; audio_codec: string | null; has_audio: boolean; sample_rate: number | null; color_space: string | null; color_transfer: string | null; color_primaries: string | null; pixel_format: string | null}
@@ -171,6 +171,26 @@ export function cutSceneAudio(input: string, output: string, scenes: readonly Ed
   return ['-hide_banner','-nostdin','-nostats','-n','-i',input,'-filter_complex',filter,'-map','[audio]','-c:a','pcm_s24le',output];
 }
 
+/** Las rutas deben provenir de fuentes ya verificadas por el backend. */
+export function cutMultiSourceAudio(inputs: ReadonlyMap<string, string | null>, output: string, scenes: readonly MultiSourceScene[]): string[] {
+  if (scenes.length < 2 || scenes.length > 32 || !output) return bad();
+  const args: string[] = [];
+  const cuts = scenes.map((scene, index) => {
+    const input = inputs.get(scene.source_id);
+    const start = input === null ? 0 : scene.audio_source_start_frame ?? scene.source_start_frame;
+    const length = scene.source_end_frame - scene.source_start_frame;
+    if (input === undefined || input === '' || !Number.isInteger(start) || !Number.isInteger(length) || start < 0 || length < 15 ||
+        start + length > MAX_SEGMENT_SECONDS * 30) return bad();
+    if (input === null) args.push('-f','lavfi','-i','anullsrc=r=48000:cl=stereo');
+    else args.push('-i', input);
+    return `[${index}:a:0]aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,atrim=start_sample=${start * 1600}:end_sample=${(start + length) * 1600},asetpts=PTS-STARTPTS[p${index}]`;
+  });
+  const joined = scenes.map((_, index) => `[p${index}]`).join('');
+  return ['-hide_banner','-nostdin','-nostats','-n',...args,'-filter_complex',
+    [...cuts, `${joined}concat=n=${scenes.length}:v=0:a=1[audio]`].join(';'),
+    '-map','[audio]','-c:a','pcm_s24le','-ar','48000','-ac','2',output];
+}
+
 function sceneVideo(sourceVideo: string, scenes: readonly EditScene[]) {
   const videoInputs: string[] = [];
   const cuts = scenes.map((scene, index) => {
@@ -182,6 +202,34 @@ function sceneVideo(sourceVideo: string, scenes: readonly EditScene[]) {
   const links = scenes.map((_, index) => `[plano${index}]`).join('');
   cuts.push(`${links}concat=n=${scenes.length}:v=1:a=0,settb=1/30,setpts=N[montaje]`);
   return {videoInputs,cuts};
+}
+
+/** Homogeneiza cada plano antes de unir fuentes con geometrías diferentes. */
+export function multiSourceVideoInputs(inputs: ReadonlyMap<string, string>, scenes: readonly MultiSourceScene[], width: number, height: number): {videoInputs: string[]; cuts: string[]} {
+  if (scenes.length < 2 || scenes.length > 32 || !Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
+      width < 2 || height < 2 || width > 3840 || height > 3840 || width % 2 || height % 2) return bad();
+  const videoInputs: string[] = [];
+  const cuts = scenes.map((scene, index) => {
+    const input = inputs.get(scene.source_id);
+    const start = scene.source_start_frame, end = scene.source_end_frame;
+    if (!input || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end - start < 15 ||
+        end > MAX_SEGMENT_SECONDS * 30) return bad();
+    const seek = Math.max(0, Math.floor(start / 30) - 1);
+    videoInputs.push('-threads','2','-ss',String(seek),'-i',input);
+    return `[${index}:v]fps=30:start_time=0,trim=start_frame=${start - seek * 30}:end_frame=${end - seek * 30},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=bilinear:out_color_matrix=bt709:out_range=tv,crop=${width}:${height},setsar=1,format=yuv420p,settb=1/30[plano${index}]`;
+  });
+  const links = scenes.map((_, index) => `[plano${index}]`).join('');
+  cuts.push(`${links}concat=n=${scenes.length}:v=1:a=0,settb=1/30,setpts=N,${limitedBt709}[montaje]`);
+  return {videoInputs, cuts};
+}
+
+export function stageMultiSourcePicture(inputs: ReadonlyMap<string, string>, scenes: readonly MultiSourceScene[], resolution: Resolution, output: string): string[] {
+  const {width, height} = outputDimensions(resolution);
+  const {videoInputs, cuts} = multiSourceVideoInputs(inputs, scenes, width, height);
+  return ['-hide_banner','-nostdin','-v','error','-n','-filter_complex_threads','3',...videoInputs,
+    '-filter_complex',cuts.join(';'),'-map','[montaje]','-an','-c:v','h264_nvenc','-preset','p5',
+    '-rc','vbr','-cq','16','-b:v','0','-maxrate',resolution === '4k' ? '60M' : '24M',
+    '-g','30','-movflags','+faststart',output];
 }
 
 export function stageHyperframesPicture(source: string, scenes: readonly EditScene[], resolution: Resolution, output: string): string[] {
@@ -234,9 +282,9 @@ const proresVideo = ['-vf',sdrVideoFilter('yuva444p10le'),'-c:v','prores_ks','-p
 const pcmAudio = ['-c:a','pcm_s24le','-ar','48000','-ac','2'];
 const proresTimescale = 15360;
 
-export function encodeProresFragment(frames: string, output: string, count: number): string[] {
-  if (!Number.isInteger(count) || count < 1) return bad();
-  return ['-hide_banner','-nostdin','-nostats','-n','-f','image2','-framerate','30','-start_number','0','-i',frames,
+export function encodeProresFragment(frames: string, output: string, count: number, startNumber = 0): string[] {
+  if (!Number.isInteger(count) || count < 1 || !Number.isInteger(startNumber) || startNumber < 0) return bad();
+  return ['-hide_banner','-nostdin','-nostats','-n','-f','image2','-framerate','30','-start_number',String(startNumber),'-i',frames,
     '-map','0:v:0','-an','-frames:v',String(count),...proresVideo,'-video_track_timescale',String(proresTimescale),output];
 }
 

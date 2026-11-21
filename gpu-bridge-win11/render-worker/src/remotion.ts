@@ -11,7 +11,7 @@ export function compositionInput(request: RenderRequest, videoFile: string | nul
     ...(request.props.scenes && {scenes: request.props.scenes}),
     ...(request.props.ad && {ad: request.props.ad})};
 }
-export interface SceneOptions {request: RenderRequest; scratch: string; cacheRoot: string; browser: string; videoSource: string | null; signal: AbortSignal; overlay?: true}
+export interface SceneOptions {request: RenderRequest; scratch: string; cacheRoot: string; browser: string; videoSource: string | null; signal: AbortSignal; overlay?: true; preconformed?: true}
 const defaultSdk = {bundle, makeCancelSignal, openBrowser, renderFrames, renderStill, selectComposition};
 export type SceneDependencies = typeof defaultSdk;
 export function createSceneRenderer(sdk: SceneDependencies = defaultSdk) {
@@ -31,6 +31,7 @@ return async function scene(options: SceneOptions, frames: number[] | null): Pro
     abort = (): void => cancel(); options.signal.addEventListener('abort', abort, {once: true});
     options.signal.throwIfAborted();
     const inputProps = compositionInput(options.request, lease.videoFile);
+    if (options.preconformed) inputProps.video_is_montage = true;
     if (options.overlay) {
       inputProps.transparent = true;
       inputProps.overlay_only = true;

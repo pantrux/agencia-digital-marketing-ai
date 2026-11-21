@@ -128,13 +128,22 @@ def test_closed_request_surface(service, raw):
     assert not calls
 
 
-def test_worker_signature_does_not_override_sandbox_free_or_owner(service):
+def test_worker_signature_requires_known_environment_and_plan(service):
     instance, calls, _ = service
-    for changes in [{"plan_id": "pro"}, {"billing_mode": "production"}, {"actor_id": "b" * 64}]:
+    for changes in [{"plan_id": "desconocido"}, {"billing_mode": "desconocido"}]:
         raw = envelope(**changes)
         assert_status(403, lambda raw=raw: process(instance, raw))
     assert not calls
     process(instance)
+
+
+def test_firma_autorizada_conserva_cuenta_plan_y_entorno(service):
+    instance, calls, _ = service
+    raw = envelope(actor_id="b" * 64, plan_id="ilimitado", billing_mode="production")
+    process(instance, raw)
+    assert calls[0].actor == "b" * 64
+    assert calls[0].plan_id == "ilimitado"
+    assert calls[0].billing_mode == "production"
 
 
 def test_overlap_is_atomic_across_connections(service):
@@ -162,7 +171,7 @@ def test_overlap_is_atomic_across_connections(service):
         assert_status(429, lambda: process(instance))
         assert_status(429, lambda: process(instance, envelope(request_id=SECOND)))
         assert_status(429, lambda: process(instance, envelope(order_id=SECOND)))
-        assert_status(403, lambda: process(instance, envelope(actor_id="b" * 64)))
+        assert_status(429, lambda: process(instance, envelope(actor_id="b" * 64)))
     finally:
         release.set()
         thread.join(5)

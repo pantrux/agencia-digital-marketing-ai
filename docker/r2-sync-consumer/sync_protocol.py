@@ -30,6 +30,7 @@ class ProtocolError(ValueError):
 class VerifiedRequest:
     job: AssetJob
     fingerprint: str
+    protocol: str = "v1"
 
     @property
     def body_sha256(self) -> str:
@@ -80,13 +81,14 @@ def _parse_body(body, max_object_bytes) -> AssetJob:
     return job
 
 
-def verify_request(
+def _verify_request(
     body: bytes,
     timestamp: str,
     signature: str,
     secret: bytes,
     max_object_bytes: int,
     now_seconds: Callable[[], int],
+    version: str,
 ) -> VerifiedRequest:
     """Exige cabeceras ya desambiguadas; el reloj y la política son obligatorios."""
     job = _parse_body(body, max_object_bytes)
@@ -95,7 +97,11 @@ def verify_request(
     seconds = int(timestamp)
     if seconds > MAX_SAFE_INTEGER:
         raise ProtocolError("TIMESTAMP")
-    if type(signature) is not str or SIGNATURE.fullmatch(signature) is None:
+    if (
+        version not in ("v1", "v2")
+        or type(signature) is not str
+        or re.fullmatch(rf"{version}=[0-9a-f]{{64}}", signature) is None
+    ):
         raise ProtocolError("FIRMA")
     if type(secret) is not bytes or not 32 <= len(secret) <= 128:
         raise ProtocolError("CLAVE")
@@ -111,7 +117,7 @@ def verify_request(
         raise ProtocolError("RELOJ")
     fingerprint = hashlib.sha256(body).hexdigest()
     # Método, ruta, versión y LF son constantes; ninguna URL llega de la entrada.
-    message = f"v1\n{timestamp}\nPOST\n/v1/sync\n{fingerprint}".encode("ascii")
+    message = f"{version}\n{timestamp}\nPOST\n/{version}/sync\n{fingerprint}".encode("ascii")
     try:
         expected = hmac.digest(secret, message, "sha256")
         supplied = bytes.fromhex(signature[3:])
@@ -120,4 +126,14 @@ def verify_request(
         raise ProtocolError("FIRMA") from None
     if not authenticated:
         raise ProtocolError("FIRMA")
-    return VerifiedRequest(job, fingerprint)
+    return VerifiedRequest(job, fingerprint, version)
+
+
+def verify_request(body, timestamp, signature, secret, max_object_bytes, now_seconds):
+    """Conserva el contrato v1 para una sola fuente por orden."""
+    return _verify_request(body, timestamp, signature, secret, max_object_bytes, now_seconds, "v1")
+
+
+def verify_source_request(body, timestamp, signature, secret, max_object_bytes, now_seconds):
+    """Verifica el contrato v2 para una fuente de una producción múltiple."""
+    return _verify_request(body, timestamp, signature, secret, max_object_bytes, now_seconds, "v2")

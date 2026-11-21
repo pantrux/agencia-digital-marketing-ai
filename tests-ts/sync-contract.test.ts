@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
-  encodeSyncJob, importSyncKey, parseSyncBody, signSyncJob,
+  encodeSyncJob, importSyncKey, parseSyncBody, signSyncJob, signSourceSyncJob,
   validateSyncJob, verifySyncRequest,
 } from '../src/media/sync-contract.js';
 
@@ -24,6 +24,12 @@ let key: CryptoKey;
 beforeAll(async () => { key = await importSyncKey(rawKey); });
 
 describe('Mensaje R2 v1 cerrado y canónico', () => {
+  it('firma fuentes múltiples con un dominio separado del protocolo anterior', async () => {
+    const signed = await signSourceSyncJob(fixture(), policy, key, timestamp);
+    expect(signed.bodySha256).toBe(fingerprint);
+    expect(signed.signature).toBe('v2=dcf43d6de3029e24817d533565d8308702727305a616e7670d668a11ddc2b0b9');
+    await expect(verifySyncRequest(signed, policy, key, () => Number(timestamp))).rejects.toMatchObject({ code: 'FIRMA' });
+  });
   it('ordena los campos, conserva bytes exactos y congela el trabajo', () => {
     const reversed = Object.fromEntries(Object.entries(fixture()).reverse());
     expect(new TextDecoder().decode(encodeSyncJob(reversed, policy))).toBe(canonical);

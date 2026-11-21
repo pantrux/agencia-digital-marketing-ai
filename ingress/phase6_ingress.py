@@ -27,6 +27,7 @@ NAS_MATERIAL_DIRECTORIES = {
 }
 MAX_INVENTORY_BYTES = 4096
 SYNC_URI = "/v1/sync"
+SYNC_V2_URI = "/v2/sync"
 SOFIA_URI = "/v1/sofia/chat"
 PRIVATE_NETWORKS = tuple(
     ipaddress.IPv4Network(cidr) for cidr in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
@@ -165,8 +166,16 @@ def guard_machine_request(path, limit):
     ]
 
 
-def guard_machine_server(sofia_enabled):
-    uri = "^/v1/(sync|sofia/chat)$" if sofia_enabled else f"^{SYNC_URI}$"
+def guard_machine_server(sofia_enabled, sync_v2=False):
+    uri = (
+        "^/(v1/sync|v2/sync|v1/sofia/chat)$"
+        if sync_v2 and sofia_enabled
+        else "^/(v1/sync|v2/sync)$"
+        if sync_v2
+        else "^/v1/(sync|sofia/chat)$"
+        if sofia_enabled
+        else f"^{SYNC_URI}$"
+    )
     return [f'if ($request_uri !~ "{uri}") {{ return 404; }}', "access_log off;"]
 
 
@@ -305,7 +314,7 @@ def site_origin(host, use_relay=False):
     }
 
 
-def render(value):
+def render(value, sync_v2=False):
     value = validate_inventory(value)
     sofia = value["sofia_tls"]
     peer = value["tunnel_peer_ipv4"]
@@ -353,7 +362,7 @@ def render(value):
             )
         else:
             closed = "location / { return 404; }"
-            machine_guard = guard_machine_server(sofia is not None)
+            machine_guard = guard_machine_server(sofia is not None, sync_v2)
             server.extend(machine_guard)
             server.append(closed)
             locations = [closed]
@@ -369,6 +378,11 @@ def render(value):
                         f"https://{sofia['ipv4']}:{sofia['port']}",
                         sofia["server_name"],
                     )
+                )
+            if sync_v2:
+                suffix = "_2" if sofia is not None else "_1"
+                routes.append(
+                    (suffix, "sync-v2", SYNC_V2_URI, 4096, "35s", "http://192.168.0.85:3010", None)
                 )
             for suffix, name, uri, limit, timeout, target, server_name in routes:
                 filename = f"{name}.conf"
@@ -434,12 +448,17 @@ def main(argv=None):
     parser.add_argument(
         "--inventory", type=Path, metavar="JSON", help="Inventario local sin credenciales"
     )
+    parser.add_argument(
+        "--sync-v2", action="store_true", help="Preparar la ruta de materiales múltiples"
+    )
     args = parser.parse_args(argv)
     result = plan()
     if args.inventory is not None:
         try:
             with args.inventory.open("rb") as stream:
-                result = render(inventory(stream.read(MAX_INVENTORY_BYTES + 1)))
+                result = render(
+                    inventory(stream.read(MAX_INVENTORY_BYTES + 1)), sync_v2=args.sync_v2
+                )
         except InputError as error:
             print(str(error), file=sys.stderr)
             return 2
