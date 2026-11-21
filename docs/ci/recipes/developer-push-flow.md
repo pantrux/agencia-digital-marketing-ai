@@ -232,3 +232,8 @@ Comprueba los fundidos, el icono y la URL en un MP4 de ensayo.
 Para cambios en `resolve-audio-lucas`, coteja la huella del manifiesto de
 skills. La conexión real de OpenClaw con Resolve Studio y la revisión del
 vídeo exportado se comprueban en el entorno del proyecto.
+
+Para el ProRes 4444 largo, verifica un MOV 4K de varios GiB en el volumen
+temporal del renderer. La lectura íntegra de las marcas de los paquetes
+tiene hasta 180 segundos dentro del plazo general del render. Comprueba
+que se conservan todos los fotogramas, la transparencia y el audio de la entrega.

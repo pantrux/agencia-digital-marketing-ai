@@ -21,6 +21,7 @@ const receiptName = '.recibo-puente-v1.json';
 const hashPattern = /^[a-f0-9]{64}$/;
 type RenderStage = 'render' | 'stills';
 const linksPerImage = 512;
+const proresPacketTimeoutMs = 180_000;
 const approvedAdMusic = {
   relative: '_biblioteca_global/musica-stock/' + AD_MUSIC_ID + '.mp3',
   sha256: '8433b770a630d9b1594fd484442c677907ece899a4d149954cd2e74fd733e311',
@@ -403,7 +404,9 @@ export class RenderBackend implements Backend {
           throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'El máster no conserva todos los fotogramas esperados.');
         }
         if (proresList || normalizeVideo || scenes) {
-          const {stdout} = await this.deps.run(this.config.ffprobe, packetProbeArgs(output), {timeoutMs: 30000, signal: bounded});
+          // Leer las marcas de todos los paquetes ProRes recorre el MOV multigigabyte.
+          const timeoutMs = proresList ? proresPacketTimeoutMs : 30_000;
+          const {stdout} = await this.deps.run(this.config.ffprobe, packetProbeArgs(output), {timeoutMs, signal: bounded});
           if (!overlayPacketTimingSupported(stdout, request.durationInFrames)) {
             throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'El máster no conserva las marcas de tiempo esperadas.');
           }

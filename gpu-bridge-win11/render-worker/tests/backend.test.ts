@@ -76,6 +76,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
   const dimensions = outputDimensions(options.resolution ?? '1080p');
   const prores = options.format === 'prores4444';
   const calls: string[][] = [];
+  const packetTimeouts: number[] = [];
   const captures: (number[] | null)[] = [];
   const conformed: boolean[] = [];
   const duration = options.duration ?? 3;
@@ -90,7 +91,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
       for (const file of files) await writeFile(file, 'imagen');
       return {files, frameCount: frames?.length ?? count};
     },
-    run: async (executable, args) => {
+    run: async (executable, args, processOptions) => {
       calls.push(args);
       if (executable === config.ffprobe) {
         const filename = path.basename(args.at(-1)!);
@@ -101,6 +102,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
             side_data_list:[{side_data_type:'Display Matrix',rotation:90,displaymatrix:'00000000: 0 -65536 0\n00000001: 65536 0 0\n00000002: 0 0 1073741824'}]}]}), stderr:''};
         }
         if (args.includes('-show_entries')) {
+          packetTimeouts.push(processOptions.timeoutMs);
           if (options.normalizedVideo && filename === 'crudo.mp4') {
             const packets = Array.from({length:sourceCount}, (_, index) => ({pts:index * 3003, duration:3003}));
             return {stdout:JSON.stringify({streams:[{time_base:'1/90000'}],packets}), stderr:''};
@@ -123,7 +125,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
       return {stdout: '', stderr: ''};
     },
   });
-  return {root, nas, backend, calls, captures, conformed};
+  return {root, nas, backend, calls, captures, conformed, packetTimeouts};
 }
 test('salud no disponible antes de pruebas y publicación solo después de medición final aceptada', async () => {
   const fixture = await setup(false);
@@ -333,6 +335,7 @@ test('la gráfica ProRes de 60 s publica solo después de comprobar 1800 marcas 
         assert.equal(tail?.[tail.indexOf('-f') + 1], 'image2');
         await access(path.join(fixture.nas,result.files[0]!.path));
       }
+      assert.deepEqual(fixture.packetTimeouts, [180_000]);
     } finally {await rm(fixture.root, {recursive: true, force: true});}
   }
 });
