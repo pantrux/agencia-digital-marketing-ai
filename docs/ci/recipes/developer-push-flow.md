@@ -161,6 +161,8 @@ Las pruebas de carga múltiple importan el módulo de carga del portal. Por ello
 
 Para aceptar un cambio del servicio de revisión de Studio, comprueba que Valeria reciba los defectos, las reglas incumplidas y la solicitud del titular dentro de las rondas de calidad del plan. La solicitud conserva su reserva y el kit anterior en todas las rondas. Si el equipo consigue una aprobación, verifica que se publique únicamente esa versión y que se pueda usar como base de otra revisión. Si agota las rondas, comprueba que el portal muestre el estado y conserve la entrega previa. La unidad tiene un límite de cuatro horas para las rondas y el empaquetado. El control 4 cubre los contratos de publicación y el rechazo de un dictamen de vista previa alterado.
 
+El control 4 llama también al punto de entrada de la unidad y verifica que una cola vacía devuelva `idle`. Confirma el arranque de esa unidad contra el entorno de ensayo antes de habilitar su temporizador.
+
 El control de infraestructura ejecuta la misma comprobación de D1 desde una carpeta temporal. Wrangler aplica las migraciones ordenadas sobre la base ficticia y un segundo pase coteja que el registro de migraciones siga idéntico. Ambos pases verifican integridad y claves foráneas. [Migraciones locales de D1](https://developers.cloudflare.com/d1/wrangler-commands/#d1-migrations-apply)
 
 Para habilitar el montaje por escenas, comprobar el despacho de `output_edit` y el rechazo de vista previa antes del máster. Aplicar la migración `0018_production_edit.sql` y verificar el receptor, los agentes y el puente antes de publicar el selector del portal.

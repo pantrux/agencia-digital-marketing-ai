@@ -287,6 +287,33 @@ def test_servicio_de_revision_reclama_y_registra_rechazo(handoff, order, monkeyp
     }
 
 
+def test_arranque_del_servicio_de_revisiones_sin_ordenes(handoff, monkeypatch, tmp_path, capsys):
+    import production_mateo as strategist
+    import production_publish as publisher
+    import production_revision as revision
+
+    profile = tmp_path / "profile"
+    profile.write_text(
+        json.dumps({"key": "d" * 64, "owner": str(uuid.uuid4()), "fixture": str(uuid.uuid4())})
+    )
+    token, gpu = tmp_path / "dispatch", tmp_path / "gpu"
+    token.write_text("b" * 64)
+    gpu.write_text("c" * 64)
+    cli = [profile, token, gpu, tmp_path / "r2", tmp_path / "hmac", tmp_path]
+    monkeypatch.setattr(sys, "argv", ["production_revision.py", *map(str, cli)])
+    monkeypatch.setattr(publisher, "credentials", lambda *_: ("r2", "acceso", "secreto", b"firma"))
+
+    def dispatch(payload, secret):
+        assert payload == {"action": "delivery_revision_claim"}
+        assert secret == "b" * 64
+        return {"revision": None}
+
+    monkeypatch.setattr(strategist, "dispatch_request", dispatch)
+    revision.main()
+    assert json.loads(capsys.readouterr().out) == {"status": "idle"}
+    assert all((tmp_path / name).is_dir() for name in ("draft", "render", "review"))
+
+
 def test_revision_releva_el_dictamen_de_una_vista_previa_verificada(
     handoff, order, monkeypatch, tmp_path
 ):
