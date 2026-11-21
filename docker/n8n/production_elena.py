@@ -417,8 +417,11 @@ def review_video(
     decode_options = {"stamps": [check["segundo"] for check in checks]} if checks else {}
     band = props.get("title_layout") == "band"
     if band:
-        decode_options["stamps"] = [min(0.55, duration * 0.2), duration * 0.5,
-                                    duration - min(0.12, duration * 0.08)]
+        decode_options["stamps"] = [
+            min(0.55, duration * 0.2),
+            duration * 0.5,
+            duration - min(0.12, duration * 0.08),
+        ]
     audio_check = None
     if ad:
         with tempfile.TemporaryDirectory(prefix="studio-qa-mezcla-") as workspace:

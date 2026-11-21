@@ -330,7 +330,8 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None, transcript
         raise ValueError("Ingesta fuera del contrato de escaleta")
     if (
         type(answer) is not dict
-        or answer.keys() - (OPTIONAL | ({"rotulo_en_banda"} if continuous else {"escenas"})) != PROFILE
+        or answer.keys() - (OPTIONAL | ({"rotulo_en_banda"} if continuous else {"escenas"}))
+        != PROFILE
         or type(answer["angulo"]) is not int
         or not 1 <= answer["angulo"] <= 3
         or type(answer["apto_sin_cambios"]) is not bool
@@ -353,7 +354,9 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None, transcript
         or len(answer["titulo"].encode("utf-16-le")) // 2 > 42
         or len(answer["subtitulo"].encode("utf-16-le")) // 2 > 64
     ):
-        raise VisualResponseFormatError("La banda requiere título de hasta 42 y subtítulo de 64 caracteres con tamaño estándar")
+        raise VisualResponseFormatError(
+            "La banda requiere título de hasta 42 y subtítulo de 64 caracteres con tamaño estándar"
+        )
     reasons = []
     if not answer["apto_sin_cambios"]:
         reasons.append("La revisión indica que deben ajustarse cortes, encuadre u ocultaciones.")
@@ -1210,7 +1213,11 @@ def process(
     if prior is not None and edl["render"] is not None:
         previous = prior["render"]["props"]
         props = edl["render"]["props"]
-        changes = ("scenes", "ad") if reel or multiple else ("title", "subtitle", "subtitle_size", "title_layout")
+        changes = (
+            ("scenes", "ad")
+            if reel or multiple
+            else ("title", "subtitle", "subtitle_size", "title_layout")
+        )
         if (not user_revision and edl["angulo"] != prior["angulo"]) or all(
             props.get(key) == previous.get(key) for key in changes
         ):
