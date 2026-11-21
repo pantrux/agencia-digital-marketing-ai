@@ -1,7 +1,8 @@
 import { validateSyncJob } from "../../../src/media/sync-contract.js";
 import { signR2UploadPart } from "../../../src/media/r2-signing.js";
-import { listMultipartParts, requestedParts, verifyDigest, type IngestEnv, type MultipartObserver } from "./ingest.js";
-import { HttpError, readJson, response } from "./platform.js";
+import type { PortalIdentity, sessionLookup } from "./identity.js";
+import { listMultipartParts, requestedParts, uploadsConfigured, verifyDigest, type IngestEnv, type MultipartObserver } from "./ingest.js";
+import { HttpError, ownerId, prepareOwnedStatement, readJson, response } from "./platform.js";
 import { storageFits, storageQuotaArguments } from "./storage-quota.js";
 
 const partSize = 16 * 1024 ** 2;
@@ -13,27 +14,36 @@ type SourceRow = { id: string; order_id: string; project_slug: string; bytes: nu
   extension: string; order_status: string; usage_status: string };
 type UploadRow = { source_id: string; object_key: string; upload_id: string | null; status: string;
   operation_id: string | null; lease_until: number | null; expires_at: number; object_etag: string | null };
+type SourceWithUpload = SourceRow & { user_id: string } & (UploadRow | { source_id: null });
+type SourceOwner = string | Awaited<ReturnType<typeof sessionLookup>>;
 
 /** Reserva y abre la carga de una fuente del pedido. */
-export async function createSourceUpload(env: IngestEnv, user: string, order: string, sourceId: string,
+export async function createSourceUpload(env: IngestEnv, owner: SourceOwner, order: string, sourceId: string,
   observe?: MultipartObserver): Promise<Response> {
-  const lookup = `FROM production_sources source
+  const sourceJoins = `FROM production_sources source
     JOIN production_source_sets source_set ON source_set.order_id=source.order_id
     JOIN orders o ON o.id=source_set.order_id AND o.user_id=source_set.user_id
-    JOIN usage_ledger ledger ON ledger.order_id=o.id AND ledger.user_id=o.user_id
-    WHERE source.id=? AND o.id=? AND o.user_id=? AND COALESCE(o.provider_mode,'production')=?`;
+    JOIN usage_ledger ledger ON ledger.order_id=o.id AND ledger.user_id=o.user_id`;
+  const sourceScope = `WHERE source.id=? AND o.id=? AND o.user_id=${ownerId}
+    AND COALESCE(o.provider_mode,'production')=?`;
   const started = performance.now();
-  const source = await env.DB.withSession("first-primary").prepare(`SELECT source.id,source.order_id,
-    source.bytes,source.sha256,source.extension,o.project_slug,o.status AS order_status,ledger.status AS usage_status ${lookup}`)
-    .bind(sourceId, order, user, env.BILLING_MODE).first<SourceRow>();
-  if (!source) throw new HttpError(404, "MATERIAL_NO_ENCONTRADO");
+  const initial = await env.DB.batch<PortalIdentity | SourceWithUpload>([
+    ...(typeof owner === "string" ? [] : [owner.statement(env.DB)]),
+    prepareOwnedStatement(env.DB, owner, `SELECT source.id,source.order_id,source.bytes,source.sha256,source.extension,
+      o.user_id,o.project_slug,o.status AS order_status,ledger.status AS usage_status,upload.*
+      ${sourceJoins} LEFT JOIN production_source_uploads upload ON upload.source_id=source.id ${sourceScope}`,
+    sourceId, order, env.BILLING_MODE),
+  ]);
+  const caller = typeof owner === "string" ? undefined : initial.shift()?.results[0];
+  if (typeof owner !== "string" && (!caller || !("email" in caller))) throw new HttpError(401, "AUTENTICACION_REQUERIDA");
+  if (caller && !uploadsConfigured(env)) throw new HttpError(503, "SUBIDA_NO_DISPONIBLE");
+  const source = initial[0]?.results[0];
+  if (!source || !("order_id" in source)) throw new HttpError(404, "MATERIAL_NO_ENCONTRADO");
+  const user = source.user_id;
   if (source.order_status !== "queued" || source.usage_status !== "reserved") {
-    const completed = await env.DB.withSession("first-primary").prepare(`SELECT upload.* FROM production_source_uploads upload
-      JOIN production_sources source ON source.id=upload.source_id ${lookup.replace("FROM production_sources source", "")}
-      AND upload.status='completed' AND upload.object_etag IS NOT NULL`)
-      .bind(sourceId, order, user, env.BILLING_MODE).first<UploadRow>();
-    if (completed && completed.upload_id && ["processing", "completed"].includes(source.order_status) && source.usage_status === "consumed") {
-      return response({ id: source.id, uploadId: completed.upload_id, key: completed.object_key, status: "completed",
+    if (source.source_id !== null && source.status === "completed" && source.object_etag && source.upload_id
+      && ["processing", "completed"].includes(source.order_status) && source.usage_status === "consumed") {
+      return response({ id: source.id, uploadId: source.upload_id, key: source.object_key, status: "completed",
         partSize, partCount: Math.ceil(source.bytes / partSize), hash_verified: true });
     }
     throw new HttpError(409, "ORDEN_NO_RESERVADA");
@@ -46,6 +56,21 @@ export async function createSourceUpload(env: IngestEnv, user: string, order: st
       extension: source.extension, bytes: source.bytes, sha256: source.sha256, object_key: key }, { maxObjectBytes: 1024 ** 3 });
   } catch { throw new HttpError(422, "MATERIAL_INVALIDO"); }
   const now = Math.floor(Date.now() / 1000);
+  const info = (value: UploadRow, newlyOpened = false) => response({ id: source.id, uploadId: value.upload_id,
+    key: value.object_key, status: value.status, partSize, partCount: Math.ceil(source.bytes / partSize),
+    ...(newlyOpened ? { newlyOpened: true } : {}) });
+  const reusable = (value: UploadRow): Response | undefined => {
+    if (value.object_key !== key) throw new HttpError(409, "MATERIAL_EN_CONFLICTO");
+    if (value.status === "completed" && value.upload_id && value.object_etag) return info(value);
+    if (value.status === "open" && value.upload_id) {
+      if (value.expires_at <= now) throw new HttpError(410, "SUBIDA_VENCIDA");
+      return info(value);
+    }
+  };
+  if (source.source_id !== null) {
+    const previous = reusable(source);
+    if (previous) return previous;
+  }
   const token = crypto.randomUUID();
   const [created, found] = await env.DB.batch<UploadRow>([
     env.DB.prepare(`INSERT INTO production_source_uploads(source_id,object_key,status,operation_id,lease_until,created_at,expires_at)
@@ -58,17 +83,14 @@ export async function createSourceUpload(env: IngestEnv, user: string, order: st
         AND o.status='queued' AND ledger.status='reserved' AND ${storageFits}
       ON CONFLICT(source_id) DO NOTHING`).bind(key, token, now + leaseDuration, now, now + sessionTtl,
       sourceId, order, user, env.BILLING_MODE, ...storageQuotaArguments(source.bytes, now)),
-    env.DB.prepare(`SELECT upload.* FROM production_source_uploads upload
-      JOIN production_sources source ON source.id=upload.source_id ${lookup.replace("FROM production_sources source", "")}`)
-      .bind(sourceId, order, user, env.BILLING_MODE),
+    prepareOwnedStatement(env.DB, user, `SELECT upload.* ${sourceJoins}
+      JOIN production_source_uploads upload ON upload.source_id=source.id ${sourceScope}`,
+    sourceId, order, env.BILLING_MODE),
   ]);
   const row = found?.results[0];
   if (!row) throw new HttpError(409, "ALMACENAMIENTO_AGOTADO");
-  if (row.object_key !== key) throw new HttpError(409, "MATERIAL_EN_CONFLICTO");
-  const info = (value: UploadRow, newlyOpened = false) => response({ id: source.id, uploadId: value.upload_id,
-    key: value.object_key, status: value.status, partSize, partCount: Math.ceil(source.bytes / partSize),
-    ...(newlyOpened ? { newlyOpened: true } : {}) });
-  if (row.status === "completed" && row.upload_id && row.object_etag) return info(row);
+  const previous = reusable(row);
+  if (previous) return previous;
   if (row.status === "completing") return completeSourceUpload(null, env, user, order, sourceId);
   let ownsLease = created?.meta.changes === 1;
   if (row.status === "aborted") {
@@ -90,7 +112,6 @@ export async function createSourceUpload(env: IngestEnv, user: string, order: st
     ownsLease = true;
   }
   if (row.expires_at <= now) throw new HttpError(410, "SUBIDA_VENCIDA");
-  if (row.status === "open" && row.upload_id) return info(row);
   if (row.status !== "creating") throw new HttpError(409, "SUBIDA_EN_TRANSICION");
   if (!ownsLease) {
     const claim = await env.DB.prepare(`UPDATE production_source_uploads SET operation_id=?,lease_until=?
@@ -121,7 +142,8 @@ export async function createSourceUpload(env: IngestEnv, user: string, order: st
     try { await upload.abort(); } catch { /* R2 expira subidas multipart huérfanas. */ }
     throw new HttpError(409, "SUBIDA_EN_TRANSICION");
   }
-  observe?.(storageStarted - started, confirmationStarted - storageStarted, performance.now() - confirmationStarted);
+  const testAccount = Boolean(caller && "email" in caller && caller.email.toLowerCase().endsWith(".invalid"));
+  observe?.(storageStarted - started, confirmationStarted - storageStarted, performance.now() - confirmationStarted, testAccount);
   return info({ ...row, status: "open", upload_id: upload.uploadId }, true);
 }
 
