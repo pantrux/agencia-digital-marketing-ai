@@ -49,6 +49,8 @@ class PhaseFourVaultDocumentation(unittest.TestCase):
         self.assertIn(".6", location)
         self.assertIn(".7", location)
         self.assertIn("ambos extremos", risk)
+        with self.assertRaises(ValueError):
+            documentation("DAVINCI_MCP_TOKEN_INCORRECTO")
 
 
 if __name__ == "__main__":
