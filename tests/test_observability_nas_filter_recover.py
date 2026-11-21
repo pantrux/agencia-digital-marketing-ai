@@ -138,7 +138,8 @@ def test_arranque_conserva_default_forward_detras_del_filtro_propio():
     assert recover["recovery_plan"](repair, am, SMTP, target, target, startup=True) == []
 
 
-def test_arranque_de_contenedores_exige_filtros_y_revierte_si_falla(monkeypatch):
+@pytest.mark.parametrize("failure", [ValueError("COMANDO_RECHAZADO"), KeyboardInterrupt()])
+def test_arranque_de_contenedores_exige_filtros_y_revierte_si_falla(monkeypatch, failure):
     recover = run_path(str(SOURCE))
     launch = recover["start_containers"]
     identities = ({"cid": "prometheus"}, {"cid": "alertmanager"}, {})
@@ -147,7 +148,7 @@ def test_arranque_de_contenedores_exige_filtros_y_revierte_si_falla(monkeypatch)
     def command(argv):
         commands.append(argv[-2:])
         if argv[-1] == "prometheus":
-            raise ValueError("COMANDO_RECHAZADO")
+            raise failure
         return argv[-1].encode()
 
     host = SimpleNamespace(
@@ -162,8 +163,9 @@ def test_arranque_de_contenedores_exige_filtros_y_revierte_si_falla(monkeypatch)
     with pytest.raises(ValueError, match="CAMBIO_CONCURRENTE"):
         launch(host, identities, {"filter": "incompleto"}, lambda: identities)
     assert commands == []
-    with pytest.raises(ValueError, match="COMANDO_RECHAZADO"):
+    with pytest.raises(type(failure)) as raised:
         launch(host, identities, {"filter": "seguro"}, lambda: identities)
+    assert raised.value is failure
     assert [command[-1] for command in commands] == [
         "alertmanager",
         "prometheus",

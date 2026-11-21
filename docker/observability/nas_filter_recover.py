@@ -331,10 +331,7 @@ def stopped_prometheus(repair, am):
         and host["NetworkMode"] in (name, repair.NET)
         and state["Status"] == "exited"
         and state["Running"] is False
-        and state["Pid"] == 0
-        and state["ExitCode"] == 0
-        and not state["OOMKilled"]
-        and not state["Error"],
+        and state["Pid"] == 0,
         "PROM_CONTENEDOR_IDENTIDAD",
     )
     networks = row["NetworkSettings"]["Networks"]
@@ -375,7 +372,14 @@ def start_containers(repair, identities, desired, inspect):
                     raise
             time.sleep(2)
         raise ValueError("ARRANQUE_SALUD")
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        TypeError,
+        subprocess.SubprocessError,
+        KeyboardInterrupt,
+    ) as error:
         failed = False
         for cid in reversed(started):
             try:
@@ -477,6 +481,10 @@ def main():
                 require(inspect(stopped=cold) == identity, "CONTENEDOR_CAMBIO")
 
             if args.action == "plan-start":
+                for family in {
+                    step.get("family", 4) for step in steps if step["action"] != "restore"
+                }:
+                    repair.library(family)
                 for step in steps:
                     if step["action"] == "restore":
                         restore(repair, step, test=True)
