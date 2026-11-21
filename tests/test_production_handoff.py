@@ -1789,6 +1789,80 @@ def test_elena_reintenta_un_dictamen_sin_json_con_las_mismas_muestras(monkeypatc
     assert requests[1]["attachments"] == requests[0]["attachments"]
 
 
+@pytest.mark.parametrize("crop_added_by_render", [False, True])
+def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
+    monkeypatch, order, tmp_path, crop_added_by_render
+):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_elena as elena
+
+    metrics = {
+        "width": 1080,
+        "height": 1920,
+        "fps": 30,
+        "codec": "h264",
+        "color": "bt709",
+        "duration": 60,
+        "lufs": -14,
+        "peak": -2,
+    }
+    raw = "proyectos/job-prueba/01_raw/clip.mp4"
+    objective = "Preserva el encuadre del original."
+
+    def decode(_path, _digest, _duration, *, stamps, sample_bytes):
+        assert stamps == [0.55, 30.0, 59.88]
+        assert sample_bytes == 12000
+        return metrics, [(second, b"master") for second in stamps]
+
+    def sample_frames(receipt, stamps, limit):
+        assert receipt["order"] == order and receipt["raw"] == raw
+        assert stamps == [0.55, 30.0, 59.88] and limit == 12000
+        return [(second, b"original") for second in stamps]
+
+    def run_visual(request):
+        evidence = json.loads(request["message"].rsplit("\n", 1)[1])
+        assert evidence["objetivo_confirmado"] == objective
+        assert [row["original"] for row in evidence["comparacion_encuadre"]] == [4, 5, 6]
+        assert len(request["attachments"]) == 6
+        return {
+            "puntaje": 92,
+            "marca_free": "",
+            "observaciones": [{"muestra": 1, "detalle": "Macetero ya cortado en el original"}],
+            "defectos": (
+                [{"muestra": 2, "correccion": "Restaurar el borde lateral de la fuente"}]
+                if crop_added_by_render
+                else []
+            ),
+        }
+
+    monkeypatch.setattr(elena, "decode", decode)
+    monkeypatch.setattr(elena, "sample_frames", sample_frames)
+    monkeypatch.setattr(elena, "run_visual", run_visual)
+    props = {
+        "title": "Sansevierias",
+        "subtitle": "De interior",
+        "duration_seconds": 60,
+        "title_layout": "band",
+        "video_path": raw,
+    }
+    review = elena.review_video(
+        tmp_path / "master.mp4",
+        "a" * 64,
+        props,
+        1,
+        "Ilimitado",
+        "1080p",
+        str(uuid.uuid4()),
+        source_order=order,
+        objective=objective,
+    )
+    assert review["dictamen"]["decision"] == ("rechazado" if crop_added_by_render else "aprobado")
+    assert review["referencia_original"]["sha256"] == order["media"]["sha256"]
+    assert [row["segundo"] for row in review["muestras"]] == [
+        row["segundo"] for row in review["referencia_original"]["muestras"]
+    ]
+
+
 @pytest.mark.parametrize(
     ("plan", "marca", "resolution", "width", "height"),
     [
@@ -2079,7 +2153,7 @@ def test_lucas_y_elena_relevan_la_misma_orden_vigente(monkeypatch, tmp_path, ord
     arguments, options = audits[0]
     assert arguments[:3] == (order, edl, receipt["master"]["sha256"])
     assert arguments[4:] == (reviewed / name, receipt, 1)
-    assert options == {"synthetic": False}
+    assert options == {"synthetic": False, "objective": "Relevo automático"}
 
 
 def test_lucas_respeta_el_reintento_y_renderiza_otra_orden(monkeypatch, tmp_path, order):
@@ -2226,7 +2300,12 @@ def test_revisiones_pagadas_relevan_el_dictamen_y_el_master_exacto(
     order["plan_id"] = plan
     order["output_resolution"] = "1080p" if plan == "pro" else "4k"
     lead = {"owner": str(uuid.uuid4()), "fixture": str(uuid.uuid4())}
-    brief = {"order_id": identity, "user_id": order["user_id"], "confirmed_at": 123}
+    brief = {
+        "order_id": identity,
+        "user_id": order["user_id"],
+        "confirmed_at": 123,
+        "objective": "Presentar el producto",
+    }
     metadata = {
         "order_id": identity,
         "brief_sha256": hashlib.sha256(canonical(brief)).hexdigest(),
@@ -2261,8 +2340,11 @@ def test_revisiones_pagadas_relevan_el_dictamen_y_el_master_exacto(
             )
         )
 
-    def audit(_order, _edl, digest, _request_id, target, artifact, revision, *, synthetic):
+    def audit(
+        _order, _edl, digest, _request_id, target, artifact, revision, *, synthetic, objective
+    ):
         assert not synthetic and digest == str(revision) * 64
+        assert objective == brief["objective"]
         reviewed.append(revision)
         report = {
             **metadata,
@@ -2313,7 +2395,12 @@ def test_elena_reintenta_el_rechazo_guardado_sin_repetir_la_auditoria(monkeypatc
     identity = order["order_id"]
     leaf = identity + ".json"
     profile = {"owner": order["user_id"], "fixture": str(uuid.uuid4())}
-    brief = {"order_id": identity, "user_id": order["user_id"], "confirmed_at": 123}
+    brief = {
+        "order_id": identity,
+        "user_id": order["user_id"],
+        "confirmed_at": 123,
+        "objective": "Presentar el producto",
+    }
     digest = hashlib.sha256(elena.canonical(brief)).hexdigest()
     master = "d" * 64
     receipt = {"order_id": identity, "job_id": identity + "-v1", "brief_sha256": digest}
@@ -2690,7 +2777,9 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(
             )
         )
 
-    def fake_audit(_order, _edl, digest, _request, dest, _rendered, _revision, *, revision_id):
+    def fake_audit(
+        _order, _edl, digest, _request, dest, _rendered, _revision, *, revision_id, objective
+    ):
         calls.append(("review", revision_id, digest))
         record = {
             "order_id": order["order_id"],

@@ -435,14 +435,15 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None, transcript
     }
 
 
-def sample_images(receipt, *, ad=False, transcript=None, include_ends=False):
+def sample_frames(receipt, stamps, limit):
+    """Extrae fotogramas del original verificado en los segundos solicitados."""
     job = receipt["order"]["media"]
     path = MEDIA / source_paths(receipt)[0]
     if path.resolve(strict=True) != path:
         raise ValueError("Ruta del original no canónica")
     duration = receipt["duration_seconds"]
-    if type(duration) not in (float, int) or not 0 < duration <= 600:
-        raise ValueError("Duración de ingesta inválida")
+    if not stamps or any(not 0 <= stamp < duration for stamp in stamps):
+        raise ValueError("Muestra fuera de la duración del original")
     images = []
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, "rb") as source:
@@ -451,27 +452,6 @@ def sample_images(receipt, *, ad=False, transcript=None, include_ends=False):
             raise ValueError("Identidad del original cambió")
         if hashlib.file_digest(source, "sha256").hexdigest() != job["sha256"]:
             raise ValueError("Huella del original cambió")
-        reel = receipt["order"].get("output_edit") == "reel"
-        fractions = (0.01, 0.25, 0.5, 0.75, 0.98) if reel else (0.15, 0.5, 0.85)
-        limit = 12000 if reel else MAX_JPEG
-        stamps = [round(duration * fraction, 5) for fraction in fractions]
-        if include_ends:
-            stamps = [0.0, *stamps, round(duration - min(0.12, duration * 0.08), 5)]
-            limit = 12000
-        if ad:
-            words = transcript["words"] if transcript else []
-            anchors = [
-                word["start"]
-                for word in words
-                if re.search(r"[.?!]$", word["word"]) and 0 <= word["start"] < duration
-            ]
-            targets = [duration * (i + 0.5) / 8 for i in range(8)]
-            step = duration / len(targets)
-            stamps = []
-            for target in targets:
-                nearby = [stamp for stamp in anchors if abs(stamp - target) < step / 2]
-                stamps.append(min(nearby, key=lambda stamp: abs(stamp - target), default=target))
-            limit = 7000
         for stamp in stamps:
             args = [
                 "/usr/bin/ffmpeg",
@@ -526,6 +506,34 @@ def sample_images(receipt, *, ad=False, transcript=None, include_ends=False):
         ):
             raise ValueError("El original cambió durante la inspección")
     return images
+
+
+def sample_images(receipt, *, ad=False, transcript=None, include_ends=False):
+    duration = receipt["duration_seconds"]
+    if type(duration) not in (float, int) or not 0 < duration <= 600:
+        raise ValueError("Duración de ingesta inválida")
+    reel = receipt["order"].get("output_edit") == "reel"
+    fractions = (0.01, 0.25, 0.5, 0.75, 0.98) if reel else (0.15, 0.5, 0.85)
+    limit = 12000 if reel else MAX_JPEG
+    stamps = [round(duration * fraction, 5) for fraction in fractions]
+    if include_ends:
+        stamps = [0.0, *stamps, round(duration - min(0.12, duration * 0.08), 5)]
+        limit = 12000
+    if ad:
+        words = transcript["words"] if transcript else []
+        anchors = [
+            word["start"]
+            for word in words
+            if re.search(r"[.?!]$", word["word"]) and 0 <= word["start"] < duration
+        ]
+        targets = [duration * (i + 0.5) / 8 for i in range(8)]
+        step = duration / len(targets)
+        stamps = []
+        for target in targets:
+            nearby = [stamp for stamp in anchors if abs(stamp - target) < step / 2]
+            stamps.append(min(nearby, key=lambda stamp: abs(stamp - target), default=target))
+        limit = 7000
+    return sample_frames(receipt, stamps, limit)
 
 
 def sample_source_batches(receipt, *, ad=False, transcripts=None):

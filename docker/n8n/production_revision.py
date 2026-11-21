@@ -314,6 +314,7 @@ def render_and_review(
             rendered,
             1,
             revision_id=identity,
+            objective=base["brief"]["objective"],
         )
     if (
         review.get("order_id") != claim["order_id"]
