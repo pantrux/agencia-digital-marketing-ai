@@ -589,6 +589,56 @@ def test_analisis_visual_multiple_rechaza_muestras_no_examinadas(handoff, order,
         )
 
 
+def test_escaleta_multiple_usa_todas_las_palabras_si_caben_en_el_contexto(
+    handoff, order, monkeypatch
+):
+    import production_valeria as director
+
+    first, second = order["media"]["asset_id"], str(uuid.uuid4())
+    batches = [{"source_id": asset, "images": [(2.0, b"muestra")]} for asset in (first, second)]
+    analyses = [
+        {
+            "source_id": asset,
+            "duracion_segundos": 24,
+            "resumen": "Plantas y maceteros",
+            "muestras": [{"segundo": 2, "descripcion": "Planta en primer plano"}],
+        }
+        for asset in (first, second)
+    ]
+    transcripts = {
+        asset: {
+            "words": [
+                {"start": i / 2, "end": (i + 1) / 2, "word": f"{label}{i}"} for i in range(40)
+            ]
+        }
+        for asset, label in ((first, "primera"), (second, "segunda"))
+    }
+    brief = {"objective": "Mostrar plantas", "audience": "Coleccionistas", "tone": "Cercano"}
+    request_id = str(uuid.uuid4())
+
+    def plan():
+        return director.multiple_plan_request(
+            [], brief, batches, analyses, request_id, transcripts=transcripts
+        )[0]
+
+    def facts(request):
+        message = request["message"]
+        return json.loads(message[message.index('{"objetivo"') :])["fuentes"]
+
+    complete = plan()
+    first_source, second_source = facts(complete)
+    assert first_source["transcripcion_completa"] and second_source["transcripcion_completa"]
+    assert first_source["palabras_con_tiempo"][-1] == [19.5, 20, "primera39"]
+    assert second_source["palabras_con_tiempo"][-1] == [19.5, 20, "segunda39"]
+
+    limit = len(director.visual_payload(complete)) - 500
+    monkeypatch.setattr(director, "MAX_VISUAL_BYTES", limit + 1000)
+    bounded = plan()
+    assert len(director.visual_payload(bounded)) <= limit
+    assert not all(source["transcripcion_completa"] for source in facts(bounded))
+    assert [source["id"] for source in facts(bounded)] == [first, second]
+
+
 def test_escaleta_multiple_entrega_rutas_y_subtitulos_de_cada_fuente(handoff, order):
     from production_valeria import ad_captions, make_edl
 
