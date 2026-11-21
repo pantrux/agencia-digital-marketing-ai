@@ -941,8 +941,11 @@ def multiple_plan_request(
         )
         + "Usa cada intervalo en palabras_con_tiempo para cortar sin partir frases. "
         "transcripcion_completa indica que se incluyen todas las palabras reconocidas en esa fuente. "
-        "Puedes proponer la escaleta a partir de estas evidencias. Elena verificará el montaje exportado. "
-        "Si faltan pruebas para un montaje responsable indica apto_sin_cambios=false. "
+        "apto_sin_cambios indica si la escaleta está lista para producir una vista previa. "
+        "Elena comprobará la continuidad, el encuadre y la mezcla sobre el video exportado. "
+        "Anota esas comprobaciones pendientes en observacion. "
+        "Usa apto_sin_cambios=false si la escaleta requiere material nuevo o si hay un defecto "
+        "concreto que los cortes y rótulos propuestos dejan sin resolver. "
     )
     if brief.get("ad_cta"):
         prompt += (
