@@ -10,6 +10,7 @@ import { storageFits, storageQuotaArguments } from "./storage-quota.js";
 const maxObjectBytes = 1024 ** 3;
 const partSize = 16 * 1024 ** 2;
 const maxParts = maxObjectBytes / partSize;
+const initialPartCount = 3;
 const sessionTtl = 86400;
 const operationLease = 600;
 const maxXmlBytes = 96 * 1024;
@@ -56,6 +57,7 @@ export interface IngestEnv {
 }
 
 export type MultipartObserver = (preparation: number, storage: number, confirmation: number, testAccount?: boolean) => void;
+export const initialPartsHeader = "X-Studio-Prefirmar-Partes";
 
 export function uploadsConfigured(env: IngestEnv): boolean {
   return /^[a-f0-9]{32}$/u.test(env.R2_ACCOUNT_ID)
@@ -131,7 +133,7 @@ function findUpload(db: SqlSession, mode: IngestEnv["BILLING_MODE"], owner: SqlO
     WHERE s.${by} = ? AND s.user_id = ${ownerId} AND COALESCE(o.provider_mode, 'production') = ?`, id, mode);
 }
 
-function uploadInfo(row: UploadRow, newlyOpened = false): Response {
+function uploadInfo(row: UploadRow, newlyOpened = false, initialParts?: Awaited<ReturnType<typeof signInitialParts>>): Response {
   if (!row.upload_id || (row.status !== "open" && row.status !== "completed")) {
     return fail(409, "SUBIDA_EN_TRANSICION");
   }
@@ -139,6 +141,7 @@ function uploadInfo(row: UploadRow, newlyOpened = false): Response {
     id: row.id, uploadId: row.upload_id, key: row.object_key, status: row.status,
     partSize, partCount: Math.ceil(row.bytes / partSize),
     ...(newlyOpened ? { newlyOpened: true } : {}),
+    ...(initialParts?.length ? { initialParts } : {}),
     ...(row.status === "completed" ? { etag: row.object_etag, hash_verified: true } : {}),
   });
 }
@@ -272,14 +275,31 @@ async function createUpload(
     try { await handle.abort(); } catch { /* La política nativa de R2 expira multipart huérfanos. */ }
     return fail(409, "SUBIDA_EN_TRANSICION");
   }
-  const reply = uploadInfo({ ...row, status: "open", upload_id: handle.uploadId }, true);
   observe?.(storageStarted - started, confirmationStarted - storageStarted, performance.now() - confirmationStarted,
     Boolean(caller && "email" in caller && caller.email.toLowerCase().endsWith(".invalid")));
-  return reply;
+  const initialParts = request.headers.get(initialPartsHeader) === "1"
+    ? await signInitialParts(env, job, handle.uploadId, content_type, row.expires_at) : undefined;
+  return uploadInfo({ ...row, status: "open", upload_id: handle.uploadId }, true, initialParts);
 }
 
 function credentials(env: IngestEnv) {
   return { accountId: env.R2_ACCOUNT_ID, accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY };
+}
+
+/** Permite comenzar el primer grupo de partes tras confirmar la apertura en D1. */
+export async function signInitialParts(env: IngestEnv, job: Readonly<SyncJob>, uploadId: string,
+  mimeType: string, expiresAt: number) {
+  const expires = Math.min(60, expiresAt - unix());
+  if (!uploadsConfigured(env) || expires < 1) return [];
+  const date = amzDate();
+  const auth = credentials(env);
+  const count = Math.min(initialPartCount, Math.ceil(job.bytes / partSize));
+  return Promise.all(Array.from({ length: count }, async (_, index) => ({
+    partNumber: index + 1,
+    ...await signR2UploadPart(job, { maxObjectBytes }, auth, date, {
+      uploadId, partNumber: index + 1, bytes: Math.min(partSize, job.bytes - index * partSize), mimeType, expires,
+    }),
+  })));
 }
 
 function xmlField(source: string, field: "IsTruncated" | "PartNumber" | "ETag" | "Size"): string | null {

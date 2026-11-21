@@ -1,7 +1,7 @@
-import { validateSyncJob } from "../../../src/media/sync-contract.js";
+import { validateSyncJob, type SyncJob } from "../../../src/media/sync-contract.js";
 import { signR2UploadPart } from "../../../src/media/r2-signing.js";
 import type { PortalIdentity, sessionLookup } from "./identity.js";
-import { listMultipartParts, requestedParts, uploadsConfigured, verifyDigest, type IngestEnv, type MultipartObserver } from "./ingest.js";
+import { listMultipartParts, requestedParts, signInitialParts, uploadsConfigured, verifyDigest, type IngestEnv, type MultipartObserver } from "./ingest.js";
 import { HttpError, ownerId, prepareOwnedStatement, readJson, response } from "./platform.js";
 import { storageFits, storageQuotaArguments } from "./storage-quota.js";
 
@@ -19,7 +19,7 @@ type SourceOwner = string | Awaited<ReturnType<typeof sessionLookup>>;
 
 /** Reserva y abre la carga de una fuente del pedido. */
 export async function createSourceUpload(env: IngestEnv, owner: SourceOwner, order: string, sourceId: string,
-  observe?: MultipartObserver): Promise<Response> {
+  observe?: MultipartObserver, preSign = false): Promise<Response> {
   const sourceJoins = `FROM production_sources source
     JOIN production_source_sets source_set ON source_set.order_id=source.order_id
     JOIN orders o ON o.id=source_set.order_id AND o.user_id=source_set.user_id
@@ -51,14 +51,15 @@ export async function createSourceUpload(env: IngestEnv, owner: SourceOwner, ord
   const contentType = mime[source.extension];
   if (!contentType) throw new HttpError(422, "MATERIAL_INVALIDO");
   const key = `ingest/${order}/${source.id}.${source.extension}`;
+  let job: Readonly<SyncJob>;
   try {
-    validateSyncJob({ job_id: order, asset_id: source.id, project_slug: source.project_slug,
+    job = validateSyncJob({ job_id: order, asset_id: source.id, project_slug: source.project_slug,
       extension: source.extension, bytes: source.bytes, sha256: source.sha256, object_key: key }, { maxObjectBytes: 1024 ** 3 });
   } catch { throw new HttpError(422, "MATERIAL_INVALIDO"); }
   const now = Math.floor(Date.now() / 1000);
-  const info = (value: UploadRow, newlyOpened = false) => response({ id: source.id, uploadId: value.upload_id,
+  const info = (value: UploadRow, newlyOpened = false, initialParts?: Awaited<ReturnType<typeof signInitialParts>>) => response({ id: source.id, uploadId: value.upload_id,
     key: value.object_key, status: value.status, partSize, partCount: Math.ceil(source.bytes / partSize),
-    ...(newlyOpened ? { newlyOpened: true } : {}) });
+    ...(newlyOpened ? { newlyOpened: true } : {}), ...(initialParts?.length ? { initialParts } : {}) });
   const reusable = (value: UploadRow): Response | undefined => {
     if (value.object_key !== key) throw new HttpError(409, "MATERIAL_EN_CONFLICTO");
     if (value.status === "completed" && value.upload_id && value.object_etag) return info(value);
@@ -144,7 +145,8 @@ export async function createSourceUpload(env: IngestEnv, owner: SourceOwner, ord
   }
   const testAccount = Boolean(caller && "email" in caller && caller.email.toLowerCase().endsWith(".invalid"));
   observe?.(storageStarted - started, confirmationStarted - storageStarted, performance.now() - confirmationStarted, testAccount);
-  return info({ ...row, status: "open", upload_id: upload.uploadId }, true);
+  const initialParts = preSign ? await signInitialParts(env, job, upload.uploadId, contentType, row.expires_at) : undefined;
+  return info({ ...row, status: "open", upload_id: upload.uploadId }, true, initialParts);
 }
 
 /** Firma únicamente una parte de una fuente abierta y perteneciente al titular. */

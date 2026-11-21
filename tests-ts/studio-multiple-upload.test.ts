@@ -22,7 +22,7 @@ describe("Carga de varios vídeos", () => {
     vi.stubGlobal("sessionStorage", { getItem: (key: string) => memory.get(key) ?? null,
       setItem: (key: string, value: string) => memory.set(key, value), removeItem: (key: string) => memory.delete(key) });
   });
-  it("reserva una orden y completa dos fuentes conservando sus identidades", async () => {
+  it.each([false, true])("reserva una orden y completa dos fuentes con firma anticipada %s", async (prefirmada) => {
     const paths: string[] = [], progress: number[] = [];
     const api = async <T>(path: string, init?: RequestInit): Promise<T> => {
       paths.push(path);
@@ -31,7 +31,11 @@ describe("Carga de varios vídeos", () => {
       else if (path.endsWith("/sources")) {
         const body = JSON.parse(String(init?.body)) as { sources: Entry[] };
         result = { assets: body.sources.map((entry, position) => ({ ...entry, id: ids[position], position })) };
-      } else if (path.endsWith("/upload")) result = { id: path.split("/").at(-2), status: "open", newlyOpened: true, partSize: 16 * 1024 ** 2, partCount: 1 };
+      } else if (path.endsWith("/upload")) {
+        expect(new Headers(init?.headers).get("X-Studio-Prefirmar-Partes")).toBe("1");
+        result = { id: path.split("/").at(-2), status: "open", newlyOpened: true, partSize: 16 * 1024 ** 2, partCount: 1,
+          ...(prefirmada ? { initialParts: [{ partNumber: 1, url: "https://fixture.invalid", headers: {} }] } : {}) };
+      }
       else if (path.endsWith("/sign")) result = { url: "https://fixture.invalid", headers: {} };
       else if (path.endsWith("/complete")) result = { status: "completed" };
       else throw new Error(path);
@@ -44,6 +48,7 @@ describe("Carga de varios vídeos", () => {
     expect(created).toHaveBeenCalledOnce();
     expect(paths.filter((path) => path === "/orders")).toHaveLength(1);
     expect(paths.filter((path) => path.endsWith("/complete"))).toHaveLength(2);
+    expect(paths.filter((path) => path.endsWith("/sign"))).toHaveLength(prefirmada ? 0 : 2);
     expect(paths.some((path) => path.includes(ids[0]!))).toBe(true);
     expect(paths.some((path) => path.includes(ids[1]!))).toBe(true);
     expect(progress.at(-1)).toBe(100);
