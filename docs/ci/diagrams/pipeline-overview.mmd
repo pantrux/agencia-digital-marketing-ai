@@ -55,6 +55,7 @@ flowchart TB
     CONVERSA --> MULTIQA["Verificar transcripción, montaje y aprobación de Elena en entorno aislado"]
     MULTIQA -. "Verificar arranque de la unidad y cola vacía" .-> REVISION["Revisiones de entrega con publicación inmutable"]
     FASE6 --> BANDQA["Montaje con banda: Elena compara el máster y el original en los mismos instantes"]
+    FASE6 --> SLOENTREGAS["Medir el p95 de entregas automáticas y contar las recuperadas por separado"]
     REVISION --> REVQA{"¿Elena aprobó el render?"}
     REVQA -->|"Sí"| VERSION["Publicar la versión aprobada y conservar la anterior"]
     REVQA -->|"No, con rondas disponibles"| ITERA["Valeria corrige con el dictamen y Lucas vuelve a renderizar"]

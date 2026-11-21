@@ -20,6 +20,7 @@ PROFILE = Path(__file__).resolve().with_name("profile.json")
 PROMETHEUS = "https://192.168.0.8:9090/api/v1/otlp/v1/metrics"
 METRICS = {
     "studio_delivery_30d_completed": "completados",
+    "studio_delivery_30d_completed_with_manual_review": "completados_con_intervencion_manual",
     "studio_delivery_30d_duration_verified": "completados_con_duracion_cotejada",
     "studio_delivery_30d_pending_overdue": "pendientes_con_demora",
     "studio_delivery_30d_manual_review": "revision_manual",

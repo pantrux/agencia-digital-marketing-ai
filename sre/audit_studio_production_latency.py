@@ -23,6 +23,8 @@ QUERY = """
            COALESCE(o.provider_mode,'production') AS provider_mode,
            lower(u.email) LIKE '%.invalid' AS reserved_test_domain,
            r.order_id IS NOT NULL AS manual_review,
+           EXISTS (SELECT 1 FROM production_manual_adjustments a
+                   WHERE a.order_id=o.id) AS manual_adjustment,
            k.id,k.created_at AS delivered_at,k.bytes,k.sha256,k.duration_ms
     FROM orders o JOIN production_briefs b ON b.order_id=o.id AND b.user_id=o.user_id
     JOIN users u ON u.id=o.user_id
@@ -101,6 +103,7 @@ def summarize(rows, now, duration_for):
     pending = 0
     overdue = 0
     manual = 0
+    completed_with_intervention = 0
     cancelled = 0
     for row in rows:
         start = row["confirmed_at"]
@@ -114,6 +117,8 @@ def summarize(rows, now, duration_for):
         if row["status"] != "completed":
             continue
         completed += 1
+        assisted = row["manual_review"] or row["manual_adjustment"]
+        completed_with_intervention += bool(assisted)
         delivered = row["delivered_at"]
         if delivered is None or not start <= delivered <= now:
             continue
@@ -121,13 +126,14 @@ def summarize(rows, now, duration_for):
         if duration is None:
             continue
         measurable += 1
-        if abs(duration - 60) <= 1 / 30:
+        if not assisted and abs(duration - 60) <= 1 / 30:
             elapsed.append(delivered - start)
             reserved = row["portal_started_at"]
             if type(reserved) is int and 0 <= reserved <= start:
                 from_reservation.append(delivered - reserved)
     return {
         "completados": completed,
+        "completados_con_intervencion_manual": completed_with_intervention,
         "completados_con_duracion_cotejada": measurable,
         "pendientes": pending,
         "pendientes_con_demora": overdue,
