@@ -9,6 +9,7 @@ import os
 import re
 import struct
 import subprocess
+import time
 import types
 from pathlib import Path
 
@@ -16,6 +17,7 @@ ROOT = Path("/volume2/agency-prometheus-private-v1/filter-operator-v1")
 PROFILE = ROOT / "firewall-recovery-profile.json"
 GRAFANA = ROOT / "nas_grafana_filter.py"
 GRAFANA_SHA = "d3bc0fa21227bd0610faa24ca07a887818a6dec8bc2697f4496fb9f1066d7432"
+DSM_FORWARD = ("-j", "DEFAULT_FORWARD")
 
 
 def require(condition, code):
@@ -50,7 +52,16 @@ def startup_target(repair, am, smtp, observed, approved):
                     all(not rule or rule[-1] != name for rule in node["rules"]),
                     "REFERENCIA_AJENA",
                 )
-            state[hook] = original[hook]
+            wanted = original[hook]
+            if key == "4:filter" and hook == "FORWARD":
+                prefix = [("-j", "PPPOE_FORWARD")]
+                guards = [*prefix, ("-j", name)]
+                if state[hook]["rules"] in ([*prefix, DSM_FORWARD], [*guards, DSM_FORWARD]):
+                    require(
+                        wanted["rules"] == guards and "DEFAULT_FORWARD" in state, "PERFIL_SALTO"
+                    )
+                    wanted = {**wanted, "rules": [*guards, DSM_FORWARD]}
+            state[hook] = wanted
             state[name] = original[name]
     state = rebased["4:nat"]
     original = repair.chains(approved["4:nat"])
@@ -119,13 +130,23 @@ def recovery_plan(repair, am, smtp, observed, expected, *, startup=False):
         )
 
         missing_hooks = []
+        preserve_dsm_forward = False
         for hook in repair.BUILTINS if table == "filter" else ():
             jump = ("-j", repair.owned_chain(hook))
             wanted = target[hook]
-            require(wanted["rules"][-1:] == [jump], "PERFIL_SALTO")
+            offset = int(family == "4" and hook == "FORWARD")
+            tail = wanted["rules"][offset + 1 :]
+            require(wanted["rules"][offset : offset + 1] == [jump], "PERFIL_SALTO")
+            if tail:
+                require(startup and offset == 1 and tail == [DSM_FORWARD], "PERFIL_SALTO")
+                preserve_dsm_forward = True
             if current[hook] != wanted:
                 require(
-                    current[hook] == {"policy": wanted["policy"], "rules": wanted["rules"][:-1]},
+                    current[hook]
+                    == {
+                        "policy": wanted["policy"],
+                        "rules": [*wanted["rules"][:offset], *tail],
+                    },
                     "TOPOLOGIA_DSM",
                 )
                 missing_hooks.append(hook)
@@ -174,6 +195,7 @@ def recovery_plan(repair, am, smtp, observed, expected, *, startup=False):
                     "before": before,
                     "after": state(),
                     "family": int(family),
+                    **({"preserve_dsm_forward": True} if preserve_dsm_forward else {}),
                 }
             )
         if nat_hook_missing:
@@ -225,11 +247,32 @@ def install_nat_hook(repair, before):
             lib.free(handle)
 
 
+def install_hooks_preserving_dsm(repair, before):
+    """Inserta el filtro aprobado antes del salto de Docker restituido por DSM."""
+    with repair.lock(Path("/run/xtables.lock")):
+        require(repair.hashes(repair.snapshot()) == before, "CAMBIO_CONCURRENTE")
+        lib = repair.library(4)
+        handle = lib.init(b"filter")
+        require(handle, "LIB_INIT")
+        try:
+            for hook in repair.BUILTINS:
+                name = repair.owned_chain(hook).encode()
+                require(lib.is_chain(name, handle), "LIB_CADENA")
+                jump = repair.jump_entry(4, name)
+                offset = int(hook == "FORWARD")
+                require(lib.insert_entry(hook.encode(), jump, offset, handle), "LIB_INSERCION")
+            require(lib.commit(handle), "LIB_COMMIT")
+        finally:
+            lib.free(handle)
+
+
 def apply(repair, steps, attest):
     for step in steps:
         require(repair.hashes(repair.snapshot()) == step["before"], "CAMBIO_CONCURRENTE")
         attest()
-        if step["action"] == "hooks":
+        if step.get("preserve_dsm_forward"):
+            install_hooks_preserving_dsm(repair, step["before"])
+        elif step["action"] == "hooks":
             family = step["family"]
             repair.hooks(family, True, step["before"], repair.library(family))
         elif step["action"] == "nat_hook":
@@ -239,6 +282,114 @@ def apply(repair, steps, attest):
             require(repair.hashes(repair.snapshot()) == step["before"], "CAMBIO_CONCURRENTE")
             restore(repair, step, test=False)
         require(repair.hashes(repair.snapshot()) == step["after"], "DERIVA_APLICACION")
+
+
+def stopped_prometheus(repair, am):
+    require(
+        os.geteuid() == os.getegid() == 0
+        and os.readlink("/proc/self/ns/net") == os.readlink("/proc/1/ns/net"),
+        "HOST_ABI",
+    )
+    repair.verified_file(repair.MULTI, repair.MULTI_SHA)
+    net = am.docker_inspect(repair, "network", repair.NET)
+    row = am.docker_inspect(repair, "container", repair.CID)
+    host, config, state = row["HostConfig"], row["Config"], row["State"]
+    name = "agency-prometheus-nas-bridge-v1"
+    require(
+        net["Id"] == repair.NET
+        and net["Name"] == name
+        and net["Driver"] == "bridge"
+        and net["Scope"] == "local"
+        and not net["Internal"]
+        and not net["EnableIPv6"]
+        and net["Labels"].get("agency.owner") == repair.OWNER
+        and net["Options"]
+        == {
+            "com.docker.network.bridge.enable_icc": "false",
+            "com.docker.network.bridge.enable_ip_masquerade": "false",
+            "com.docker.network.bridge.name": repair.BRIDGE,
+        }
+        and net["IPAM"]["Config"] == [{"Subnet": "172.31.254.0/29", "Gateway": "172.31.254.1"}]
+        and not net["Containers"],
+        "PROM_RED_IDENTIDAD",
+    )
+    require(
+        row["Id"] == repair.CID
+        and row["Name"] == "/" + name
+        and row["Image"] == repair.IMAGE
+        and config["Labels"].get("agency.owner") == repair.OWNER
+        and config["User"] == "61209:61209"
+        and not config.get("ExposedPorts")
+        and not host["PortBindings"]
+        and not host["PublishAllPorts"]
+        and not host["Privileged"]
+        and host["ReadonlyRootfs"]
+        and host["CapDrop"] == ["ALL"]
+        and not host["CapAdd"]
+        and "no-new-privileges:true" in host["SecurityOpt"]
+        and host["RestartPolicy"]["Name"] == "no"
+        and host["NetworkMode"] in (name, repair.NET)
+        and state["Status"] == "exited"
+        and state["Running"] is False
+        and state["Pid"] == 0
+        and state["ExitCode"] == 0
+        and not state["OOMKilled"]
+        and not state["Error"],
+        "PROM_CONTENEDOR_IDENTIDAD",
+    )
+    networks = row["NetworkSettings"]["Networks"]
+    require(set(networks) == {name}, "PROM_RED_CONTENEDOR")
+    endpoint = networks[name]
+    require(
+        endpoint["NetworkID"] in ("", repair.NET)
+        and endpoint["IPAMConfig"]["IPv4Address"] == repair.ADDRESS
+        and endpoint["IPAddress"] in ("", repair.ADDRESS)
+        and not endpoint["GlobalIPv6Address"],
+        "PROM_ENDPOINT_IDENTIDAD",
+    )
+    am.route(repair, repair.ADDRESS, repair.BRIDGE)
+    return {"cid": repair.CID, "pid": 0, "started_at": state["StartedAt"]}
+
+
+def start_containers(repair, identities, desired, inspect):
+    docker = (repair.DOCKER, "--host", "unix:///var/run/docker.sock")
+    started = []
+    try:
+        for service in reversed(identities[:2]):
+            require(repair.hashes(repair.snapshot()) == desired, "CAMBIO_CONCURRENTE")
+            cid = service["cid"]
+            started.append(cid)
+            require(
+                repair.command((*docker, "start", cid)).strip() == cid.encode("ascii"),
+                "ARRANQUE_IDENTIDAD",
+            )
+        deadline = time.monotonic() + 65
+        while time.monotonic() < deadline:
+            try:
+                running = inspect()
+                if running[1]["running"]:
+                    require(repair.hashes(repair.snapshot()) == desired, "DERIVA_POST_ARRANQUE")
+                    return
+            except ValueError as error:
+                if str(error) == "DERIVA_POST_ARRANQUE":
+                    raise
+            time.sleep(2)
+        raise ValueError("ARRANQUE_SALUD")
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        failed = False
+        for cid in reversed(started):
+            try:
+                subprocess.run(
+                    (*docker, "stop", "--time", "12", cid),
+                    capture_output=True,
+                    timeout=20,
+                    check=True,
+                )
+            except (OSError, subprocess.SubprocessError):
+                failed = True
+        if failed:
+            raise ValueError("PARADA_RECUPERACION") from error
+        raise
 
 
 def load_runtime(profile_sha):
@@ -295,10 +446,11 @@ def load_runtime(profile_sha):
     smtp = am_plan["smtp_ipv4"]
     live_am = am_plan["alertmanager"]
 
-    def inspect():
+    def inspect(*, stopped=False):
+        prometheus = stopped_prometheus(repair, am) if stopped else repair.host()
         return (
-            repair.host(),
-            am.alertmanager_host(repair, live_am["cid"], live_am["network"], smtp, stopped=False),
+            prometheus,
+            am.alertmanager_host(repair, live_am["cid"], live_am["network"], smtp, stopped=stopped),
             grafana.grafana_host(repair),
         )
 
@@ -307,28 +459,37 @@ def load_runtime(profile_sha):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("check", "recover"))
+    parser.add_argument("action", choices=("check", "recover", "plan-start", "start"))
     parser.add_argument("--profile-sha256", required=True)
     args = parser.parse_args()
     try:
         repair, am, smtp, target, inspect, startup = load_runtime(args.profile_sha256)
+        cold = args.action in ("plan-start", "start")
+        require(not cold or startup, "PERFIL_ARRANQUE_REQUERIDO")
         with repair.lock(repair.JOURNAL.parent / ".firewall-filter-reconcile.lock", os.O_CREAT):
-            identity = inspect()
+            identity = inspect(stopped=cold)
             observed = repair.snapshot()
             if startup:
                 target = startup_target(repair, am, smtp, observed, target)
             steps = recovery_plan(repair, am, smtp, observed, target, startup=startup)
 
             def attest():
-                require(inspect() == identity, "CONTENEDOR_CAMBIO")
+                require(inspect(stopped=cold) == identity, "CONTENEDOR_CAMBIO")
 
-            if args.action == "recover":
+            if args.action == "plan-start":
+                for step in steps:
+                    if step["action"] == "restore":
+                        restore(repair, step, test=True)
+                require(repair.snapshot() == observed, "CAMBIO_CONCURRENTE")
+            if args.action in ("recover", "start"):
                 apply(repair, steps, attest)
                 require(
                     repair.hashes(repair.snapshot()) == repair.hashes(target), "DERIVA_APLICACION"
                 )
             attest()
-        print(json.dumps({"success": args.action == "recover" or not steps, "steps": len(steps)}))
+            if args.action == "start":
+                start_containers(repair, identity, repair.hashes(target), inspect)
+        print(json.dumps({"success": args.action != "check" or not steps, "steps": len(steps)}))
         return int(args.action == "check" and bool(steps))
     except (
         OSError,
