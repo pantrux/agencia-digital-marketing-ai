@@ -1149,9 +1149,9 @@ def test_mateo_reintenta_sin_bloquear_las_ordenes_siguientes(monkeypatch, tmp_pa
     monkeypatch.setattr(mateo, "run_mateo", strategy)
     with pytest.raises(TimeoutError):
         mateo.main()
+    assert (output / f"{second}.json").is_file()
     now += 10
     mateo.main()
-    assert (output / f"{second}.json").is_file()
     now += 19
     mateo.main()
     assert attempts == [first, second]
@@ -2102,7 +2102,7 @@ def test_lucas_respeta_el_reintento_y_renderiza_otra_orden(monkeypatch, tmp_path
     monkeypatch.setattr(lucas, "JOURNAL", journal)
     monkeypatch.setattr(lucas, "VALERIA", direction)
     monkeypatch.setattr(lucas, "lookup", lambda *_: brief)
-    monkeypatch.setattr(lucas, "time", SimpleNamespace(time=lambda: clock))
+    monkeypatch.setattr(lucas, "time", SimpleNamespace(time=lambda: clock, monotonic=lambda: clock))
 
     def render(pending, _receipt, _edl, _token, _revision, target):
         if pending["order_id"] == blocked and fails:
@@ -2112,9 +2112,9 @@ def test_lucas_respeta_el_reintento_y_renderiza_otra_orden(monkeypatch, tmp_path
     monkeypatch.setattr(lucas, "run", render)
     with pytest.raises(TimeoutError):
         lucas.run_pending(profile, "b" * 64, "a" * 64, rendered)
+    assert (rendered / f"{ready}.json").is_file()
     clock += 55
     lucas.run_pending(profile, "b" * 64, "a" * 64, rendered)
-    assert (rendered / f"{ready}.json").is_file()
     clock += 5
     with pytest.raises(TimeoutError):
         lucas.run_pending(profile, "b" * 64, "a" * 64, rendered)
@@ -2125,6 +2125,72 @@ def test_lucas_respeta_el_reintento_y_renderiza_otra_orden(monkeypatch, tmp_path
     clock += 1
     lucas.run_pending(profile, "b" * 64, "a" * 64, rendered)
     assert (rendered / f"{blocked}.json").is_file()
+
+
+@pytest.mark.parametrize("agent", ["mateo", "lucas"])
+@pytest.mark.parametrize(("failure_seconds", "attempt_count"), [(0, 2), (15, 1)])
+def test_colas_acotan_intentos_durante_una_caida(
+    agent, failure_seconds, attempt_count, monkeypatch, tmp_path, order
+):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    stage = importlib.import_module(f"production_{agent}")
+    journal, previous, output = (tmp_path / name for name in ("ingesta", "previa", "salida"))
+    for directory in (journal, previous, output):
+        directory.mkdir()
+    identities = [str(uuid.UUID(int=index, version=4)) for index in range(1, 5)]
+    without_brief, *ready = identities
+    brief = {"objective": "Ensayo de caída compartida"}
+    direction = {
+        "brief_sha256": hashlib.sha256(stage.canonical(brief)).hexdigest(),
+        "escaleta": {"estado": "lista_para_stills"},
+    }
+    for identity in identities:
+        media = {
+            **order["media"],
+            "job_id": identity,
+            "project_slug": "job-" + identity.replace("-", ""),
+            "object_key": f"ingest/{identity}/{order['media']['asset_id']}.mp4",
+        }
+        name = f"{identity}.json"
+        (journal / name).write_bytes(
+            stage.canonical({"order": {**order, "order_id": identity, "media": media}})
+        )
+        (previous / name).write_bytes(stage.canonical(direction))
+
+    clock = 1000
+    attempted = []
+
+    def lookup(candidate, _token):
+        nonlocal clock
+        if candidate["order_id"] == without_brief:
+            clock += 20
+            return None
+        return brief
+
+    def fail(identity):
+        nonlocal clock
+        attempted.append(identity)
+        clock += failure_seconds
+        raise TimeoutError("Caída simulada")
+
+    monkeypatch.setattr(stage, "JOURNAL", journal)
+    monkeypatch.setattr(stage, "time", SimpleNamespace(time=lambda: clock, monotonic=lambda: clock))
+    monkeypatch.setattr(stage, "lookup", lookup)
+    profile = {"owner": order["user_id"], "fixture": ready[0]}
+    with pytest.raises(TimeoutError):
+        if agent == "mateo":
+            monkeypatch.setattr(stage, "SOFIA", previous)
+            monkeypatch.setattr(
+                stage, "run_mateo", lambda receipt, *_: fail(receipt["order"]["order_id"])
+            )
+            stage.process_pending(profile, "b" * 64, b"c" * 64, output)
+        else:
+            monkeypatch.setattr(stage, "VALERIA", previous)
+            monkeypatch.setattr(stage, "run", lambda candidate, *_: fail(candidate["order_id"]))
+            stage.run_pending(profile, "b" * 64, "a" * 64, output)
+    assert attempted == ready[:attempt_count]
+    with closing(sqlite3.connect(output / "reintentos" / f"{agent}.sqlite3")) as database:
+        assert database.execute("SELECT count(*) FROM retries").fetchone() == (attempt_count,)
 
 
 @pytest.mark.parametrize(

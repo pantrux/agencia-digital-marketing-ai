@@ -251,6 +251,7 @@ def process_pending(profile, token, key, output):
     state.mkdir(mode=0o700, exist_ok=True)
     if state.resolve(strict=True) != state:
         raise ValueError("Directorio de reintentos inválido")
+    deferred_error = None
     with closing(sqlite3.connect(state / "mateo.sqlite3")) as db:
         db.execute(
             """CREATE TABLE IF NOT EXISTS retries (
@@ -267,6 +268,7 @@ def process_pending(profile, token, key, output):
             ).fetchone()
             if previous and previous[1] > int(time.time()):
                 continue
+            started = time.monotonic()
             try:
                 receipt = json.loads(read_regular(path, INTAKE_LIMIT))
                 order = receipt["order"]
@@ -281,7 +283,7 @@ def process_pending(profile, token, key, output):
                     profile["owner"],
                     key,
                 )
-            except ORDER_ERRORS:
+            except ORDER_ERRORS as error:
                 failures = min(previous[0] + 1, 5) if previous else 1
                 due_at = int(time.time()) + min(30 * 2 ** (failures - 1), 300)
                 with db:
@@ -291,11 +293,17 @@ def process_pending(profile, token, key, output):
                         SET failures=excluded.failures, due_at=excluded.due_at""",
                         (path.stem, failures, due_at),
                     )
-                raise
+                # Un fallo temprano puede corresponder a esta orden. Da paso a una siguiente.
+                if deferred_error is not None or time.monotonic() - started >= 15:
+                    raise
+                deferred_error = error
+                continue
             if previous:
                 with db:
                     db.execute("DELETE FROM retries WHERE order_id=?", (path.stem,))
             break
+    if deferred_error is not None:
+        raise deferred_error
 
 
 def main():
