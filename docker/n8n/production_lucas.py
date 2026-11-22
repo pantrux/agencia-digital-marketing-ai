@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import time
 from contextlib import closing
+from os.path import lexists
 from pathlib import Path
 
 from production_elena import audit_preview
@@ -213,11 +214,17 @@ def run(order, receipt, edl, token, revision, target, *, revision_id=None):
         "brief_sha256": edl["brief_sha256"],
         "job_id": body["job_id"],
     }
+    render_receipt = target.with_suffix(".render.receipt")
+    result = None
     if reel:
-        preview = {**body, "job_id": body["job_id"] + "-preview", "resolution": "1080p"}
-        draft = submit_with_receipt(
-            "render", preview, token, target.with_suffix(".preview.receipt"), source=source
-        )
+        preview_receipt = target.with_suffix(".preview.receipt")
+        reuse_preview = resolution == "1080p" and not lexists(preview_receipt)
+        if reuse_preview:
+            preview = body
+            preview_receipt = render_receipt
+        else:
+            preview = {**body, "job_id": body["job_id"] + "-preview", "resolution": "1080p"}
+        draft = submit_with_receipt("render", preview, token, preview_receipt, source=source)
         asset = verify_mp4(draft, preview)
         report = target.with_suffix(".preview-review.receipt")
         verdict = audit_preview(order, edl, body["job_id"], asset, report)["dictamen"]["decision"]
@@ -230,6 +237,8 @@ def run(order, receipt, edl, token, revision, target, *, revision_id=None):
             return
         if verdict != "aprobado":
             raise ValueError("Estado de revisión previa inválido")
+        if reuse_preview:
+            result = draft
     stills = submit_with_receipt(
         "stills",
         {**body, "frames": frames},
@@ -238,13 +247,8 @@ def run(order, receipt, edl, token, revision, target, *, revision_id=None):
         source=source,
     )
     verify_stills(stills, body, frames)
-    result = submit_with_receipt(
-        "render",
-        body,
-        token,
-        target.with_name(target.stem + ".render.receipt"),
-        source=source,
-    )
+    if result is None:
+        result = submit_with_receipt("render", body, token, render_receipt, source=source)
     master = verify_mp4(result, body)
     direction = {"direction_sha256": hashlib.sha256(canonical(edl)).hexdigest()}
     publish(

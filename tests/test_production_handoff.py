@@ -348,8 +348,9 @@ def test_revision_releva_el_dictamen_de_una_vista_previa_verificada(
     review_dir = tmp_path / "review"
     review_dir.mkdir()
 
-    def preview_only(kind, body, *_, **__):
-        assert kind == "render" and body["job_id"] == f"{identity}-r-preview"
+    def preview_only(kind, body, _token, bridge_receipt, **_):
+        assert kind == "render" and body["job_id"] == f"{identity}-r"
+        assert bridge_receipt == render.with_suffix(".render.receipt")
         return {"sha256": "c" * 64, "path": "vista-previa.mp4"}
 
     receipt = render.with_suffix(".preview-review.receipt")
@@ -1983,12 +1984,25 @@ def test_lucas_exige_la_marca_del_plan_en_las_capturas(
     assert checked == [(file, {expected})]
 
 
-def test_vista_previa_rechazada_bloquea_el_master(monkeypatch, tmp_path, order):
+@pytest.mark.parametrize(
+    ("resolution", "decision", "old_preview", "interrupt_review"),
+    [
+        ("4k", "rechazado", False, False),
+        ("1080p", "rechazado", False, False),
+        ("1080p", "aprobado", False, False),
+        ("4k", "aprobado", False, False),
+        ("1080p", "aprobado", True, False),
+        ("1080p", "aprobado", False, True),
+    ],
+)
+def test_vista_previa_controla_el_master_del_reel(
+    monkeypatch, tmp_path, order, resolution, decision, old_preview, interrupt_review
+):
     monkeypatch.syspath_prepend(str(SCRIPTS))
     import production_lucas as lucas
 
     order["plan_id"] = "ilimitado"
-    order["output_resolution"] = "4k"
+    order["output_resolution"] = resolution
     order["output_edit"] = "reel"
     job = order["media"]
     root = f"proyectos/{job['project_slug']}"
@@ -2001,7 +2015,7 @@ def test_vista_previa_rechazada_bloquea_el_master(monkeypatch, tmp_path, order):
         "plan": "Ilimitado",
         "composition": "AgencyVertical",
         "format": "mp4",
-        "resolution": "4k",
+        "resolution": resolution,
         "props": {
             "video_path": raw,
             "audio_path": audio,
@@ -2027,41 +2041,85 @@ def test_vista_previa_rechazada_bloquea_el_master(monkeypatch, tmp_path, order):
         "brief_sha256": "a" * 64,
         "escaleta": {"estado": "lista_para_stills", "render": payload},
     }
-    preview = {
-        "path": f"{root}/06_renders/{payload['job_id']}-preview/render/master.mp4",
-        **fingerprint,
-    }
-    calls = []
+    original_job = payload["job_id"]
+    reuse = resolution == "1080p" and not old_preview
+    preview_job = original_job if reuse else original_job + "-preview"
 
-    def render(kind, body, *args, **kwargs):
+    def asset(stage, stem, filename):
+        return {"path": f"{root}/{stage}/{stem}/{filename}", **fingerprint}
+
+    preview = asset("06_renders", preview_job, "render/master.mp4")
+    master = asset("06_renders", original_job, "render/master.mp4")
+    calls, reviews = [], []
+
+    def render(kind, body, _token):
         calls.append((kind, body["resolution"], body["job_id"]))
-        assert body["job_id"].endswith("-preview")
+        width, height = lucas.RENDER_SIZES[body["resolution"]]
+        if kind == "stills":
+            assert reviews[-1] == "aprobado"
+            frames = body["frames"]
+            return {
+                "width": width,
+                "height": height,
+                "frames": frames,
+                "watermark": False,
+                "files": [
+                    asset("05_revision", original_job, f"stills/still-{f}.png") for f in frames
+                ],
+            }
+        if body["job_id"] == original_job and not reuse:
+            assert reviews[-1] == "aprobado"
         return {
             "codec": "h264_nvenc",
             "hardware_acceleration": True,
             "watermark": False,
             "audio_verified": True,
             "audio": {"integrated_lufs": -14, "true_peak_dbtp": -3},
-            "media": {"width": 1080, "height": 1920, "fps": 30, "duration_seconds": 34},
-            "files": [preview],
+            "media": {"width": width, "height": height, "fps": 30, "duration_seconds": 34},
+            "files": [asset("06_renders", body["job_id"], "render/master.mp4")],
         }
 
     def review(_order, _edl, _job, item, out):
         assert item == preview
-        content = {"dictamen": {"decision": "rechazado"}}
+        if interrupt_review and not reviews:
+            reviews.append("interrumpido")
+            raise TimeoutError("Se interrumpió la revisión de la vista previa")
+        reviews.append(decision)
+        content = {"dictamen": {"decision": decision}}
         out.write_text(json.dumps(content), encoding="utf-8")
         return content
 
+    def verify_file(item, paths):
+        assert item["path"] in paths
+
     monkeypatch.setattr(lucas, "fingerprint", lambda _: fingerprint)
-    monkeypatch.setattr(lucas, "verify_file", lambda item, paths: None)
-    monkeypatch.setattr(lucas, "submit_with_receipt", render)
+    monkeypatch.setattr(lucas, "verify_file", verify_file)
+    monkeypatch.setattr(lucas, "submit", render)
     monkeypatch.setattr(lucas, "audit_preview", review, raising=False)
     target = tmp_path / "orden.json"
+    if old_preview:
+        source = lucas.verified_inputs(order, receipt, payload["props"], direction["brief_sha256"])
+        request = {**payload, "job_id": preview_job, "resolution": "1080p"}
+        lucas.submit_with_receipt(
+            "render", request, "fixture", target.with_suffix(".preview.receipt"), source=source
+        )
+    if interrupt_review:
+        with pytest.raises(TimeoutError, match="vista previa"):
+            lucas.run(order, receipt, direction, "fixture", 1, target)
+        assert target.with_suffix(".render.receipt").is_file()
+        assert not target.exists()
     lucas.run(order, receipt, direction, "fixture", 1, target)
-    assert calls == [("render", "1080p", payload["job_id"] + "-preview")]
     record = json.loads(target.read_bytes())
     assert record["preview"] == preview
-    assert "master" not in record
+    expected = [("render", "1080p", preview_job)]
+    if decision == "aprobado":
+        expected.append(("stills", resolution, original_job))
+        if not reuse:
+            expected.append(("render", resolution, original_job))
+        assert record["master"] == master
+    else:
+        assert "master" not in record
+    assert calls == expected
 
 
 def test_lucas_verifica_todas_las_fuentes_y_elena_puede_rechazar(monkeypatch, tmp_path, order):
