@@ -115,21 +115,30 @@ def test_scheduled_reuses_only_verified_complete_day(tmp_path, monkeypatch, stat
     monkeypatch.setattr(daily, "datetime", SimpleNamespace(now=lambda _: now))
     monkeypatch.setattr(daily, "ZoneInfo", lambda _: timezone(timedelta(hours=-3)))
     monkeypatch.setattr(daily, "daily_lock", lambda _: nullcontext())
+    monkeypatch.setattr(daily, "trusted_install_dir", lambda _: None)
+    monkeypatch.setattr(
+        daily, "preflight", lambda *_: pytest.fail("Una consulta de recibos es local")
+    )
+    checked = []
+    monkeypatch.setattr(daily, "verified_pin", lambda *args: checked.append(args))
 
     def observe_day(day, current_roots, zone, observed):
         assert str(day) == "2026-11-13" and current_roots == roots and observed == now
+        assert checked == [(daily.RUNTIME / daily.COVERAGE_SCRIPT, daily.COVERAGE_SHA256)]
         return {"status": status, "run_id": run_id}
-
-    def invoke(*_):
-        pytest.fail("Una corrida existente no debe capturar ni enviar datos")
 
     monkeypatch.setattr(coverage, "observe_day", observe_day)
     if status == "complete":
-        result = daily.run_daily({"roots": roots}, run_id, invoke, scheduled=True)
+        result = daily.run_daily({"roots": roots}, run_id, scheduled=True)
         assert result["action"] == "ya-confirmado" and result["backup_set_complete"]
     else:
         with pytest.raises(ValueError, match="CORRIDA_DIARIA_POR_RECONCILIAR"):
-            daily.run_daily({"roots": roots}, run_id, invoke, scheduled=True)
+            daily.run_daily({"roots": roots}, run_id, scheduled=True)
+
+
+def test_coverage_verifier_hash_matches_repository():
+    source = (daily.RUNTIME / daily.COVERAGE_SCRIPT).read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(source).hexdigest() == daily.COVERAGE_SHA256
 
 
 @pytest.mark.parametrize("failure,waits", [("CORRIDA_EN_CURSO", [15, 45]), ("DESTINO_FALLO", [])])

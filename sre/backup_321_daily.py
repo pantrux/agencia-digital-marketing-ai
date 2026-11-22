@@ -43,6 +43,8 @@ PINS = {script for script, _, _ in TASKS.values()} | {
     "sre-backup-321.sh",
 }
 RETENTION_SCRIPT = "backup_321_daily_retention.py"
+COVERAGE_SCRIPT = "backup_321_audit_daily_coverage.py"
+COVERAGE_SHA256 = "88c872f89f544e4f87d852d3dd6fa625a52e7a615cf526de511b31106905f37e"
 RETENTION_PINS = {
     RETENTION_SCRIPT: "7bec2fc7dc0344685e4b432c5dbf694b92a6bc0c2e955c8307521e3398eec8d8",
     "backup_321_retention.py": "cfcb6be1311b874f632409ba43fdbd3a8667c61468d9827b93a1cdddaecbb956",
@@ -139,6 +141,7 @@ def trusted_install_dir(path):
 
 def verified_runtime(profile):
     trusted_install_dir(RUNTIME)
+    verified_pin(RUNTIME / COVERAGE_SCRIPT, COVERAGE_SHA256)
     fields(profile["pins"], PINS, "PERFIL_PINES")
     for basename, digest in profile["pins"].items():
         verified_pin(RUNTIME / basename, digest)
@@ -403,6 +406,8 @@ def verify_openclaw(path, row, started):
 
 
 def verified_daily_result(roots, run_id, now):
+    trusted_install_dir(RUNTIME)
+    verified_pin(RUNTIME / COVERAGE_SCRIPT, COVERAGE_SHA256)
     if __package__:
         from . import backup_321_audit_daily_coverage as coverage
     else:
@@ -433,7 +438,7 @@ def deliver_with_lock_retry(invoke, request):
     return invoke("run", request)
 
 
-def run_daily(profile, run_id, invoke, *, scheduled=False):
+def run_daily(profile, run_id, invoke=None, *, scheduled=False):
     roots = {name: Path(path) for name, path in profile["roots"].items()}
     day = roots["daily"] / run_id
     with daily_lock(roots["daily"]):
@@ -449,6 +454,15 @@ def run_daily(profile, run_id, invoke, *, scheduled=False):
             not any(os.path.lexists(path / run_id) for path in roots.values()),
             "CORRIDA_DIARIA_EXISTENTE",
         )
+        if invoke is None:
+            vendor, credentials = preflight(profile)
+            invoke = runner(profile, vendor, credentials)
+            started = datetime.now(UTC)
+            if scheduled:
+                origin = scheduled_origin(started)
+                core.require(
+                    daily_id(started) == run_id and origin is not None, "CORRIDA_FUERA_DE_VENTANA"
+                )
         day.mkdir(mode=0o700)
         sync_directory(day.parent)
         result = {
@@ -626,8 +640,8 @@ def main():
             result = {"run_id": run_id, "success": True, "action": "pendiente-de-horario"}
         else:
             profile, digest = load_profile(args.profile, args.profile_pin)
-            vendor, credentials = preflight(profile)
             if args.check:
+                preflight(profile)
                 result = {
                     "success": True,
                     "action": "check",
@@ -639,9 +653,7 @@ def main():
                         verified_pin(RUNTIME / basename, expected)
                     result["retention_mode"] = args.retention
             else:
-                result = run_daily(
-                    profile, run_id, runner(profile, vendor, credentials), scheduled=args.scheduled
-                )
+                result = run_daily(profile, run_id, scheduled=args.scheduled)
                 if (
                     result["success"]
                     and result["backup_set_complete"]
