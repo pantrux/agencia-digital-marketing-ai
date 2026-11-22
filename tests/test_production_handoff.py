@@ -891,6 +891,10 @@ def test_escaleta_multiple_usa_todas_las_palabras_si_caben_en_el_contexto(
         return json.loads(message[message.index('{"objetivo"') :])["fuentes"]
 
     complete = plan()
+    assert "duración mínima de 0,5 s" in complete["message"]
+    assert "el rótulo ha de durar entre 0,5 y 6 s" in complete["message"]
+    assert "hasta menor o igual a la duración de su fuente" in complete["message"]
+    assert "apto_sin_cambios es un booleano" in complete["message"]
     first_source, second_source = facts(complete)
     assert first_source["transcripcion_completa"] and second_source["transcripcion_completa"]
     assert first_source["palabras_con_tiempo"][-1] == [19.5, 20, "primera39"]
