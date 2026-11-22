@@ -15,6 +15,7 @@ from pathlib import Path
 
 from production_elena import audit_preview
 from production_handoff import (
+    DIRECTION_LIMIT,
     RENDER_SIZES,
     canonical,
     eligible,
@@ -283,7 +284,7 @@ def render_pending(path, target, version, profile, token, dispatch):
         or not (brief := lookup(order, dispatch))
     ):
         return False
-    edl = json.loads(read_regular(path, LIMIT))
+    edl = json.loads(read_regular(path, DIRECTION_LIMIT))
     if edl["escaleta"]["estado"] != "lista_para_stills":
         return False
     if edl["brief_sha256"] != hashlib.sha256(canonical(brief)).hexdigest():
@@ -373,7 +374,7 @@ def main():
     receipt = json.loads(read_regular(JOURNAL / source, INTAKE_LIMIT))
     order = receipt["order"]
     validate(order, fixture)
-    edl = json.loads(read_regular(VALERIA / source, LIMIT))
+    edl = json.loads(read_regular(VALERIA / source, DIRECTION_LIMIT))
     run(order, receipt, edl, token, args.revision, target)
 
 

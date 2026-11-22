@@ -303,6 +303,16 @@ los recibos del audio inicial y de los materiales adicionales. Con recibos
 válidos de Sofía, la lectura debe devolver las marcas de tiempo sin abrir
 otra sesión del inspector ni volver a transcribir el audio.
 
+Para publicar reels de duración variable, activa primero el puente GPU y
+los lectores de escaletas de OpenClaw. Espera a que finalicen las órdenes
+activas antes de reiniciar servicios y coteja las huellas de las fuentes.
+Después publica el portal y confirma desde el selector la carga de clips
+de 22 y 55 segundos. Verifica que el render y la entrega conserven los
+fotogramas de la escaleta y que el anuncio programe el CTA sobre el cierre
+real. Para escaletas voluminosas, comprueba tanto la lectura del recibo
+como la solicitud autenticada a `/render` y `/stills`. Ante un fallo,
+restaura las fuentes y el despliegue del portal acreditados antes del cambio.
+
 Para verificar la recuperación de la copia diaria de D1, prueba el arranque
 de una VM después de la ventana de las 03:00. Coteja el origen del recibo
 con su fecha real y confirma que un segundo disparo no duplica el snapshot.

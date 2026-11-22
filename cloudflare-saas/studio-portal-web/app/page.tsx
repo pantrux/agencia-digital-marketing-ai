@@ -81,7 +81,6 @@ function message(error: unknown): string {
     ARCHIVO_INVALIDO: "Selecciona un vídeo MP4, MOV o WebM de hasta 1 GiB.",
     ARCHIVOS_INVALIDOS: "Selecciona entre 2 y 32 vídeos para el montaje.",
     VIDEO_SUPERA_DURACION: "El vídeo supera los 10 minutos. Recórtalo antes de subirlo.",
-    VIDEO_CORTO_PARA_REEL: "Los vídeos deben sumar al menos 30 segundos para crear un reel.",
     VIDEO_NO_VERIFICABLE: "Tu navegador no pudo leer el vídeo. Prueba con un MP4 en H.264.",
     SUBIDA_NO_DISPONIBLE: "La carga de vídeos aún está en preparación.",
     PAGO_NO_DISPONIBLE: "La activación de planes pagados todavía está en preparación.",
@@ -230,7 +229,7 @@ function ConfirmBrief({ order, suggestion }: { order: string; suggestion: {id:st
             </select>
             {needsChannel && <p role="status">Selecciona uno de los perfiles ingresados para el CTA.</p>}
           </fieldset>
-          <label htmlFor="brief-ad-cta">Llamada a la acción para anuncio de 30 segundos (opcional)</label>
+          <label htmlFor="brief-ad-cta">Llamada a la acción para el anuncio (opcional)</label>
           <input id="brief-ad-cta" maxLength={70} value={draft.ad_cta ?? ""} disabled={pending}
             placeholder={channel ? cta : "Escríbenos para conocer más"}
             onChange={(event) => setDraft({ ...draft, ad_cta: event.currentTarget.value })} />
@@ -912,8 +911,9 @@ export default function Home() {
                 <select id="output-edit" value={edit} disabled={busy}
                   onChange={(event) => setEdit(event.currentTarget.value === "reel" ? "reel" : "full")}>
                   <option value="full">Montaje de hasta 10 minutos</option>
-                  <option value="reel">Reel por escenas · 30–45 segundos</option>
+                  <option value="reel">Reel por escenas</option>
                 </select>
+                {edit === "reel" && <p>La duración se adapta al material. Puedes indicarla en el objetivo del brief.</p>}
               </div>
               {plan.max_resolution === "4k" && <div className="production-choice">
                 <label htmlFor="output-resolution">Resolución de entrega</label>

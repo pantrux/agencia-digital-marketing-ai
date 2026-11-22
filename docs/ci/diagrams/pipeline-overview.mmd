@@ -72,6 +72,8 @@ flowchart TB
     MULTIQA --> ESCMULTI["Cotejar los límites de escenas y rótulos del encargo de Valeria con su validador"]
     ESCMULTI --> FORMATO["El diario identifica el motivo del fallo de formato"]
     ESCMULTI --> ANCLAJE["El inicio o cierre del corte determina los fotogramas del rótulo anclado"]
+    ESCMULTI --> REELVARIABLE["Cotejar duración del brief, escaleta, render y ubicación real del CTA"]
+    REELVARIABLE --> CUERPORENDER["Verificar lectores de escaletas y solicitudes autenticadas del renderer antes de publicar el portal"]
     MULTIQA --> LOTESQA["Elena revisa todas las muestras en lotes a 480 px y consolida el dictamen"]
     LOTESQA --> TIEMPOSQA["Cotejar los intervalos del rótulo en segundos desde el inicio del máster"]
     MULTIQA -. "Verificar arranque de la unidad y cola vacía" .-> REVISION["Revisiones de entrega con publicación inmutable"]

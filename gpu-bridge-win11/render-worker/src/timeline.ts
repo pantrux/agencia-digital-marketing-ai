@@ -1,11 +1,12 @@
-import {AD_ENDCARD_FRAME, AD_FRAMES, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, SOCIAL_ENTRANCE_FRAMES, SOCIAL_FADE_FRAME, type EditScene, type SceneLabel, type ScriptedAd} from './contracts.ts';
+import {adTiming, LABEL_ENTRANCE_FRAMES, type EditScene, type SceneLabel, type ScriptedAd} from './contracts.ts';
 
 export function sceneLength(scene: EditScene): number {
   return scene.source_end_frame - scene.source_start_frame;
 }
 
-export function socialFadeProgress(frame: number): number {
-  return Math.max(0, Math.min(1, (frame - SOCIAL_FADE_FRAME) / (AD_FRAMES - 1 - SOCIAL_FADE_FRAME)));
+export function socialFadeProgress(frame: number, duration: number): number {
+  const {fadeStart} = adTiming(duration);
+  return Math.max(0, Math.min(1, (frame - fadeStart) / Math.max(1, duration - 1 - fadeStart)));
 }
 
 export function graphicFrames(scenes: readonly EditScene[], ad?: ScriptedAd): number[] {
@@ -24,10 +25,11 @@ export function graphicFrames(scenes: readonly EditScene[], ad?: ScriptedAd): nu
     origin += sceneLength(scene);
   }
   if (ad) {
-    changes.add(ad.destination ? SOCIAL_ENDCARD_FRAME : AD_ENDCARD_FRAME);
+    const {voiceEnd, socialStart, entranceFrames, fadeStart} = adTiming(origin);
+    changes.add(ad.destination ? socialStart : voiceEnd);
     if (ad.destination) {
-      addRange(SOCIAL_ENDCARD_FRAME, SOCIAL_ENDCARD_FRAME + SOCIAL_ENTRANCE_FRAMES + 1);
-      addRange(SOCIAL_FADE_FRAME, AD_FRAMES);
+      addRange(socialStart, socialStart + entranceFrames + 1);
+      addRange(fadeStart, origin);
     }
     for (const cue of ad.captions) {
       changes.add(cue.start_frame);

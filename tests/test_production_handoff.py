@@ -831,8 +831,8 @@ def test_escaleta_multiple_conserva_identidad_y_tiempos_de_cada_fuente(handoff, 
         )
     longer = [{**items[0], "hasta": 30}, {**items[1], "desde": 0, "hasta": 80}]
     assert multi_reel_scenes(longer, sources, long_form=True)[1] == 3300
-    with pytest.raises(VisualResponseFormatError, match="duración válida"):
-        multi_reel_scenes(longer, sources)
+    assert multi_reel_scenes(longer, sources)[1] == 3300
+    assert multi_reel_scenes([items[0], {**items[1], "hasta": 27}], sources, ad=True)[1] == 660
     with pytest.raises(VisualResponseFormatError, match="anuncio"):
         multi_reel_scenes(longer, sources, ad=True, long_form=True)
 
@@ -973,10 +973,10 @@ def test_escaleta_multiple_usa_todas_las_palabras_si_caben_en_el_contexto(
         return json.loads(message[message.index('{"objetivo"') :])["fuentes"]
 
     complete = plan()
-    assert "duración mínima de 0,5 s" in complete["message"]
+    assert "Respeta la duración indicada en el objetivo" in complete["message"]
     assert "anclaje inicio o cierre" in complete["message"]
     assert "duracion opcional entre 0,5 y 6 s" in complete["message"]
-    assert "hasta menor o igual a la duración de su fuente" in complete["message"]
+    assert "menor o igual a la duración de su fuente" in complete["message"]
     assert "apto_sin_cambios es un booleano" in complete["message"]
     first_source, second_source = facts(complete)
     assert first_source["transcripcion_completa"] and second_source["transcripcion_completa"]
@@ -1450,7 +1450,14 @@ def test_valeria_convierte_escenas_a_fotogramas_y_acota_los_rotulos(monkeypatch,
         },
         {"source_start_frame": 660, "source_end_frame": 1320},
     ]
-    for bad in ({"desde": 11, "hasta": 35}, {"desde": 60, "hasta": 82}, {"desde": 20, "hasta": 22}):
+    short = {**answer, "escenas": [{**answer["escenas"][0], "hasta": 22}]}
+    assert (
+        make_edl({**receipt, "duration_seconds": 22}, angles, short)["render"]["props"][
+            "duration_seconds"
+        ]
+        == 22
+    )
+    for bad in ({"desde": 11, "hasta": 35}, {"desde": 60, "hasta": 82}, {"desde": 22, "hasta": 22}):
         with pytest.raises(ValueError):
             make_edl(receipt, angles, {**answer, "escenas": [answer["escenas"][0], bad]})
 
@@ -4369,7 +4376,7 @@ def test_subtitulos_anuncio_conservan_frases_y_posesivos(handoff):
         {"word": "Son", "start": 3.05, "end": 3.4},
         {"word": "artesanales.", "start": 3.4, "end": 4},
     ]
-    cues = ad_captions([{"source_start_frame": 0, "source_end_frame": 135}], words)
+    cues = ad_captions([{"source_start_frame": 0, "source_end_frame": 240}], words)
     assert [cue["text"] for cue in cues] == [
         "Algunos maceteros los hace",
         "mi marido.",

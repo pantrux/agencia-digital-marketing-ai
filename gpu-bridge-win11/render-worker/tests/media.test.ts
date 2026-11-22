@@ -100,7 +100,7 @@ test('une video real de fuentes con geometrías distintas en el orden elegido', 
   } finally { rmSync(dir, {recursive:true, force:true}); }
 });
 
-test('procesa más de doce escenas de varias fuentes en audio y video', {skip: spawnSync('ffmpeg', ['-version']).status !== 0}, () => {
+test('procesa más de doce escenas, incluidas tomas breves, de varias fuentes en audio y video', {skip: spawnSync('ffmpeg', ['-version']).status !== 0}, () => {
   const dir = mkdtempSync(join(tmpdir(), 'studio-escenas-largas-'));
   try {
     const video = join(dir, 'source.mkv'), audio = join(dir, 'source.wav');
@@ -108,7 +108,7 @@ test('procesa más de doce escenas de varias fuentes en audio y video', {skip: s
     assert.equal(picture.status, 0, picture.stderr.toString());
     const sound = spawnSync('ffmpeg', ['-v','error','-f','lavfi','-i','sine=frequency=400:sample_rate=48000:duration=1',audio]);
     assert.equal(sound.status, 0, sound.stderr.toString());
-    const scenes = Array.from({length: 13}, (_, i) => ({source_id: i % 2 ? 'a' : 'b', source_start_frame: 0, source_end_frame: 15}));
+    const scenes = Array.from({length: 13}, (_, i) => ({source_id: i % 2 ? 'a' : 'b', source_start_frame: 0, source_end_frame: i === 0 ? 9 : 15}));
     const montage = multiSourceVideoInputs(new Map([['a',video], ['b',video]]), scenes, 32, 32);
     const rendered = spawnSync('ffmpeg', ['-v','error','-filter_complex_threads','1',...montage.videoInputs,
       '-filter_complex',montage.cuts.join(';'),'-map','[montaje]','-f','null','-']);

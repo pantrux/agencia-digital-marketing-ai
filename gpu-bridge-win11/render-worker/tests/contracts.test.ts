@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {AD_MUSIC_ID, outputDimensions, parseInspect, parseRender, parseStills, WorkerError} from '../src/contracts.ts';
 import {renderHyperframes} from '../src/hyperframes.ts';
+import {hyperframesHtml} from '../src/hyperframes-html.ts';
 import {compositionInput} from '../src/remotion.ts';
 import {graphicFrames, socialFadeProgress} from '../src/timeline.ts';
 
@@ -38,6 +39,17 @@ test('un reel conserva cortes y rótulos con extremos exclusivos en fotogramas',
   assert.throws(() => parseRender({...request(), props: {...props, scenes: [
     {...scenes[0], label: {...scenes[0]!.label, end_frame: 361}}, scenes[1],
   ]}}), WorkerError);
+});
+
+test('un reel corto o largo puede usar un solo tramo y conservar su duración', () => {
+  for (const duration_seconds of [22, 55]) {
+    const frames = duration_seconds * 30;
+    const reel = parseRender({...request(), props: {...request().props, duration_seconds,
+      video_path:'proyectos/sansevieras/01_raw/crudo.mp4', scenes:[{
+        source_start_frame:0, source_end_frame:frames, label:{text:'Inicio',start_frame:0,end_frame:60,position:'top'},
+      }]}});
+    assert.equal(reel.durationInFrames, frames);
+  }
 });
 
 test('un montaje múltiple acredita fuente y ruta de cada escena', () => {
@@ -183,12 +195,24 @@ test('el CTA social conserva sólo el destino elegido y agenda cada fotograma an
     scenes:[{...scenes[0],audio_source_start_frame:17999},scenes[1]]}}),WorkerError);
   const frames = graphicFrames(value.props.scenes!,value.props.ad);
   assert.ok(frames.includes(1) && frames.includes(751) && frames.includes(899));
-  assert.equal(socialFadeProgress(863),0);
-  assert.ok(socialFadeProgress(882) > 0 && socialFadeProgress(882) < 1);
-  assert.equal(socialFadeProgress(899),1);
+  assert.equal(socialFadeProgress(863,900),0);
+  assert.ok(socialFadeProgress(882,900) > 0 && socialFadeProgress(882,900) < 1);
+  assert.equal(socialFadeProgress(899,900),1);
   for (const bad of ['https://instagram.com/rinconsansevieras','https://www.facebook.com.ejemplo.invalid/perfil','https://www.facebook.com/perfil?track=1']) {
     assert.throws(() => parseRender({...request(),props:{...props,ad:{...ad,destination:{...destination,url:bad}}}}),WorkerError);
   }
+});
+
+test('HyperFrames ajusta los subtítulos, el CTA y el fundido al anuncio de 22 segundos', () => {
+  const props = {...request().props, duration_seconds:22, video_path:'proyectos/sansevieras/01_raw/crudo.mp4',
+    scenes:[{source_start_frame:0,source_end_frame:660,label:{text:'Gancho',start_frame:0,end_frame:90,position:'top'}}],
+    ad:{engine:'hyperframes',cta:'Escríbenos',brand:'Vivero',captions:[{start_frame:450,end_frame:540,text:'Una hoja'}]}};
+  const value = parseRender({...request(),props});
+  const html = hyperframesHtml(value, true);
+  assert.match(html, /data-duration="22" data-fps="30"/u);
+  assert.match(html, /data-start="17" data-duration="5" data-track-index="4"/u);
+  assert.equal(socialFadeProgress(659,660),1);
+  assert.throws(() => parseRender({...request(),props:{...props,ad:{...props.ad,captions:[{start_frame:450,end_frame:541,text:'Fuera'}]}}}),WorkerError);
 });
 
 test('publica las capturas de HyperFrames con los nombres que verifica Lucas', async () => {

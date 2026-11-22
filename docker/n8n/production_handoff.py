@@ -22,6 +22,8 @@ from production_inbox import (
 
 DOMAIN = b"studio-production-handoff-v1\n"
 MAX_ENVELOPE = MAX_BODY + 256
+# Admite los subtítulos del segmento completo y los metadatos de la escaleta.
+DIRECTION_LIMIT = 1120 * 1024
 SPOOL = Path("/mnt/producciones/.agency-production-handoff")
 SOURCE = Path("/var/lib/agency-production-inbox/inbox.sqlite3")
 RENDER_PLANS = {"free": "Free", "pro": "Pro", "ultra": "Ultra", "ilimitado": "Ilimitado"}

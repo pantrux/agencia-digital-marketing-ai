@@ -1,6 +1,6 @@
 import React, {useLayoutEffect, useRef} from 'react';
 import {AbsoluteFill, Easing, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {AD_ENDCARD_FRAME, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, TITLE_BAND_BACKGROUND, TITLE_BAND_HEIGHT, TITLE_FADE_FRAMES, TITLE_PANEL_FRACTION, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
+import {adTiming, LABEL_ENTRANCE_FRAMES, TITLE_BAND_BACKGROUND, TITLE_BAND_HEIGHT, TITLE_FADE_FRAMES, TITLE_PANEL_FRACTION, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
 import {graphicLabelTiming, sceneLength, socialFadeProgress} from '../src/timeline.ts';
 import {SocialEndcard} from './SocialEndcard.tsx';
 
@@ -56,13 +56,15 @@ function cutVideo(file: string, scenes: EditScene[]) {
 
 export const Reel: React.FC<ReelProps> = (props) => {
   const frame = useCurrentFrame();
-  const scale = useVideoConfig().width / 1080;
+  const {width, durationInFrames} = useVideoConfig();
+  const scale = width / 1080;
   const opacity = interpolate(frame, [0, TITLE_FADE_FRAMES], [0, 1], {extrapolateRight: 'clamp'});
   const band = props.title_layout === 'band';
   const social = props.ad?.destination;
   // Las capturas con crudo comparten el fundido del MP4. La capa sola se combina en FFmpeg.
-  const previewFade = social && props.video_file && !props.transparent ? socialFadeProgress(frame) : 0;
-  const endCard = props.ad && frame >= (social ? SOCIAL_ENDCARD_FRAME : AD_ENDCARD_FRAME);
+  const previewFade = social && props.video_file && !props.transparent ? socialFadeProgress(frame, durationInFrames) : 0;
+  const {voiceEnd, socialStart} = adTiming(durationInFrames);
+  const endCard = props.ad && frame >= (social ? socialStart : voiceEnd);
   const caption = props.ad?.captions.find(cue => cue.start_frame <= frame && frame < cue.end_frame);
   const activeLabel = !endCard && props.scenes ? graphicLabelTiming(props.scenes, frame) : undefined;
   const label = activeLabel?.label;

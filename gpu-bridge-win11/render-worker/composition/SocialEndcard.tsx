@@ -1,6 +1,6 @@
 import React from 'react';
-import {Easing, interpolate} from 'remotion';
-import {SOCIAL_ENDCARD_FRAME, SOCIAL_ENTRANCE_FRAMES, type AdDestination} from '../src/contracts.ts';
+import {Easing, interpolate, useVideoConfig} from 'remotion';
+import {adTiming, type AdDestination} from '../src/contracts.ts';
 import {socialFadeProgress} from '../src/timeline.ts';
 
 import {socialIcons} from '../src/social-icons.ts';
@@ -9,9 +9,11 @@ const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 export function SocialEndcard({destination, brand, cta, frame}: {
   destination: AdDestination; brand: string; cta: string; frame: number;
 }) {
-  const reveal = interpolate(frame, [SOCIAL_ENDCARD_FRAME, SOCIAL_ENDCARD_FRAME + SOCIAL_ENTRANCE_FRAMES], [0, 1],
+  const {durationInFrames} = useVideoConfig();
+  const {socialStart, entranceFrames} = adTiming(durationInFrames);
+  const reveal = interpolate(frame, [socialStart, socialStart + entranceFrames], [0, 1],
     {...clamp, easing: Easing.out(Easing.cubic)});
-  const fade = 1 - socialFadeProgress(frame);
+  const fade = 1 - socialFadeProgress(frame, durationInFrames);
   const icon = socialIcons[destination.channel];
   const address = destination.url.replace(/^https:\/\/(?:www\.)?/u, '');
   return <div style={{position:'absolute',left:0,right:0,bottom:0,height:610,opacity:reveal*fade,

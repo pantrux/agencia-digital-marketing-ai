@@ -1,7 +1,7 @@
 const maxVideoSeconds = 600;
 const metadataTimeoutMs = 10_000;
 
-export async function videoDuration(file: Blob, minimum = 0): Promise<number> {
+export async function validateVideoDuration(file: Blob): Promise<void> {
   const video = document.createElement("video");
   video.preload = "metadata";
   const url = URL.createObjectURL(file);
@@ -19,8 +19,6 @@ export async function videoDuration(file: Blob, minimum = 0): Promise<number> {
       throw new Error("VIDEO_NO_VERIFICABLE");
     }
     if (duration > maxVideoSeconds) throw new Error("VIDEO_SUPERA_DURACION");
-    if (duration < minimum) throw new Error("VIDEO_CORTO_PARA_REEL");
-    return duration;
   } finally {
     clearTimeout(timer);
     events.abort();
@@ -28,8 +26,4 @@ export async function videoDuration(file: Blob, minimum = 0): Promise<number> {
     video.load();
     URL.revokeObjectURL(url);
   }
-}
-
-export async function validateVideoDuration(file: Blob, minimum = 0): Promise<void> {
-  await videoDuration(file, minimum);
 }

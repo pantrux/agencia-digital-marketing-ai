@@ -1,4 +1,4 @@
-import {AD_FRAMES, SOCIAL_FADE_FRAME, TITLE_BAND_BACKGROUND, TITLE_BAND_HEIGHT, TITLE_PANEL_FRACTION} from './contracts.ts';
+import {adTiming, TITLE_BAND_BACKGROUND, TITLE_BAND_HEIGHT, TITLE_PANEL_FRACTION} from './contracts.ts';
 import {MAX_SEGMENT_SECONDS, outputDimensions, TITLE_FADE_FRAMES, WorkerError, type EditScene, type MultiSourceScene, type OutputFormat, type RenderRequest, type Resolution} from './contracts.ts';
 
 export interface Loudness {integrated_lufs: number; true_peak_dbtp: number; range_lu: number; threshold_lufs: number; offset_lu: number}
@@ -147,14 +147,20 @@ function normalizeAudio(count: number, duration: number, measured: Loudness, pea
 const aacAudio = ['-c:a','aac','-b:a','256k','-ar','48000','-ac','2'];
 
 // El archivo de catálogo se verifica y se copia al directorio privado antes de mezclar.
-export function mixAdAudio(speech: string, music: string, output: string, social = false): string[] {
-  const voiceFades = social ? 'afade=d=0.025,afade=t=out:st=25.95:d=0.08' : 'afade=t=out:st=25.85:d=0.15';
-  const musicFades = social ? 'afade=d=1,afade=t=out:st=28.5:d=1.5' : 'afade=d=0.35,afade=t=out:st=28.8:d=1.2';
+export function mixAdAudio(speech: string, music: string, output: string, frames: number, social: boolean): string[] {
+  const {voiceEnd} = adTiming(frames);
+  const duration = frames / 30;
+  const musicFadeOut = Math.min(social ? 1.5 : 1.2, duration / 4);
+  const musicFadeIn = Math.min(social ? 1 : 0.35, duration / 4);
+  const voiceFadeOut = Math.min(social ? 0.08 : 0.15, voiceEnd / 30);
+  const voiceFadeStart = Math.max(0, voiceEnd / 30 - voiceFadeOut + (social ? 0.03 : 0));
+  const voiceFades = `${social ? 'afade=d=0.025,' : ''}afade=t=out:st=${voiceFadeStart.toFixed(4)}:d=${voiceFadeOut.toFixed(4)}`;
+  const musicFades = `afade=d=${musicFadeIn},afade=t=out:st=${(duration - musicFadeOut).toFixed(4)}:d=${musicFadeOut}`;
   const filter = `[0:a]aformat=channel_layouts=stereo,${voiceFades},asplit=2[voice][key];`
-    + `[1:a]aformat=channel_layouts=stereo,aresample=48000,atrim=duration=30,asetpts=PTS-STARTPTS,volume=0.25,${musicFades}[music];`
+    + `[1:a]aformat=channel_layouts=stereo,aresample=48000,atrim=duration=${duration},asetpts=PTS-STARTPTS,volume=0.25,${musicFades}[music];`
     + '[music][key]sidechaincompress=threshold=0.025:ratio=6:attack=14:release=260[bed];'
     + '[voice][bed]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.94:level=0[audio]';
-  return ['-hide_banner','-nostdin','-v','error','-n','-i',speech,'-ss','5','-i',music,
+  return ['-hide_banner','-nostdin','-v','error','-n','-i',speech,'-stream_loop','-1','-ss','5','-i',music,
     '-filter_complex',filter,'-map','[audio]','-ar','48000','-c:a','pcm_s24le',output];
 }
 
@@ -173,13 +179,13 @@ export function cutSceneAudio(input: string, output: string, scenes: readonly Ed
 
 /** Las rutas deben provenir de fuentes ya verificadas por el backend. */
 export function cutMultiSourceAudio(inputs: ReadonlyMap<string, string | null>, output: string, scenes: readonly MultiSourceScene[]): string[] {
-  if (scenes.length < 2 || scenes.length > 32 || !output) return bad();
+  if (scenes.length < 1 || scenes.length > 32 || !output) return bad();
   const args: string[] = [];
   const cuts = scenes.map((scene, index) => {
     const input = inputs.get(scene.source_id);
     const start = input === null ? 0 : scene.audio_source_start_frame ?? scene.source_start_frame;
     const length = scene.source_end_frame - scene.source_start_frame;
-    if (input === undefined || input === '' || !Number.isInteger(start) || !Number.isInteger(length) || start < 0 || length < 15 ||
+    if (input === undefined || input === '' || !Number.isInteger(start) || !Number.isInteger(length) || start < 0 || length < 1 ||
         start + length > MAX_SEGMENT_SECONDS * 30) return bad();
     if (input === null) args.push('-f','lavfi','-i','anullsrc=r=48000:cl=stereo');
     else args.push('-i', input);
@@ -206,13 +212,13 @@ function sceneVideo(sourceVideo: string, scenes: readonly EditScene[]) {
 
 /** Homogeneiza cada plano antes de unir fuentes con geometrías diferentes. */
 export function multiSourceVideoInputs(inputs: ReadonlyMap<string, string>, scenes: readonly MultiSourceScene[], width: number, height: number): {videoInputs: string[]; cuts: string[]} {
-  if (scenes.length < 2 || scenes.length > 32 || !Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
+  if (scenes.length < 1 || scenes.length > 32 || !Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
       width < 2 || height < 2 || width > 3840 || height > 3840 || width % 2 || height % 2) return bad();
   const videoInputs: string[] = [];
   const cuts = scenes.map((scene, index) => {
     const input = inputs.get(scene.source_id);
     const start = scene.source_start_frame, end = scene.source_end_frame;
-    if (!input || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end - start < 15 ||
+    if (!input || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end - start < 1 ||
         end > MAX_SEGMENT_SECONDS * 30) return bad();
     const seek = Math.max(0, Math.floor(start / 30) - 1);
     videoInputs.push('-threads','2','-ss',String(seek),'-i',input);
@@ -264,7 +270,8 @@ export function encodeNvenc(frames: string, audio: string, output: string, count
     : `crop=${width}:${height}`;
   const graphicsInput = scenes?.length ?? 1;
   const overlay = 'alpha=straight:eof_action=repeat:repeatlast=1';
-  const pictureFade = social ? ',fade=t=out:s=' + SOCIAL_FADE_FRAME + ':n=' + (AD_FRAMES - SOCIAL_FADE_FRAME - 1) : '';
+  const {fadeStart} = adTiming(count);
+  const pictureFade = social ? `,fade=t=out:s=${fadeStart}:n=${Math.max(1, count - fadeStart - 1)}` : '';
   // El crudo admitido ya está en YUV BT.709. Solo se convierte la capa RGBA.
   const filter = [
     ...cuts,
