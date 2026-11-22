@@ -119,6 +119,11 @@ it("mide desde requestStart y descarta el identificador y los parámetros antes 
     connectStart: 98, connectEnd: 98,
   } as PerformanceResourceTiming;
   expect(browserSample(entry, origin)).toEqual(["multipart_firma", 200, 183, true]);
+  expect(browserSample({ ...entry, name: entry.name.replace("/parts/3/", "/parts/") }, origin))
+    .toEqual(["multipart_firma", 200, 183, true]);
+  expect(browserSample({ ...entry, name: entry.name.replace("/api/uploads/",
+    "/api/orders/00000000-0000-4000-8000-000000000002/sources/") }, origin))
+    .toEqual(["multipart_firma", 200, 183, true]);
   expect(browserSample({ ...entry, transferSize: 0 }, origin)).toBeNull();
   expect(browserSample({ ...entry, responseStatus: 401 }, origin)).toBeNull();
   expect(browserSample({ ...entry, name: entry.name.replace(origin, "https://r2.example.invalid") }, origin)).toBeNull();

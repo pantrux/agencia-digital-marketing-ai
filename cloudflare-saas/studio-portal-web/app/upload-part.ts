@@ -1,8 +1,52 @@
 export type SignedPart = { url: string; headers: Record<string, string> };
+export type NumberedSignedPart = SignedPart & { partNumber: number };
+export type SignedPartBatch = { parts: NumberedSignedPart[]; expiresIn: number };
 type PutObservation = "http_403" | "sin_respuesta";
 
 const retryDelayMs = [250, 1000];
 const concurrentParts = 3;
+
+export function partSigners(partCount: number, stored: ReadonlyMap<number, string>, preSigned: readonly NumberedSignedPart[],
+  signOne: (number: number) => Promise<SignedPart>, signBatch?: (numbers: number[]) => Promise<SignedPartBatch>,
+): (number: number) => () => Promise<SignedPart> {
+  const initial = new Map(preSigned.map((part) => [part.partNumber, part]));
+  const groups = new Map<number, number[]>();
+  const pending = new Map<number[], Promise<{ parts: Map<number, SignedPart>; expiresAt: number }>>();
+  if (signBatch) {
+    const missing = Array.from({ length: partCount }, (_, index) => index + 1)
+      .filter((number) => !stored.has(number) && !initial.has(number));
+    for (let offset = 0; offset < missing.length; offset += concurrentParts) {
+      const group = missing.slice(offset, offset + concurrentParts);
+      if (group.length > 1) for (const number of group) groups.set(number, group);
+    }
+  }
+
+  return (number) => {
+    let first = true;
+    return async () => {
+      if (!first) return signOne(number);
+      first = false;
+      const part = initial.get(number);
+      if (part) return part;
+      const group = groups.get(number);
+      if (!signBatch || !group) return signOne(number);
+      let request = pending.get(group);
+      if (!request) {
+        const requestedAt = performance.now();
+        request = signBatch(group).then(({ parts, expiresIn }) => {
+          if (!Array.isArray(parts) || parts.length !== group.length
+            || parts.some((item, index) => item?.partNumber !== group[index])
+            || !Number.isSafeInteger(expiresIn) || expiresIn < 1 || expiresIn > 60) throw new Error("CARGA_NO_DISPONIBLE");
+          // El tiempo de la solicitud ya consume parte de la vigencia.
+          return { parts: new Map(parts.map((item) => [item.partNumber, item])), expiresAt: requestedAt + expiresIn * 1000 - 2000 };
+        });
+        pending.set(group, request);
+      }
+      const received = await request;
+      return performance.now() < received.expiresAt ? received.parts.get(number)! : signOne(number);
+    };
+  };
+}
 
 function retryable(status: number): boolean {
   return status === 403 || status === 408 || status === 429 || (status >= 500 && status <= 599);
