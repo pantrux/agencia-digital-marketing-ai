@@ -50,6 +50,7 @@ export async function handleManualAdjustment(request: Request, env: OrderEnv, us
     const latest = await session.prepare(`SELECT ${visible} FROM production_manual_adjustments
       WHERE order_id=? ORDER BY number DESC LIMIT 1`).bind(orderId).first<Adjustment>();
     return response({ adjustment: latest, paused: current.paused === 1,
+      review_round: current.revision,
       included: current.allowed === 1,
       available: current.allowed === 1 && current.paused === 1 && current.status === "processing"
         && !current.pending && remaining(current) !== 0,
