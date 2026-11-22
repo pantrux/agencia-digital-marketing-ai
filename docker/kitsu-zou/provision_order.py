@@ -1,4 +1,4 @@
-"""Prepara en Kitsu el proyecto de una orden piloto e instala su asignación."""
+"""Prepara en Kitsu el proyecto de una orden de Studio e instala su asignación."""
 
 import argparse
 import base64
@@ -25,12 +25,13 @@ PAGE_SIZE = 32
 ORDER_ERRORS = (OSError, ValueError, KeyError, http.client.HTTPException)
 PAID_PLANS = ("pro", "ultra", "ilimitado")
 PAID_PLAN_SQL = ",".join(f"'{plan}'" for plan in PAID_PLANS)
+PROVISION_MODES = ("sandbox", "production")
 PENDING_ORDERS = f"""SELECT o.id,o.user_id,o.project_slug,b.confirmed_at
     FROM orders o JOIN production_briefs b ON b.order_id=o.id AND b.user_id=o.user_id
     JOIN production_dispatch d ON d.order_id=o.id AND d.received_at IS NOT NULL
     WHERE (o.plan_id IN ({PAID_PLAN_SQL}) OR
-      (o.plan_id='free' AND (o.user_id=? OR (o.id=? AND o.user_id=?))))
-      AND o.kind='production' AND o.provider_mode='sandbox'
+      (o.plan_id='free' AND (o.provider_mode='production' OR o.user_id=? OR (o.id=? AND o.user_id=?))))
+      AND o.kind='production' AND o.provider_mode=?
       AND o.status='processing'
       AND (b.confirmed_at,o.id) > (?,?)
     ORDER BY b.confirmed_at,o.id LIMIT {PAGE_SIZE}"""
@@ -163,13 +164,13 @@ def query_orders(values, query, params):
     return page["result"][0]["results"]
 
 
-def load_order(values, identity):
+def load_order(values, identity, *, mode="sandbox"):
     rows = query_orders(
         values,
         f"""SELECT user_id,project_slug,plan_id,output_resolution FROM orders WHERE id=? AND kind='production'
-        AND provider_mode='sandbox' AND plan_id IN ('free',{PAID_PLAN_SQL})
+        AND provider_mode=? AND plan_id IN ('free',{PAID_PLAN_SQL})
         AND status IN ('queued','processing')""",
-        [identity],
+        [identity, mode],
     )
     if len(rows) != 1 or rows[0]["project_slug"] != "job-" + identity.replace("-", ""):
         raise ValueError("La orden no está disponible para aprovisionamiento")
@@ -295,11 +296,12 @@ def prepare_admin(ssh, values, store, prefix, settings):
         store({prefix + "ADMIN_REVOKED": "true"})
 
 
-def pending_orders(values):
+def pending_orders(values, *, mode="sandbox"):
     scope = [
         uuid_value(values["SOFIA_OWNER_USER_ID"]),
         values.get(AUTOMATIC_FIXTURE_ORDER),
         values.get(AUTOMATIC_FIXTURE_USER),
+        mode,
     ]
     cursor = (-1, "")
     while True:
@@ -313,21 +315,27 @@ def pending_orders(values):
         cursor = next_cursor
 
 
-def provision_pending(vault, values):
+def provision_pending(vault, values, *, mode="sandbox"):
     summary = {"elegibles": 0, "aprovisionadas": 0, "fallidas": 0}
-    for row in pending_orders(values):
+    for row in pending_orders(values, mode=mode):
         summary["elegibles"] += 1
         try:
             identity = uuid_value(row["id"])
             confirmed = datetime.fromtimestamp(row["confirmed_at"], UTC)
             title = f"Producción Studio {confirmed:%Y-%m-%d} · {identity[:8]}"
-            summary["aprovisionadas"] += provision(vault, values, identity, title, automatic=True)
+            summary["aprovisionadas"] += provision(
+                vault, values, identity, title, automatic=True, mode=mode
+            )
         except ORDER_ERRORS:
             summary["fallidas"] += 1
     return summary
 
 
-def authorized(values, identity, user, automatic, plan):
+def authorized(values, identity, user, automatic, plan, *, mode="sandbox"):
+    if mode == "production":
+        return plan in ("free", *PAID_PLANS)
+    if mode != "sandbox":
+        return False
     if plan in PAID_PLANS or user == values["SOFIA_OWNER_USER_ID"]:
         return True
     if automatic:
@@ -338,7 +346,7 @@ def authorized(values, identity, user, automatic, plan):
     return values.get("STUDIO_KITSU_SYNTHETIC_PROVISION_ORDER_ID") == identity
 
 
-def provision(vault, values, identity, title, *, automatic=False):
+def provision(vault, values, identity, title, *, automatic=False, mode="sandbox"):
     title = normalize("NFC", title)
     if (
         not 1 <= len(title) <= 120
@@ -346,9 +354,9 @@ def provision(vault, values, identity, title, *, automatic=False):
         or re.search(r"[\x00-\x1f\x7f/\\]", title)
     ):
         raise ValueError("Título de entrega inválido")
-    order = load_order(values, identity)
-    if not authorized(values, identity, order["user_id"], automatic, order["plan_id"]):
-        raise ValueError("La orden no pertenece al piloto autorizado")
+    order = load_order(values, identity, mode=mode)
+    if not authorized(values, identity, order["user_id"], automatic, order["plan_id"], mode=mode):
+        raise ValueError("La orden no pertenece al entorno autorizado")
     prefix = "STUDIO_KITSU_ORDER_" + identity.replace("-", "").upper() + "_"
     previous_kit = values.get(prefix + "KIT_ID")
     with connect(values, "claw") as claw:
@@ -459,9 +467,10 @@ def read_vault(vault):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--entorno", choices=PROVISION_MODES, default="sandbox")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
-        "--pendientes", action="store_true", help="Aprovisiona órdenes listas del piloto."
+        "--pendientes", action="store_true", help="Aprovisiona órdenes listas del entorno indicado."
     )
     mode.add_argument(
         "--listar-pendientes",
@@ -481,14 +490,18 @@ def main():
     vault = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(vault)
     if args.listar_pendientes:
-        print(json.dumps({"elegibles": sum(1 for _ in pending_orders(read_vault(vault)))}))
+        print(
+            json.dumps(
+                {"elegibles": sum(1 for _ in pending_orders(read_vault(vault), mode=args.entorno))}
+            )
+        )
         return 0
     with exclusive_run(vault):
         values = read_vault(vault)
         if args.order:
-            provision(vault, values, args.order, args.title)
+            provision(vault, values, args.order, args.title, mode=args.entorno)
             return 0
-        report = provision_pending(vault, values)
+        report = provision_pending(vault, values, mode=args.entorno)
         print(json.dumps(report))
         return int(report["fallidas"] > 0)
 

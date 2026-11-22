@@ -63,7 +63,7 @@ def test_reconcilia_proyecto_y_permisos_sin_repetir_altas():
     assert len(writes) == 4
 
 
-def test_selecciona_ordenes_del_piloto_y_planes_pagados_de_ensayo_con_crudo_y_brief():
+def test_selecciona_ordenes_del_entorno_con_crudo_y_brief():
     module = load_provisioner()
     owner = "00000000-0000-4000-8000-000000000010"
     with sqlite3.connect(":memory:") as db:
@@ -75,16 +75,16 @@ def test_selecciona_ordenes_del_piloto_y_planes_pagados_de_ensayo_con_crudo_y_br
             CREATE TABLE production_briefs (order_id TEXT, user_id TEXT, confirmed_at INTEGER);
             CREATE TABLE production_dispatch (order_id TEXT, received_at INTEGER);
         """)
-        ids = [f"00000000-0000-4000-8000-{i:012d}" for i in range(1, 9)]
+        ids = [f"00000000-0000-4000-8000-{i:012d}" for i in range(1, 10)]
         for ix, identity in enumerate(ids):
             db.execute(
                 "INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     identity,
-                    identity if ix in (4, 5, 6) else owner,
+                    identity if ix in (4, 5, 6, 8) else owner,
                     "job-" + identity.replace("-", ""),
                     "production",
-                    "production" if ix == 5 else "sandbox",
+                    "production" if ix in (5, 8) else "sandbox",
                     "ultra" if ix in (4, 5) else "free",
                     "queued" if ix == 3 else "processing",
                 ),
@@ -92,16 +92,23 @@ def test_selecciona_ordenes_del_piloto_y_planes_pagados_de_ensayo_con_crudo_y_br
             if ix != 1:
                 db.execute(
                     "INSERT INTO production_briefs VALUES (?, ?, 1794665400)",
-                    (identity, identity if ix in (4, 5, 6, 7) else owner),
+                    (identity, identity if ix in (4, 5, 6, 7, 8) else owner),
                 )
             if ix != 2:
                 db.execute("INSERT INTO production_dispatch VALUES (?, 1794665300)", (identity,))
         db.row_factory = sqlite3.Row
-        rows = db.execute(module.PENDING_ORDERS, (owner, None, None, -1, "")).fetchall()
-        exact = db.execute(module.PENDING_ORDERS, (owner, ids[6], ids[6], -1, "")).fetchall()
-        wrong_order = db.execute(module.PENDING_ORDERS, (owner, ids[1], ids[6], -1, "")).fetchall()
+        rows = db.execute(module.PENDING_ORDERS, (owner, None, None, "sandbox", -1, "")).fetchall()
+        exact = db.execute(
+            module.PENDING_ORDERS, (owner, ids[6], ids[6], "sandbox", -1, "")
+        ).fetchall()
+        wrong_order = db.execute(
+            module.PENDING_ORDERS, (owner, ids[1], ids[6], "sandbox", -1, "")
+        ).fetchall()
         following = db.execute(
-            module.PENDING_ORDERS, (owner, ids[6], ids[6], 1794665400, ids[0])
+            module.PENDING_ORDERS, (owner, ids[6], ids[6], "sandbox", 1794665400, ids[0])
+        ).fetchall()
+        commercial = db.execute(
+            module.PENDING_ORDERS, (owner, None, None, "production", -1, "")
         ).fetchall()
     assert [dict(row) for row in rows] == [
         {
@@ -120,6 +127,8 @@ def test_selecciona_ordenes_del_piloto_y_planes_pagados_de_ensayo_con_crudo_y_br
     assert [row["id"] for row in exact] == [ids[0], ids[4], ids[6]]
     assert [row["id"] for row in wrong_order] == [ids[0], ids[4]]
     assert [row["id"] for row in following] == [ids[4], ids[6]]
+    assert [row["id"] for row in commercial] == [ids[5], ids[8]]
+    assert module.authorized({}, ids[8], ids[8], True, "free", mode="production")
 
 
 def test_recorre_siguiente_pagina_y_procesa_tras_un_error(monkeypatch):
@@ -133,8 +142,8 @@ def test_recorre_siguiente_pagina_y_procesa_tras_un_error(monkeypatch):
         cursors.append(params[-2:])
         return [row for row in rows if (row["confirmed_at"], row["id"]) > tuple(params[-2:])][:32]
 
-    def provision(_vault, _values, identity, _title, *, automatic):
-        assert automatic
+    def provision(_vault, _values, identity, _title, *, automatic, mode):
+        assert automatic and mode == "sandbox"
         if identity == ids[0]:
             raise ValueError("El proyecto de prueba tiene una revisión en conflicto")
         return identity == ids[-1]
@@ -157,7 +166,7 @@ def test_lee_orden_y_resolucion_en_una_sola_consulta(monkeypatch, plan, requeste
 
     def query(values, statement, params):
         calls.append(statement)
-        assert "output_resolution" in statement and params == [identity]
+        assert "output_resolution" in statement and params == [identity, "sandbox"]
         return [
             {
                 "plan_id": plan,
@@ -229,7 +238,7 @@ def test_respalda_identificadores_finales_juntos_y_reutiliza_kit_tras_interrupci
     monkeypatch.setattr(
         module,
         "load_order",
-        lambda *args: {
+        lambda *args, **kwargs: {
             "user_id": owner,
             "plan_id": "ilimitado",
             "project_slug": slug,

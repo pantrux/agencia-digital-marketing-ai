@@ -273,12 +273,15 @@ class Sofia:
         run: Callable[[Turn], str],
         owner: str,
         clock: Callable[[], float] = time.time,
+        *,
+        billing_mode: str = "sandbox",
     ):
         self.key = key
         self.ledger = ledger
         self.run = run
         self.owner = owner
         self.clock = clock
+        self.billing_mode = billing_mode
 
     def process(self, raw: bytes, stamp: str, signature: str) -> tuple[bytes, dict[str, str]]:
         if len(raw) > BODY_LIMIT:
@@ -293,6 +296,8 @@ class Sofia:
         if not hmac.compare_digest(expected, signature):
             raise Rejected(401)
         turn = signed_turn(raw)
+        if turn.billing_mode != self.billing_mode:
+            raise Rejected(403)
         try:
             reply = self.ledger.reserve(turn, fingerprint, now)
             if reply is None:
@@ -560,7 +565,7 @@ def private_secret(path: Path) -> bytes:
     return value
 
 
-def owner_profile(path: Path) -> tuple[str, Path, bytes]:
+def owner_profile(path: Path) -> tuple[str, Path, bytes, str]:
     require_private(path, directory=False)
     with path.open("rb") as source:
         raw = source.read(4097)
@@ -568,7 +573,7 @@ def owner_profile(path: Path) -> tuple[str, Path, bytes]:
         raise ValueError("Perfil privado inválido")
     fields = fields_from(raw)
     expected = {"billingMode", "oauthProfileId", "ownerActor", "socketPath", "hmacSecret"}
-    if set(fields) != expected or fields["billingMode"] != "sandbox":
+    if set(fields) != expected or fields["billingMode"] not in ("sandbox", "production"):
         raise ValueError("Perfil privado inválido")
     actor, address, key = fields["ownerActor"], fields["socketPath"], fields["hmacSecret"]
     if not matches(HEX, actor) or not isinstance(address, str) or not isinstance(key, str):
@@ -583,7 +588,7 @@ def owner_profile(path: Path) -> tuple[str, Path, bytes]:
         or not SECRET.fullmatch(key_bytes)
     ):
         raise ValueError("Perfil privado inválido")
-    return actor, address_path, key_bytes
+    return actor, address_path, key_bytes, fields["billingMode"]
 
 
 def on_terminate(signum: int, frame: object) -> None:
@@ -601,14 +606,16 @@ def main() -> int:
     os.umask(0o077)
     try:
         key = private_secret(args.hmac_file)
-        owner, socket_path, local_key = owner_profile(args.owner_profile_file)
+        owner, socket_path, local_key, billing_mode = owner_profile(args.owner_profile_file)
         if hmac.compare_digest(key, local_key):
             raise ValueError("Credenciales de servicio distintas requeridas")
         require_private(args.state_dir, directory=True)
         state = args.state_dir / "turns.sqlite3"
         if state.exists() or state.is_symlink():
             require_private(state, directory=False)
-        instance = Sofia(key, Ledger(state), OwnerUnix(socket_path, local_key), owner)
+        instance = Sofia(
+            key, Ledger(state), OwnerUnix(socket_path, local_key), owner, billing_mode=billing_mode
+        )
         signal.signal(signal.SIGTERM, on_terminate)
         with SofiaServer(("127.0.0.1", 3107), instance) as server:
             server.serve_forever()

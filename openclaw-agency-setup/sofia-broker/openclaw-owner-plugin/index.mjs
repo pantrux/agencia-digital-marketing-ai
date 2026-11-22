@@ -158,7 +158,8 @@ export function parseTurn(raw, headers, settings, path = PATH, inputLimit = INPU
   }
   const { actor_id, order_id, request_id, billing_mode, plan_id, message } = fields;
   if (typeof actor_id !== "string" || !HEX.test(actor_id) ||
-      !["sandbox", "production"].includes(billing_mode) || !["free", "pro", "ultra", "ilimitado"].includes(plan_id)) {
+      !["sandbox", "production"].includes(billing_mode) || billing_mode !== (settings.billingMode ?? "sandbox") ||
+      !["free", "pro", "ultra", "ilimitado"].includes(plan_id)) {
     throw new Reject(403);
   }
   if (typeof order_id !== "string" || typeof request_id !== "string" || !UUID.test(order_id) ||
@@ -194,7 +195,7 @@ async function readProfile(profileFile, socketName) {
     } finally {
       bytes.fill(0);
     }
-    if (data.billingMode !== "sandbox" || typeof data.oauthProfileId !== "string" ||
+    if (!["sandbox", "production"].includes(data.billingMode) || typeof data.oauthProfileId !== "string" ||
         !/^openai:[\w.@+-]{1,160}$/u.test(data.oauthProfileId) || typeof data.ownerActor !== "string" ||
         !HEX.test(data.ownerActor) || typeof data.hmacSecret !== "string" ||
         !/^[\x21-\x7E]{32,128}$/u.test(data.hmacSecret) || typeof data.socketPath !== "string" ||

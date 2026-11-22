@@ -83,6 +83,7 @@ flowchart TB
     FIRMAPARTES --> SLOMULTIPART["Medir aperturas y firmas individuales y por lotes de archivos y fuentes"]
     FASE6 --> KITENTORNO["Cotejar entorno de la orden, ruta R2 del kit y firma al Worker"]
     KITENTORNO --> KITRECIBO["El recibo local activa la publicación y el temporizador recupera pendientes"]
+    FASE6 --> PERFILENTORNO["Cotejar el entorno de reserva, OpenClaw y Kitsu antes de admitir órdenes comerciales"]
     REVISION --> REVQA{"¿Elena aprobó el render?"}
     REVQA -->|"Sí"| VERSION["Publicar la versión aprobada y conservar la anterior"]
     REVQA -->|"No, con rondas disponibles"| ITERA["Valeria corrige con el dictamen y Lucas vuelve a renderizar"]

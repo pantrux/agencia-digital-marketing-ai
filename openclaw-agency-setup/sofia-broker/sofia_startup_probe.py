@@ -87,7 +87,7 @@ def main():
         "actor_id": profile["ownerActor"],
         "order_id": identifiers["order_id"],
         "request_id": str(uuid4()),
-        "billing_mode": "sandbox",
+        "billing_mode": profile.get("billingMode", "sandbox"),
         "plan_id": "free",
         "message": "startup-readiness",
     }

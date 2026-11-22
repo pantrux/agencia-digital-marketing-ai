@@ -172,10 +172,10 @@ def native_call(order, message, owner, key):
         raise ValueError("Socket de Mateo inválido")
     turn = {
         "actor_id": hmac.digest(key, ("studio-mateo-actor-v1\n" + owner).encode(), "sha256").hex(),
-        "order_id": order,
+        "order_id": order["order_id"],
         "request_id": str(uuid.uuid4()),
-        "billing_mode": "sandbox",
-        "plan_id": "free",
+        "billing_mode": order["mode"],
+        "plan_id": order["plan_id"],
         "message": message,
     }
     raw = json.dumps(turn, ensure_ascii=False, separators=(",", ":")).encode()
@@ -232,7 +232,7 @@ def run_mateo(receipt, brief, preliminary, target, owner, key):
         "plan": order["plan_id"],
         "duracion_segundos": receipt["duration_seconds"],
     }
-    text = native_call(order["order_id"], json.dumps(facts, ensure_ascii=False), owner, key)
+    text = native_call(order, json.dumps(facts, ensure_ascii=False), owner, key)
     result = {
         "order_id": order["order_id"],
         "source_sha256": order["media"]["sha256"],

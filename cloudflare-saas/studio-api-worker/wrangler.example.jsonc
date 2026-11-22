@@ -11,6 +11,7 @@
   "vars": {
     "PUBLIC_ORIGIN": "https://studio.e-scale.cl",
     "BILLING_MODE": "sandbox",
+    "STUDIO_PRODUCTION_ORDERS_ENABLED": "false",
     "MP_ENVIRONMENT": "sandbox",
     "MP_SITE_ID": "MLC",
     "MP_SANDBOX_CHECKOUT_ENABLED": "false",

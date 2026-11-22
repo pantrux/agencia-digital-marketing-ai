@@ -213,11 +213,14 @@ test("elimina sólo el socket privado que queda tras morir el proceso", {
 
 test("admite cuentas y planes válidos con firma sobre los bytes canónicos", () => {
   const settings = { key: KEY, ownerActor: ACTOR };
-  const parse = ({ raw, headers }) => parseTurn(raw, headers, settings);
+  const parse = ({ raw, headers }, profile = settings) => parseTurn(raw, headers, profile);
   assert.deepEqual(parse(wire()), TURN);
   const other = { ...TURN, actor_id: "b".repeat(64), plan_id: "ilimitado", billing_mode: "production" };
-  assert.deepEqual(parse(wire(other)), other);
+  const productionProfile = { ...settings, billingMode: "production" };
+  assert.deepEqual(parse(wire(other), productionProfile), other);
+  assert.throws(() => parse(wire(), productionProfile), { status: 403 });
   for (const [entry, expected] of [
+    [wire(other), 403],
     [wire({ ...TURN, actor_id: "invalido" }), 403],
     [wire({ ...TURN, plan_id: "invalido" }), 403],
     [wire({ ...TURN, billing_mode: "invalido" }), 403],
