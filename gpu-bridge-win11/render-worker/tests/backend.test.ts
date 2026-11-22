@@ -5,7 +5,7 @@ import {mkdtemp, mkdir, writeFile, rm, access, readFile, stat} from 'node:fs/pro
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {RenderBackend, stageAdMusic, timelineImages} from '../src/backend.ts';
-import {outputDimensions, parseRender, parseStills, TITLE_FADE_FRAMES, type OutputFormat, type Resolution} from '../src/contracts.ts';
+import {outputDimensions, parseRender, parseStills, TITLE_FADE_FRAMES, WorkerError, type OutputFormat, type Resolution} from '../src/contracts.ts';
 import type {RuntimeConfig} from '../src/config.ts';
 import {ScratchSpace} from '../src/scratch.ts';
 import {NasPaths} from '../src/nas.ts';
@@ -62,7 +62,7 @@ test('copia la pista aprobada por huella y rechaza una pista ausente o cambiada'
 });
 
 const request = parseRender({project_id: 'sansevieras', job_id: 'prueba', composition: 'AgencyVertical', plan: 'Free', props: {title: 'Prueba sintética', duration_seconds: 3, audio_path: 'proyectos/sansevieras/03_assets/voz.wav'}});
-async function setup(badPeak: boolean, options: {format?: OutputFormat; resolution?: Resolution; badAlpha?: boolean; failProresProbe?: boolean; missingColor?: boolean; duration?: number; badTiming?: boolean; recoverPeak?: boolean; normalizedVideo?: boolean} = {}) {
+async function setup(badPeak: boolean, options: {format?: OutputFormat; resolution?: Resolution; badAlpha?: boolean; failProresProbe?: boolean; missingColor?: boolean; duration?: number; badTiming?: boolean; recoverPeak?: boolean; normalizedVideo?: boolean; encodeStalled?: boolean} = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'render-backend-'));
   const nas = path.join(root, 'nas'), cache = path.join(root, 'cache');
   await mkdir(path.join(nas, 'proyectos', 'sansevieras', '03_assets'), {recursive: true}); await mkdir(cache);
@@ -93,6 +93,12 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
     },
     run: async (executable, args, processOptions) => {
       calls.push(args);
+      if (options.encodeStalled && path.basename(args.at(-1)!) === 'master.mp4') {
+        assert.equal(executable, config.ffmpeg);
+        assert.deepEqual(args.slice(0, 4), ['-progress', 'pipe:1', '-stats_period', '2']);
+        assert.equal(processOptions.videoProgressTimeoutMs, 90_000);
+        throw new WorkerError(504, 'CODIFICACION_SIN_AVANCE', 'FFmpeg quedó detenido.');
+      }
       if (executable === config.ffprobe) {
         const filename = path.basename(args.at(-1)!);
         if (options.normalizedVideo && filename === 'movil.mp4') {
@@ -229,6 +235,20 @@ test('el límite global se distingue de un rechazo de herramienta', async (t) =>
     await assert.rejects(fixture.backend.render(request, new AbortController().signal),
       {code: 'PLAZO_TRABAJO_AGOTADO', status: 504});
     await assert.rejects(access(path.join(fixture.nas, 'proyectos', 'sansevieras', '06_renders', 'prueba')));
+  } finally {await rm(fixture.root, {recursive: true, force: true});}
+});
+
+test('la codificación detenida queda registrada sin publicar un máster', async (t) => {
+  const fixture = await setup(false, {encodeStalled: true});
+  try {
+    await fixture.backend.initialize();
+    const warn = t.mock.method(console, 'warn', () => {});
+    await assert.rejects(fixture.backend.render(request, new AbortController().signal),
+      {code: 'CODIFICACION_SIN_AVANCE', status: 504});
+    await assert.rejects(access(path.join(fixture.nas, 'proyectos', 'sansevieras', '06_renders', 'prueba')));
+    const entry = JSON.parse(String(warn.mock.calls[0]?.arguments[0]));
+    assert.equal(entry.phase, 'codificacion');
+    assert.equal(entry.error, 'CODIFICACION_SIN_AVANCE');
   } finally {await rm(fixture.root, {recursive: true, force: true});}
 });
 
