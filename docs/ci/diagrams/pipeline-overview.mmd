@@ -15,7 +15,7 @@ flowchart TB
     %% Las pruebas Node cubren bundle único concurrente, assets UUID y QA normalizada 0..1920 también en 4K.
     %% Studio comprueba el despacho de reels y el bloqueo del máster si la vista previa se rechaza.
     %% Los reels 1080p reutilizan el MP4 verificado después del dictamen previo y mantienen la revisión final.
-    %% El renderer cancela secuencias Remotion sin fotogramas nuevos y registra la fase de los fallos.
+    %% El renderer cancela Remotion sin fotogramas nuevos o una codificación FFmpeg sin avance y registra la fase.
     %% Tipos y pruebas de carga múltiple instalan el lock del portal antes de los controles de raíz.
     %% HyperFrames usa la selección persistida en D1, el renderer Windows y la revisión audiovisual de Elena.
     %% ProRes 4444 verifica todos los paquetes del MOV con hasta 180 s bajo el plazo general del render.

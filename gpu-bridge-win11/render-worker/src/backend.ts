@@ -120,6 +120,10 @@ export class RenderBackend implements Backend {
     }
     finally {await this.scratch.remove(work);}
   }
+  #encodeVideo(args: string[], signal: AbortSignal, timeoutMs = 1_200_000) {
+    return this.deps.run(this.config.ffmpeg, ['-progress', 'pipe:1', '-stats_period', '2', ...args],
+      {timeoutMs, signal, videoProgressTimeoutMs: 90_000});
+  }
   async #readProbe(file: string, signal: AbortSignal): Promise<string> {
     return (await this.deps.run(this.config.ffprobe, probeArgs(file), {timeoutMs: 30000, signal})).stdout;
   }
@@ -237,9 +241,8 @@ export class RenderBackend implements Backend {
   async #prepareStaticProres(work: string, framePattern: string, lastFrame: string, count: number, signal: AbortSignal): Promise<string> {
     const fade = path.join(work, 'prores-fundido.mov');
     const tail = path.join(work, 'prores-estatico.mov');
-    const run = (args: string[]) => this.deps.run(this.config.ffmpeg, args, {timeoutMs: 1200000, signal});
-    await run(encodeProresFragment(framePattern, fade, TITLE_FADE_FRAMES));
-    await run(encodeProresFragment(lastFrame, tail, 1));
+    await this.#encodeVideo(encodeProresFragment(framePattern, fade, TITLE_FADE_FRAMES), signal);
+    await this.#encodeVideo(encodeProresFragment(lastFrame, tail, 1), signal);
     return this.#writeProresList(work, [
       {file: fade, repeat: 1}, {file: tail, repeat: count - TITLE_FADE_FRAMES},
     ], count, signal);
@@ -249,7 +252,7 @@ export class RenderBackend implements Backend {
     const fragments = [];
     for (const [index, start] of frames.entries()) {
       const file = path.join(work, `prores-escena-${index}.mov`);
-      await this.deps.run(this.config.ffmpeg, encodeProresFragment(files[index]!, file, 1), {timeoutMs: 120000, signal});
+      await this.#encodeVideo(encodeProresFragment(files[index]!, file, 1), signal, 120_000);
       fragments.push({file, repeat: (frames[index + 1] ?? count) - start});
     }
     return this.#writeProresList(work, fragments, count, signal);
@@ -329,8 +332,7 @@ export class RenderBackend implements Backend {
       if (multiScenes && !request.transparent) {
         await this.scratch.ensureSpace(512 * 1024 ** 2);
         const conform = path.join(work, 'montaje-multiple.mp4');
-        await this.deps.run(this.config.ffmpeg, stageMultiSourcePicture(multiVideo, multiScenes, request.resolution, conform),
-          {timeoutMs: 1200000, signal: bounded});
+        await this.#encodeVideo(stageMultiSourcePicture(multiVideo, multiScenes, request.resolution, conform), bounded);
         if (videoFrameCount(await this.#readProbe(conform, bounded)) !== request.durationInFrames) {
           throw new WorkerError(502, 'MONTAJE_INCOMPLETO', 'El montaje no conserva todos sus fotogramas.');
         }
@@ -359,8 +361,7 @@ export class RenderBackend implements Backend {
       if (usesHyperframes && scenes && sourceVideo && !multiScenes) {
         await this.scratch.ensureSpace(512 * 1024 ** 2);
         const conform = path.join(work, 'montaje.mp4');
-        await this.deps.run(this.config.ffmpeg, stageHyperframesPicture(sourceVideo, scenes, request.resolution, conform),
-          {timeoutMs: 120000, signal: bounded});
+        await this.#encodeVideo(stageHyperframesPicture(sourceVideo, scenes, request.resolution, conform), bounded, 120_000);
         if (videoFrameCount(await this.#readProbe(conform, bounded)) !== request.durationInFrames) {
           throw new WorkerError(502, 'MONTAJE_INCOMPLETO', 'El montaje previo de HyperFrames no conserva todos sus fotogramas.');
         }
@@ -391,9 +392,9 @@ export class RenderBackend implements Backend {
       let proresList: string | null;
       if (sceneProres && usesHyperframes) {
         const fragment = path.join(work, 'prores-animado.mov');
-        await this.deps.run(this.config.ffmpeg, encodeProresFragment(
+        await this.#encodeVideo(encodeProresFragment(
           path.join(work, 'frames-hyperframes', 'frame_%06d.png'), fragment, request.durationInFrames, 1,
-        ), {timeoutMs:1200000, signal:bounded});
+        ), bounded);
         proresList = await this.#writeProresList(work, [{file:fragment, repeat:1}], request.durationInFrames, bounded);
       } else proresList = sceneProres && layerFrames
         ? await this.#prepareSceneProres(work, layerFrames, scene.files, request.durationInFrames, bounded)
@@ -413,7 +414,7 @@ export class RenderBackend implements Backend {
           : proresList
           ? muxProresFragments(proresList, audio, output, request.durationInFrames, duration, measured, peak)
           : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, usesHyperframes || multiScenes ? undefined : scenes, ad ? AD_MUSIC_ID : undefined, Boolean(ad?.destination) && !usesHyperframes, request.props.title_layout);
-        await this.deps.run(this.config.ffmpeg, encode, {timeoutMs: 1200000, signal: bounded});
+        await this.#encodeVideo(encode, bounded);
         phase = 'control';
         const outputProbe = await this.#readProbe(output, bounded);
         if ((sourceVideo || proresList || correctingMp4 || scenes) && videoFrameCount(outputProbe) !== request.durationInFrames) {
@@ -477,8 +478,7 @@ export class RenderBackend implements Backend {
           paths.set(item.id, file);
         }
         source = path.join(work, 'vista-previa-multiple.mp4');
-        await this.deps.run(this.config.ffmpeg, stageMultiSourcePicture(paths, scenes, request.resolution, source),
-          {timeoutMs:1200000,signal:bounded});
+        await this.#encodeVideo(stageMultiSourcePicture(paths, scenes, request.resolution, source), bounded);
         if (videoFrameCount(await this.#readProbe(source, bounded)) !== request.durationInFrames) {
           throw new WorkerError(502, 'MONTAJE_INCOMPLETO', 'La vista previa no conserva todos sus fotogramas.');
         }
