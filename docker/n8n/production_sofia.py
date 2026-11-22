@@ -1,10 +1,13 @@
 """Obtiene el primer brief de Sofía para una orden de ingesta acreditada."""
 
 import argparse
+import asyncio
 import json
 import os
 import re
 import subprocess
+import sys
+from contextlib import AsyncExitStack
 from pathlib import Path
 
 from production_handoff import canonical, eligible, load_profile, publish, read_regular, validate
@@ -76,21 +79,7 @@ def validate_transcript(result):
     return result
 
 
-MCP_TRANSCRIBE = """
-import asyncio,json,sys
-from pathlib import Path
-root=Path(sys.executable).parent.parent.parent
-sys.path.insert(0,str(root/"mcp_servers"))
-import call_stdio
-args=json.load(sys.stdin)
-settings=call_stdio.runtime_settings()
-settings["AGENCY_MEDIA_PROJECTS"]=args["proyecto"]
-call_stdio.runtime_settings=lambda: settings
-print(json.dumps(asyncio.run(call_stdio.call("mcp-media-inspector","transcribir_audio",args)),ensure_ascii=False,allow_nan=False))
-"""
-
-
-def transcript_for(receipt, output, source=None):
+async def transcript_for(receipt, output, source, transcribe):
     audio = receipt["audio"] if source is None else source["audio"]
     if audio is None:
         return None
@@ -129,16 +118,9 @@ def transcript_for(receipt, output, source=None):
         ):
             raise ValueError("La transcripción guardada pertenece a otro medio")
         return validate_transcript(cached["result"])
-    run = subprocess.run(
-        [str(MCP / "venv/bin/python"), "-I", "-B", "-c", MCP_TRANSCRIBE],
-        input=canonical({"proyecto": project, "ruta": audio["path"]}),
-        capture_output=True,
-        check=True,
-        timeout=310,
-    )
-    if len(run.stdout) > MAX_TRANSCRIPT:
+    data = await transcribe(project, audio["path"])
+    if len(canonical(data)) > MAX_TRANSCRIPT:
         raise ValueError("Transcripción de ingesta excede el límite")
-    data = json.loads(run.stdout)
     if data.keys() != {"result"} or fingerprint(path) != expected:
         raise ValueError("El inspector no confirmó la transcripción del audio")
     result = validate_transcript(data["result"])
@@ -147,6 +129,40 @@ def transcript_for(receipt, output, source=None):
         raise ValueError("Recibo de transcripción excede el límite")
     publish(sidecar, raw)
     return result
+
+
+async def collect_transcripts(receipt, output, sources):
+    async with AsyncExitStack() as stack:
+        client = None
+        inspector = None
+        authorized_project = receipt["order"]["media"]["project_slug"]
+
+        async def transcribe(project, path):
+            nonlocal client, inspector
+            if project != authorized_project:
+                raise ValueError("El audio pertenece a otro proyecto")
+            async with asyncio.timeout(310):
+                if client is None:
+                    sys.path.insert(0, str(MCP / "mcp_servers"))
+                    import call_stdio
+
+                    inspector = call_stdio
+                    config = inspector.runtime_settings()
+                    config["AGENCY_MEDIA_PROJECTS"] = project
+                    client = await stack.enter_async_context(
+                        inspector.client_for("mcp-media-inspector", config)
+                    )
+                return await inspector.call_tool(
+                    client,
+                    "mcp-media-inspector",
+                    "transcribir_audio",
+                    {"proyecto": project, "ruta": path},
+                )
+
+        return {
+            index: await transcript_for(receipt, output, item, transcribe)
+            for _, index, item in sorted(sources, key=lambda entry: (entry[0], entry[1]))
+        }
 
 
 def start_brief(receipt, output):
@@ -175,9 +191,7 @@ def start_brief(receipt, output):
     sources = [(duration, 0, None)] + [
         (item["duration_seconds"], index, item) for index, item in enumerate(additional, start=1)
     ]
-    transcripts = {}
-    for _, index, item in sorted(sources, key=lambda entry: (entry[0], entry[1])):
-        transcripts[index] = transcript_for(receipt, output, item)
+    transcripts = asyncio.run(collect_transcripts(receipt, output, sources))
     facts = {
         "plan": order["plan_id"],
         "duracion_segundos": duration,
@@ -277,5 +291,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+    except Exception:
+        # El cliente stdio puede envolver el fallo de transporte en un ExceptionGroup.
         raise SystemExit("Falló el turno de ingesta de Sofía") from None
