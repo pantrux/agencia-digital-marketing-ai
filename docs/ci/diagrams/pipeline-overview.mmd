@@ -26,6 +26,7 @@ flowchart TB
     %% Kitsu acepta medios aprobados de hasta 3 GiB. Su proxy reserva un margen para la estructura multipart.
     %% El control 7 coteja los árboles de ambos commits cuando la comparación alcanza su límite.
     %% La evidencia operativa de Fase 4 se registra fuera de CI.
+    %% La copia integral conserva cron a las 03:30 y usa un temporizador para recuperar el día tras el arranque.
     %% Ruff y formato incluyen docker/.
     %% Los controles de Worker, ingress y portal se ejecutan cuando existen sus fuentes de entrada.
     INICIO["Solicitud de cambio a main, actualización de main o ejecución manual"]

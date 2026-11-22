@@ -130,6 +130,7 @@ APPLICATION_CRITICAL_FILES = (
     "sre/backup_321_openclaw_transport.py",
     "sre/backup_321_verify_openclaw_restore.py",
     "sre/systemd/agency-backup-321-daily.service",
+    "sre/systemd/agency-backup-321-daily.timer",
     "sre/systemd/agency-backup-d1-clock.service",
     "sre/systemd/agency-backup-d1-clock.timer",
     "sre/systemd/agency-backup-openclaw-clock.service",

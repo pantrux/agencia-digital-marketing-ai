@@ -11,7 +11,7 @@ Type=oneshot
 User=root
 Group=root
 WorkingDirectory=/opt/media-platform/backup-321-runtime-v3b
-ExecStart=/usr/bin/python3 -I -B /opt/media-platform/backup-321-runtime-v3b/backup_321_daily.py --retention apply
+ExecStart=/usr/bin/python3 -I -B /opt/media-platform/backup-321-runtime-v3b/backup_321_daily.py --scheduled --retention apply
 Environment=LC_ALL=C.UTF-8
 UMask=0077
 TimeoutStartSec=5h
