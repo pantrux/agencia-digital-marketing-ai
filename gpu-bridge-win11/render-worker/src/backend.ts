@@ -108,7 +108,16 @@ export class RenderBackend implements Backend {
   async #job<T>(signal: AbortSignal, fn: (work: string, signal: AbortSignal) => Promise<T>): Promise<T> {
     this.#requireReady();
     const work = await this.scratch.job();
-    try {return await fn(work, AbortSignal.any([signal, AbortSignal.timeout(1200000)]));}
+    const deadline = AbortSignal.timeout(1200000);
+    const bounded = AbortSignal.any([signal, deadline]);
+    try {return await fn(work, bounded);}
+    catch (error) {
+      if (deadline.aborted && bounded.reason === deadline.reason &&
+          (!(error instanceof WorkerError) || error.code === 'PROCESO_CANCELADO')) {
+        throw new WorkerError(504, 'PLAZO_TRABAJO_AGOTADO', 'El puente agotó el plazo de trabajo.');
+      }
+      throw error;
+    }
     finally {await this.scratch.remove(work);}
   }
   async #readProbe(file: string, signal: AbortSignal): Promise<string> {
@@ -259,7 +268,9 @@ export class RenderBackend implements Backend {
 
   async render(request: RenderRequest, signal: AbortSignal) {
     const started = performance.now();
+    let phase = 'entrada';
     return this.#withReceipt(request, 'render', signal, publish => this.#job(signal, async (work, bounded) => {
+      phase = 'audio';
       const audioStarted = performance.now();
       const duration = request.durationInFrames / 30;
       const pixels = request.width * request.height;
@@ -309,6 +320,7 @@ export class RenderBackend implements Backend {
       }
       const measured = parseLoudness((await this.deps.run(this.config.ffmpeg, measureAudio(audio, duration), {timeoutMs: 1200000, signal: bounded})).stderr);
       const framesStarted = performance.now();
+      phase = 'preparacion_video';
       const video = await this.#videoInput(request, bounded);
       const staticProres = !scenes && request.format === 'prores4444' && !video && request.durationInFrames > TITLE_FADE_FRAMES + 1;
       const videoBytes = video ? (await stat(video.source)).size : 0;
@@ -366,11 +378,13 @@ export class RenderBackend implements Backend {
       }
       else if (staticProres) await this.scratch.ensureSpace((TITLE_FADE_FRAMES + 1) * frameBytes * 2);
       else if (!sourceVideo) await this.scratch.ensureSpace(videoBytes + request.durationInFrames * frameBytes + outputs);
+      phase = usesHyperframes ? 'fotogramas_hyperframes' : 'fotogramas_remotion';
       const scene = await this.#scene(request, work, layerFrames, bounded, sourceVideo ? null : video?.source ?? null,
         sourceVideo || (usesHyperframes && request.transparent) ? true : undefined);
       const encodeStarted = performance.now();
       if (scene.frameCount !== (layerFrames?.length ?? request.durationInFrames)
         || scene.files.length !== (layerFrames?.length ?? 1)) throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'La composición no produjo todos los fotogramas.');
+      phase = 'codificacion';
       const framePattern = scenes && layerFrames && !sceneProres
         ? await timelineImages(work, layerFrames, scene.files, request.durationInFrames, bounded)
         : layerFrames ? path.join(work, 'frames', 'still-%d.png') : scene.files[0]!;
@@ -389,6 +403,7 @@ export class RenderBackend implements Backend {
       let output = '', info: MediaInfo | undefined, finalAudio = measured;
       const retryPeak = request.durationInFrames > 1800 && (sourceVideo || proresList) ? -3.5 : -2;
       for (const peak of [-1.5, retryPeak]) {
+        phase = 'codificacion';
         const extension = request.format === 'prores4444' ? 'mov' : 'mp4';
         const previousOutput = output;
         const correctingMp4 = peak === retryPeak && request.format === 'mp4';
@@ -399,6 +414,7 @@ export class RenderBackend implements Backend {
           ? muxProresFragments(proresList, audio, output, request.durationInFrames, duration, measured, peak)
           : encodeOutput(request.format, request.resolution, framePattern, audio, output, request.durationInFrames, duration, measured, peak, sourceVideo, normalizeVideo, usesHyperframes || multiScenes ? undefined : scenes, ad ? AD_MUSIC_ID : undefined, Boolean(ad?.destination) && !usesHyperframes, request.props.title_layout);
         await this.deps.run(this.config.ffmpeg, encode, {timeoutMs: 1200000, signal: bounded});
+        phase = 'control';
         const outputProbe = await this.#readProbe(output, bounded);
         if ((sourceVideo || proresList || correctingMp4 || scenes) && videoFrameCount(outputProbe) !== request.durationInFrames) {
           throw new WorkerError(502, 'FOTOGRAMAS_INCOMPLETOS', 'El máster no conserva todos los fotogramas esperados.');
@@ -423,6 +439,7 @@ export class RenderBackend implements Backend {
       const alpha = request.transparent ? {...await this.#alpha(output, work, 'render', alphaAt, bounded), sample_seconds: alphaAt} : null;
       bounded.throwIfAborted();
       const publishStarted = performance.now();
+      phase = 'publicacion_nas';
       const files = await publish([output]);
       const finished = performance.now();
       const stage_ms = {
@@ -433,7 +450,13 @@ export class RenderBackend implements Backend {
       };
       const render_pipeline = usesHyperframes ? 'capas_hyperframes_nvenc' : scenes ? 'capas_por_escena' : sourceVideo ? 'capas_remotion_nvenc' : staticProres ? 'prores_grafica_estatica' : 'fotogramas_remotion';
       return {files, codec: request.format === 'mp4' ? 'h264_nvenc' : 'prores_ks', hardware_acceleration: request.format === 'mp4', resolution: request.resolution, watermark: request.watermark, audio_verified: true, audio: finalAudio, alpha_verified: request.transparent && alpha?.has_transparency === true, alpha, media: info, elapsed_ms: Math.round(finished - started), stage_ms, render_pipeline};
-    }));
+    })).catch((error: unknown) => {
+      const job = createHash('sha256').update(`${request.project_id}/${request.job_id}`).digest('hex').slice(0, 16);
+      console.warn(JSON.stringify({service: 'remotion', utc: new Date().toISOString(), operation: 'render',
+        job, phase, elapsed_ms: Math.round(performance.now() - started),
+        error: error instanceof WorkerError ? error.code : 'FALLO_INTERNO'}));
+      throw error;
+    });
   }
   async stills(request: StillsRequest, signal: AbortSignal) {
     const started = performance.now();
