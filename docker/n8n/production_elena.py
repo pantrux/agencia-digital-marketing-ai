@@ -48,10 +48,75 @@ AD_MUSIC_CREDIT = (
     "https://creativecommons.org/licenses/by/4.0/"
 )
 BAND_SAMPLE_BYTES = 12000
+BAND_COMPARISON_BYTES = 22000
 
 VALERIA = Path("/var/lib/agency-production-valeria")
 LUCAS = Path("/var/lib/agency-production-lucas")
 FIELDS = {"puntaje", "marca_free", "observaciones", "defectos"}
+
+
+def paired_band_samples(originals, masters):
+    """Muestra el original completo y el máster con la misma escala y posición de la banda."""
+    # La banda del puente mide 264 px en 1080p y 528 px en 4K.
+    fit = "force_original_aspect_ratio=decrease:force_divisible_by=2"
+    filters = (
+        f"[0:v]scale=360:552:{fit},"
+        "pad=360:640:trunc((ow-iw)/4)*2:trunc((oh-ih+88)/4)*2:color=0x141a15,setsar=1[original];"
+        f"[1:v]scale=360:640:{fit},pad=360:640:(ow-iw)/2:(oh-ih)/2:color=0x141a15,setsar=1[master];"
+        "[original][master]hstack=inputs=2"
+    )
+    with tempfile.TemporaryDirectory(prefix="studio-qa-encuadre-") as directory:
+        original, master = (Path(directory) / name for name in ("original.jpg", "master.jpg"))
+        pairs = []
+        for (stamp, original_bytes), (_, master_bytes) in zip(originals, masters, strict=True):
+            original.write_bytes(original_bytes)
+            master.write_bytes(master_bytes)
+            for quality in (8, 16, 24):
+                image = subprocess.run(
+                    [
+                        "/usr/bin/ffmpeg",
+                        "-v",
+                        "error",
+                        "-nostdin",
+                        "-filter_complex_threads",
+                        "1",
+                        "-protocol_whitelist",
+                        "file",
+                        "-i",
+                        str(original),
+                        "-protocol_whitelist",
+                        "file",
+                        "-i",
+                        str(master),
+                        "-filter_complex",
+                        filters,
+                        "-frames:v",
+                        "1",
+                        "-threads",
+                        "1",
+                        "-c:v",
+                        "mjpeg",
+                        "-q:v",
+                        str(quality),
+                        "-f",
+                        "image2pipe",
+                        "pipe:1",
+                    ],
+                    stdin=subprocess.DEVNULL,
+                    check=True,
+                    capture_output=True,
+                    timeout=10,
+                ).stdout
+                if (
+                    4 <= len(image) <= BAND_COMPARISON_BYTES
+                    and image.startswith(b"\xff\xd8")
+                    and image.endswith(b"\xff\xd9")
+                ):
+                    pairs.append((stamp, image))
+                    break
+            else:
+                raise ValueError("No se pudo preparar la comparación de encuadre")
+    return pairs
 
 
 def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", samples=3):
@@ -459,7 +524,7 @@ def review_video(
         "muestra (1, 2 o 3) y detalle, y defectos con objetos muestra y correccion. "
         "Incluye en defectos únicamente cambios necesarios para poder entregar. "
     )
-    originals = []
+    attachments = images
     if band:
         source = {
             "order": source_order,
@@ -470,22 +535,24 @@ def review_video(
         originals = sample_frames(source, stamps, BAND_SAMPLE_BYTES)
         if [second for second, _ in originals] != stamps:
             raise ValueError("Las muestras del original no coinciden con las del máster")
+        attachments = paired_band_samples(originals, images)
         evidence["comparacion_encuadre"] = [
-            {"master": index, "original": index + len(images), "segundo": second}
-            for index, second in enumerate(stamps, 1)
+            {"muestra": index, "segundo": second} for index, second in enumerate(stamps, 1)
         ]
         if objective:
             evidence["objetivo_confirmado"] = objective
         instructions += (
             "El título y el subtítulo deben leerse en la banda superior, fuera de la imagen. "
-            "Las muestras 1 a 3 son del máster; 4 a 6 son referencias del original. "
-            "Compara las parejas del JSON en el mismo instante. Verifica si la edición recortó "
-            "contenido visible en el original al inicio, en el centro o al cierre. "
+            "Cada muestra contiene un par del mismo instante. A la izquierda está la toma completa "
+            "ajustada al espacio de la banda. A la derecha está el máster con sus rótulos. "
+            "Compara los bordes de ambas imágenes a esa misma escala. Para afirmar que la edición "
+            "recortó, identifica qué contenido aparece en un borde de la izquierda y falta en el "
+            "mismo borde de la derecha. Los márgenes de ajuste proporcional son parte del diseño. "
             "Describe en observaciones los cortes de encuadre que ya estaban en la grabación. "
             "Si un corte de origen impide cumplir el objetivo confirmado, regístralo como defecto "
             "y explica qué toma hace falta. Registra como defecto cualquier recorte introducido "
             "por la edición, banda sobre el rostro o producto, o texto cortado. "
-            "Cita sólo números de muestra del máster en el dictamen y evalúa su calidad final. "
+            "Cita el número del par correspondiente al máster en el dictamen y evalúa su calidad final. "
         )
     if checks:
         evidence["rotulos_por_muestra"] = [check["rotulo_esperado"] for check in checks]
@@ -556,7 +623,7 @@ def review_video(
     request = visual_request(
         "agency-critic",
         instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
-        images + originals,
+        attachments,
         request_id,
     )
     try:
@@ -622,6 +689,10 @@ def review_video(
                     "muestras": [
                         {"segundo": s, "sha256": hashlib.sha256(p).hexdigest()}
                         for s, p in originals
+                    ],
+                    "comparaciones": [
+                        {"segundo": s, "sha256": hashlib.sha256(p).hexdigest()}
+                        for s, p in attachments
                     ],
                 }
             }

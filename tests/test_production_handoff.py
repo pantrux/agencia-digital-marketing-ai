@@ -1905,11 +1905,19 @@ def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
         assert stamps == [0.55, 30.0, 59.88] and limit == 12000
         return [(second, b"original") for second in stamps]
 
+    def paired_band_samples(originals, masters):
+        stamps = [0.55, 30.0, 59.88]
+        assert originals == [(second, b"original") for second in stamps]
+        assert masters == [(second, b"master") for second in stamps]
+        return [(second, b"par en el mismo instante") for second in stamps]
+
     def run_visual(request):
         evidence = json.loads(request["message"].rsplit("\n", 1)[1])
         assert evidence["objetivo_confirmado"] == objective
-        assert [row["original"] for row in evidence["comparacion_encuadre"]] == [4, 5, 6]
-        assert len(request["attachments"]) == 6
+        assert [row["muestra"] for row in evidence["comparacion_encuadre"]] == [1, 2, 3]
+        assert "A la izquierda está la toma completa" in request["message"]
+        assert "A la derecha está el máster" in request["message"]
+        assert len(request["attachments"]) == 3
         return {
             "puntaje": 92,
             "marca_free": "",
@@ -1923,6 +1931,7 @@ def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
 
     monkeypatch.setattr(elena, "decode", decode)
     monkeypatch.setattr(elena, "sample_frames", sample_frames)
+    monkeypatch.setattr(elena, "paired_band_samples", paired_band_samples)
     monkeypatch.setattr(elena, "run_visual", run_visual)
     props = {
         "title": "Sansevierias",
@@ -1946,6 +1955,11 @@ def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
     assert review["referencia_original"]["sha256"] == order["media"]["sha256"]
     assert [row["segundo"] for row in review["muestras"]] == [
         row["segundo"] for row in review["referencia_original"]["muestras"]
+    ]
+    assert [row["segundo"] for row in review["referencia_original"]["comparaciones"]] == [
+        0.55,
+        30.0,
+        59.88,
     ]
 
 
