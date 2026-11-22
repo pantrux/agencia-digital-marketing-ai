@@ -48,6 +48,8 @@ Para cambios en las rutas multipart, coteja que la familia `presign` del recolec
 
 Al revisar el publicador de Studio, comprueba que el entorno de la orden verificada coincida tanto con la ruta del ZIP y del ProRes en R2 como con el entorno de la firma que recibe el Worker. La producción comercial requiere habilitar y verificar por separado la admisión de órdenes y revisiones fuera del piloto. La prueba de publicación usa respuestas aisladas de R2 y Studio y conserva el checkout pausado.
 
+Para verificar el activador de publicación, deposita el recibo aprobado de una orden de ensayo en la carpeta de entregas mediante el escritor habitual. Comprueba que la unidad se active sin esperar al temporizador y que conserve las señales de dictamen y asignación. El temporizador comprueba los recibos pendientes cuando la unidad queda inactiva.
+
 Para ensayos del codificador facial, coteja las fuentes fijadas de Immich y prueba el formato real por API con un corpus desechable. Registra las particiones y los umbrales antes de inferir. [Aceptación facial](../../../docker/immich-server/README-ACEPTACION-FACIAL.md#ensayo-de-vistas-previas-webp-sin-pérdida)
 
 Para probar la llegada de fotos a grupos existentes, fija tres tandas en el manifiesto sintético y coteja las asignaciones acumuladas después de drenar las colas de cada una. [Sonda por manifiesto](../../../docker/immich-server/README-ACEPTACION-FACIAL.md#espacio-y-orden-de-ejecución)
