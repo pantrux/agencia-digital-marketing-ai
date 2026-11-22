@@ -64,7 +64,7 @@ def test_traspaso_conserva_fotogramas_y_rechaza_corte_alterado(cut):
     assert resolve.srt_time(1) == "00:00:00,033"
     assert resolve.srt_time(900) == "00:00:30,000"
     props["scenes"][0]["source_end_frame"] = 991
-    with pytest.raises(ValueError, match="900 fotogramas"):
+    with pytest.raises(ValueError, match="fotogramas de la escaleta"):
         resolve.validated_cut(intake, direction)
 
 
@@ -113,6 +113,7 @@ def test_reconoce_musica_desplazada_y_rechaza_otra_pista(cut):
     reference = array("h", (generator.randint(-20000, 20000) for _ in range(16000)))
     segment = array("h", (sample // 4 for sample in reference[9000:13000]))
     assert matching_music_window(segment, reference)
+    assert matching_music_window(segment[:500], reference)
     assert not matching_music_window(array("h", [0] * 4000), reference)
     other = array("h", (generator.randint(-20000, 20000) for _ in range(4000)))
     assert not matching_music_window(other, reference)

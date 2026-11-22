@@ -13,6 +13,7 @@ from pathlib import Path
 
 from production_delivery import MAX_KIT, digest_stream, open_media
 from production_handoff import (
+    DIRECTION_LIMIT,
     QA_ROUNDS,
     canonical,
     eligible,
@@ -109,7 +110,7 @@ def load_claim_context(claim, journal, strategies, directions, revision_drafts, 
         direction_path = Path(revision_drafts) / f"{job[:-2]}.json"
     else:
         raise ValueError("Trabajo de la entrega base inválido")
-    direction = json.loads(read_regular(direction_path, METADATA_LIMIT))
+    direction = json.loads(read_regular(direction_path, DIRECTION_LIMIT))
     strategy = json.loads(read_regular(Path(strategies) / f"{identity}.json", LIMIT))
     approved_base(claim, receipt, direction, kit_path)
     return {"receipt": receipt, "strategy": strategy, "direction": direction, "kit_path": kit_path}

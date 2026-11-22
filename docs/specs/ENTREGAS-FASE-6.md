@@ -88,7 +88,7 @@ El comando de auditoría consulta los briefs confirmados en los últimos 30 día
 
 ### Reel por escenas
 
-En Producción, **Montaje** permite pedir un reel de 30–45 segundos. Studio conserva la selección en la orden y Valeria genera de dos a seis cortes ordenados sobre el material recibido. Los rótulos tienen posición y límites por fotograma. El mismo montaje sincroniza el audio del MP4 y la gráfica transparente del MOV cuando se solicita ProRes.
+En Producción, **Reel por escenas** adapta la duración al objetivo del brief y al material disponible. Studio conserva la selección y Valeria puede usar un solo tramo, conservar el clip completo o armar el reel con varios cortes. Cada fuente sigue sujeta a la capacidad técnica de ingesta y render. Los rótulos tienen posición y límites por fotograma. El mismo montaje sincroniza el audio del MP4 y la gráfica transparente del MOV cuando se solicita ProRes.
 
 Lucas guarda la vista previa de 1080p y su recibo antes de solicitar el máster. Elena revisa la apertura, el cierre y muestras por escena, con el rótulo esperado en cada punto. Un rechazo de vista previa sigue el circuito existente de revisiones y se vincula a la huella de la escaleta y del archivo revisado. El máster aprobado sigue el flujo normal de Kitsu y Entregas.
 
@@ -111,7 +111,7 @@ journalctl -u agency-studio-delivery-metrics.service --since today
 
 ## Anuncio guiado por guion
 
-En una orden **Reel por escenas** con salida MP4, confirma el brief con una llamada a la acción de hasta 70 caracteres y el nombre de marca que aparecerá al cierre. Studio activa un anuncio de 30 segundos con planos del original, subtítulos de la voz y una placa de marca y CTA entre los segundos 26 y 30. La mezcla utiliza «Carefree» de Kevin MacLeod, con licencia CC BY 4.0, y atenúa la pista durante el diálogo. La biblioteca conserva la fuente original con huella fijada. El ZIP incluye el crédito para la publicación del anuncio. La revisión transcribe la mezcla final y mide la coincidencia temporal con los subtítulos antes de aprobar.
+En una orden **Reel por escenas** con salida MP4, confirma el brief con una llamada a la acción de hasta 70 caracteres y el nombre de marca que aparecerá al cierre. Studio adapta el anuncio a la duración del montaje, con subtítulos respaldados por la voz y la gráfica del CTA al final. La mezcla utiliza «Carefree» de Kevin MacLeod, con licencia CC BY 4.0, y atenúa la pista durante el diálogo. La biblioteca conserva la fuente original con huella fijada. El ZIP incluye el crédito para la publicación del anuncio. La revisión transcribe la mezcla final y mide la coincidencia temporal con los subtítulos antes de aprobar.
 
 Aplica primero la migración D1 `0019_brief_ad_cta.sql`. Despliega el Worker, las recetas de los agentes y el renderer antes de publicar la interfaz. Las órdenes con el campo vacío siguen la ruta habitual. El máster sólo se genera tras el dictamen de vista previa y conserva los controles técnicos del perfil de la orden. La revisión comprueba encuadre de apertura, subtítulos por frases y el nivel de la música al final. Escuchar la mezcla sigue siendo una comprobación editorial independiente.
 
@@ -136,7 +136,7 @@ copia. Conserva el render, su huella y el dictamen de Elena en el área privada
 de revisión.
 
 
-Lucas puede preparar un anuncio guiado de 30 s de un plan pagado con `docker/n8n/production_resolve.py`. El piloto es optativo y usa los recibos privados de ingesta y dirección. Coteja las huellas de las fuentes, escribe una copia vertical a 30 fps y entrega un OTIO a 900 fotogramas con pistas de imagen, voz y música, un SRT y marcadores de los rótulos y el CTA. Mantén el paquete con sus referencias y guarda los cambios en el proyecto de Resolve.
+Lucas puede preparar un anuncio guiado de un plan pagado con `docker/n8n/production_resolve.py`. El piloto es optativo y usa los recibos privados de ingesta y dirección. Coteja las huellas de las fuentes, escribe una copia vertical a 30 fps y entrega un OTIO con los fotogramas de la escaleta, pistas de imagen, voz y música, un SRT y marcadores de los rótulos y el CTA. Mantén el paquete con sus referencias y guarda los cambios en el proyecto de Resolve.
 
 En Windows, instala `opentimelineio==0.18.1` en el entorno de preparación y usa el FFmpeg del puente. Ejemplo con argumentos del proyecto seleccionado:
 

@@ -25,7 +25,7 @@ El worker admite 600 segundos por pieza y hasta 20 minutos de procesamiento. Las
 
 ## Montaje de anuncio corto
 
-Monta las escenas en el orden de la escaleta y comprueba su correspondencia con la voz original. Proyecta los subtítulos en el reloj de salida y valida el MP4 final a 30 segundos. Mantén la música por debajo de la voz y mide la mezcla terminada. Verifica gancho, subtítulos y CTA en la vista previa antes de generar el máster.
+Monta las escenas en el orden de la escaleta y comprueba su correspondencia con la voz original. Proyecta los subtítulos en el reloj de salida y valida que el MP4 final tenga la duración de la escaleta. Mantén la música por debajo de la voz y mide la mezcla terminada. Verifica gancho, subtítulos y CTA en la vista previa antes de generar el máster.
 
 ## Música de catálogo y montaje
 

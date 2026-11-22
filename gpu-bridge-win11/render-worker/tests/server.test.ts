@@ -12,7 +12,20 @@ test('todas las rutas exigen token y socket permitido; salud no inventa disponib
   assert.equal((await app.handle({...request('/health'), remoteAddress: '192.168.0.100'})).status, 403);
   assert.equal((await app.handle(request('/healthz'))).status, 503);
   assert.equal((await app.handle(request('/render', '{'))).status, 422);
-  assert.equal((await app.handle(request('/render', 'x'.repeat(65537)))).status, 413);
+  assert.equal((await app.handle(request('/render', 'x'.repeat(1024 * 1024 + 1)))).status, 413);
+  assert.equal((await app.handle(request('/inspect', 'x'.repeat(65537)))).status, 413);
+});
+
+test('el renderer recibe escaletas de más de 64 KiB con subtítulos temporizados', async () => {
+  const app = new Application(token, backend());
+  const captions = Array.from({length:400}, (_, i) => ({start_frame:i * 30,end_frame:i * 30 + 27,text:'界'.repeat(68)}));
+  const props = {...data.props,duration_seconds:420,video_path:'proyectos/sansevieras/01_raw/crudo.mp4',
+    scenes:[{source_start_frame:0,source_end_frame:12600,label:{text:'Gancho',start_frame:0,end_frame:60,position:'top'}}],
+    ad:{cta:'Escríbenos',brand:'Vivero',captions}};
+  const body = JSON.stringify({...data,props});
+  assert.ok(Buffer.byteLength(body) > 65536);
+  assert.equal((await app.handle(request('/render',body))).status, 200);
+  assert.equal((await app.handle(request('/stills',body))).status, 200);
 });
 test('tercer render se rechaza mientras dos operaciones siguen activas', async () => {
   let release!: () => void; const blocked = new Promise<void>((resolve) => {release = resolve;});

@@ -34,6 +34,12 @@ it("admite un vídeo de exactamente diez minutos y libera la URL local", async (
   expect(revoke).toHaveBeenCalledExactlyOnceWith("blob:prueba");
 });
 
+it("valida los metadatos de un clip de 22 segundos", async () => {
+  const revoke = prepare(22);
+  await expect(validateVideoDuration(new Blob())).resolves.toBeUndefined();
+  expect(revoke).toHaveBeenCalledExactlyOnceWith("blob:prueba");
+});
+
 it.each([601, Infinity, NaN, 0, "error"] as const)("rechaza metadatos fuera del contrato (%s)", async (result) => {
   const revoke = prepare(result);
   await expect(validateVideoDuration(new Blob())).rejects.toThrow(

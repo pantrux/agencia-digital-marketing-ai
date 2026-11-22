@@ -18,6 +18,7 @@ from contextlib import closing, contextmanager
 from pathlib import Path
 
 from production_handoff import (
+    DIRECTION_LIMIT,
     RENDER_SIZES,
     canonical,
     eligible,
@@ -354,7 +355,7 @@ def deliver_pending_order(identity, entry, profile, dispatch, target, gpu):
         return False
     render, qa = revision
     master = approved_master(order, render, qa, brief)
-    direction = json.loads(read_regular(VALERIA / target.name, LIMIT))
+    direction = json.loads(read_regular(VALERIA / target.name, DIRECTION_LIMIT))
     strategy = json.loads(read_regular(MATEO / target.name, LIMIT))
     caption = approved_caption(order, render, direction, strategy)
     relative, digest, length = stage_package(order, master, render, qa, brief, caption=caption)
@@ -373,7 +374,7 @@ def deliver_pending_order(identity, entry, profile, dispatch, target, gpu):
     extra = {}
     if render_format(order) == "prores4444":
         leaf = revision_leaf(identity, int(render["job_id"][-1]))
-        approved_direction = json.loads(read_regular(VALERIA / leaf, LIMIT))
+        approved_direction = json.loads(read_regular(VALERIA / leaf, DIRECTION_LIMIT))
         # El MP4 aprobado puede preparar su vista previa mientras el puente genera el MOV.
         with ThreadPoolExecutor(max_workers=1) as executor:
             preview = executor.submit(attach_preview, *preview_args)

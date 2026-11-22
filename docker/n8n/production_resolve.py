@@ -11,12 +11,11 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from production_handoff import canonical, publish, read_regular, render_plan
+from production_handoff import DIRECTION_LIMIT, canonical, publish, read_regular, render_plan
 from production_inbox import UUID, matches
-from production_valeria import AD_MUSIC_ID, source_paths
+from production_valeria import AD_MUSIC_ID, ad_endcard_frame, source_paths
 
 FPS = 30
-FRAMES = 900
 MUSIC_PATH = f"_biblioteca_global/musica-stock/{AD_MUSIC_ID}.mp3"
 MUSIC_SHA256 = "8433b770a630d9b1594fd484442c677907ece899a4d149954cd2e74fd733e311"
 LIMIT = 131072
@@ -63,6 +62,7 @@ def validated_cut(intake, direction):
     decision = direction["escaleta"]
     render = decision["render"]
     props = render["props"]
+    duration = props["duration_seconds"]
     if (
         direction["order_id"] != order_id
         or direction["source_sha256"] != media["sha256"]
@@ -73,12 +73,14 @@ def validated_cut(intake, direction):
         or render["composition"] != "AgencyVertical"
         or render["format"] != "mp4"
         or (props["video_path"], props["audio_path"]) != source_paths(intake)
-        or props["duration_seconds"] != FRAMES / FPS
+        or type(duration) not in (int, float)
+        or not 0.1 <= duration <= 600
         or props["ad"]["soundtrack"] != AD_MUSIC_ID
     ):
-        raise ValueError("El montaje de 30 s no corresponde a una escaleta acreditada")
+        raise ValueError("El montaje no corresponde a una escaleta acreditada")
+    frames = round(duration * FPS)
     source_frames = int(intake["duration_seconds"] * FPS)
-    if not FRAMES <= source_frames <= 600 * FPS:
+    if not frames <= source_frames <= 600 * FPS:
         raise ValueError("Duración del crudo fuera del límite")
     scenes = props["scenes"]
     if not 1 <= len(scenes) <= 12:
@@ -89,15 +91,16 @@ def validated_cut(intake, direction):
         if type(start) is not int or type(end) is not int or not 0 <= start < end <= source_frames:
             raise ValueError("Corte fuera del crudo")
         total += end - start
-    if total != FRAMES:
-        raise ValueError("El montaje no suma 900 fotogramas")
+    if total != frames:
+        raise ValueError("El montaje no suma los fotogramas de la escaleta")
+    voice_end = ad_endcard_frame(frames)
     previous = 0
     for cue in props["ad"]["captions"]:
         start, end, caption = cue["start_frame"], cue["end_frame"], cue["text"]
         if (
             type(start) is not int
             or type(end) is not int
-            or not previous <= start < end <= FRAMES
+            or not previous <= start < end <= voice_end
             or not isinstance(caption, str)
             or not 0 < len(caption) <= 240
             or len(caption.splitlines()) != 1
@@ -136,12 +139,14 @@ def timeline(props, package, source_frames):
     voice = otio.schema.Track(name="Voz original", kind="Audio")
     bed = otio.schema.Track(name="Música de catálogo", kind="Audio")
     cut.tracks.extend((picture, voice, bed))
+    frames = round(props["duration_seconds"] * FPS)
+    voice_end = ad_endcard_frame(frames)
     offset = 0
     for scene in props["scenes"]:
         start = scene["source_start_frame"]
         length = scene["source_end_frame"] - start
         picture.append(clip(package / "imagen-edicion.mov", start, length, source_frames))
-        voice_length = min(length, max(0, 26 * FPS - offset))
+        voice_length = min(length, max(0, voice_end - offset))
         if voice_length:
             voice.append(clip(package / "voz-original.wav", start, voice_length, source_frames))
         if voice_length < length:
@@ -156,19 +161,30 @@ def timeline(props, package, source_frames):
                 )
             )
         offset += length
-    bed.append(clip(package / "musica-catalogo.wav", 0, FRAMES, FRAMES))
+    bed.append(clip(package / "musica-catalogo.wav", 0, frames, frames))
     cut.tracks.markers.append(
         otio.schema.Marker(
             name=f"{props['ad']['brand']} · {props['ad']['cta']}",
-            marked_range=span(26 * FPS, 4 * FPS),
+            marked_range=span(voice_end, frames - voice_end),
         )
     )
     return otio.adapters.write_to_string(cut, "otio_json")
 
 
-def transcode(ffmpeg, source, destination, options):
+def transcode(ffmpeg, source, destination, options, *, loop=False):
     subprocess.run(
-        [ffmpeg, "-v", "error", "-nostdin", "-n", "-i", str(source), *options, str(destination)],
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-nostdin",
+            "-n",
+            *(["-stream_loop", "-1"] if loop else []),
+            "-i",
+            str(source),
+            *options,
+            str(destination),
+        ],
         stdin=subprocess.DEVNULL,
         check=True,
         timeout=900,
@@ -259,7 +275,19 @@ def write_package(
         ffmpeg,
         music,
         work / "musica-catalogo.wav",
-        ["-map", "0:a:0", "-t", "30", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s24le"],
+        [
+            "-map",
+            "0:a:0",
+            "-t",
+            str(props["duration_seconds"]),
+            "-ac",
+            "2",
+            "-ar",
+            "48000",
+            "-c:a",
+            "pcm_s24le",
+        ],
+        loop=True,
     )
     if any(inspect_file(path) != metadata for path, metadata in expected.items()):
         raise ValueError("Un medio cambió mientras se preparaba el montaje")
@@ -308,7 +336,8 @@ def project_name(order, revision):
 def open_resolve(intake, direction, media_root, package):
     import DaVinciResolveScript as script
 
-    order, _, _ = validated_cut(intake, direction)
+    order, props, _ = validated_cut(intake, direction)
+    frames = round(props["duration_seconds"] * FPS)
     revision = verify_package(order, direction, package)
     resolve = script.scriptapp("Resolve")
     if not resolve:
@@ -332,7 +361,7 @@ def open_resolve(intake, direction, media_root, package):
     )
     if not cut or cut.GetTrackCount("video") != 1 or cut.GetTrackCount("audio") != 2:
         raise RuntimeError("Resolve no importó la pista de imagen y las dos pistas de audio")
-    if cut.GetEndFrame() - cut.GetStartFrame() != FRAMES:
+    if cut.GetEndFrame() - cut.GetStartFrame() != frames:
         raise RuntimeError("Resolve alteró la duración del montaje")
     if (
         not project.SetCurrentTimeline(cut)
@@ -340,13 +369,13 @@ def open_resolve(intake, direction, media_root, package):
         or not resolve.OpenPage("fairlight")
     ):
         raise RuntimeError("Resolve no pudo guardar y abrir la mezcla en Fairlight")
-    return {"proyecto": name, "fotogramas": FRAMES, "pistas_audio": 2}
+    return {"proyecto": name, "fotogramas": frames, "pistas_audio": 2}
 
 
 def mix_resolve(intake, direction, media_root, package, voice_db, music_db):
     import DaVinciResolveScript as script
 
-    order, _, _ = validated_cut(intake, direction)
+    order, props, _ = validated_cut(intake, direction)
     name = project_name(order, verify_package(order, direction, package))
     if not all(level is not None and -60 <= level <= 12 for level in (voice_db, music_db)):
         raise ValueError("Indica ambos niveles de Fairlight entre −60 y +12 dB")
@@ -362,7 +391,7 @@ def mix_resolve(intake, direction, media_root, package, voice_db, music_db):
         not cut
         or cut.GetName() not in {TIMELINE_NAME, "montaje"}
         or cut.GetTrackCount("audio") != 2
-        or cut.GetEndFrame() - cut.GetStartFrame() != FRAMES
+        or cut.GetEndFrame() - cut.GetStartFrame() != round(props["duration_seconds"] * FPS)
         or [cut.GetTrackName("audio", i) for i in (1, 2)] != ["Voz original", "Música de catálogo"]
     ):
         raise RuntimeError("Abre el montaje del traspaso con las dos pistas de audio")
@@ -456,7 +485,8 @@ def main():
     parser.add_argument("--musica-db", type=float)
     args = parser.parse_args()
     intake, direction = (
-        json.loads(read_regular(path, LIMIT)) for path in (args.ingesta, args.escaleta)
+        json.loads(read_regular(args.ingesta, LIMIT)),
+        json.loads(read_regular(args.escaleta, DIRECTION_LIMIT)),
     )
     package = args.destino.parent.resolve(strict=True) / args.destino.name
     levels = (args.voz_db, args.musica_db) if args.accion == "mezclar" else ()

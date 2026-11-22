@@ -1,6 +1,6 @@
 import Uppy from "@uppy/core";
 import { createSHA256 } from "hash-wasm";
-import { validateVideoDuration, videoDuration } from "./upload-duration";
+import { validateVideoDuration } from "./upload-duration";
 import { partSigners, uploadMissingParts, uploadPart, type NumberedSignedPart, type SignedPart, type SignedPartBatch } from "./upload-part";
 
 type Api = <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -51,7 +51,7 @@ export async function uploadVideo(
   const extension = file.name.split(".").pop()?.toLowerCase();
   if (extension !== "mp4" && extension !== "mov" && extension !== "webm") throw new Error("ARCHIVO_INVALIDO");
   if (!file.size || file.size > maximum) throw new Error("ARCHIVO_INVALIDO");
-  await validateVideoDuration(file, edit === "reel" ? 30 : 0);
+  await validateVideoDuration(file);
   const digest = await sha256(file);
   const retryKey = "studio:upload:" + digest + (brandId ? ":" + brandId : "") + (edit === "reel" ? ":reel" : "");
   const known = sessionStorage.getItem(retryKey);
@@ -149,8 +149,7 @@ export async function uploadVideos(
     }
     return { file, extension };
   });
-  const durations = await mapTwo(items.length, (index) => videoDuration(items[index]!.file));
-  if (edit === "reel" && durations.reduce((sum, value) => sum + value, 0) < 30) throw new Error("VIDEO_CORTO_PARA_REEL");
+  await mapTwo(items.length, (index) => validateVideoDuration(items[index]!.file));
   const digests = await mapTwo(items.length, (index) => sha256(items[index]!.file));
   const manifest = items.map(({ file, extension }, index) => ({ name: file.name, bytes: file.size, sha256: digests[index]!, extension }));
   const signature = new TextEncoder().encode(JSON.stringify({ manifest, brandId, resolution, format, edit }));

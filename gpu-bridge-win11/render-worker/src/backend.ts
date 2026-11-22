@@ -341,7 +341,7 @@ export class RenderBackend implements Backend {
       }
       if (ad) {
         const track = await stageAdMusic(this.nas, this.scratch, request.project_id, work, bounded);
-        await this.deps.run(this.config.ffmpeg, mixAdAudio(speech, track, audio, Boolean(ad.destination || ad.engine)), {timeoutMs: 120000, signal: bounded});
+        await this.deps.run(this.config.ffmpeg, mixAdAudio(speech, track, audio, request.durationInFrames, Boolean(ad.destination || ad.engine)), {timeoutMs: 120000, signal: bounded});
       }
       const measured = parseLoudness((await this.deps.run(this.config.ffmpeg, measureAudio(audio, duration), {timeoutMs: 1200000, signal: bounded})).stderr);
       const framesStarted = performance.now();

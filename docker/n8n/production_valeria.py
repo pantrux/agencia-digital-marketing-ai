@@ -17,6 +17,7 @@ from contextlib import closing
 from pathlib import Path
 
 from production_handoff import (
+    DIRECTION_LIMIT,
     canonical,
     eligible,
     is_test_order,
@@ -130,8 +131,8 @@ def scene_label(label, length, *, allow_panel=False):
         return round(value * 30)
 
     first, last = (frame(label[key]) for key in ("desde", "hasta"))
-    if not 15 <= last - first <= 180:
-        raise VisualResponseFormatError("El rótulo debe durar entre 0,5 y 6 segundos")
+    if not min(15, length) <= last - first <= 180:
+        raise VisualResponseFormatError("La duración del rótulo no cabe en la escena")
     return {
         "text": title.strip(),
         "start_frame": first,
@@ -164,13 +165,21 @@ def multi_scene_label(label, length, *, allow_panel):
     return scene_label(local, length, allow_panel=allow_panel)
 
 
+def validate_ad_opening(scenes):
+    first = scenes[0]
+    hook = first.get("label")
+    length = first["source_end_frame"] - first["source_start_frame"]
+    if not hook or hook["start_frame"] > 15 or hook["end_frame"] < min(60, length):
+        raise VisualResponseFormatError("El anuncio necesita un gancho desde la apertura")
+
+
 def reel_scenes(items, duration, *, ad=False):
     def boundary(value, maximum):
         if type(value) not in (int, float) or not 0 <= value <= maximum:
             raise VisualResponseFormatError("Tiempo de escena fuera del intervalo")
         return round(value * 30)
 
-    if type(items) is not list or not 2 <= len(items) <= (12 if ad else 6):
+    if type(items) is not list or not 1 <= len(items) <= (12 if ad else 6):
         raise VisualResponseFormatError("Cantidad de escenas fuera del contrato")
     scenes, cursor, total = [], 0, 0
     for item in items:
@@ -179,7 +188,7 @@ def reel_scenes(items, duration, *, ad=False):
         start = boundary(item["desde"], duration)
         end = boundary(item["hasta"], duration)
         length = end - start
-        if (not ad and start < cursor) or end > math.floor(duration * 30) or length < 15:
+        if (not ad and start < cursor) or end > math.floor(duration * 30) or length < 1:
             raise VisualResponseFormatError("Los cortes deben avanzar sin superponerse")
         scene = {"source_start_frame": start, "source_end_frame": end}
         if "rotulo" in item:
@@ -187,15 +196,13 @@ def reel_scenes(items, duration, *, ad=False):
         scenes.append(scene)
         cursor = end
         total += length
-    if not 900 <= total <= 1350 or not any("label" in scene for scene in scenes):
-        raise VisualResponseFormatError("El reel requiere 30 a 45 segundos y al menos un rótulo")
+    if not 3 <= total <= 18000 or not any("label" in scene for scene in scenes):
+        raise VisualResponseFormatError(
+            "El reel requiere una duración renderizable y al menos un rótulo"
+        )
     if ad:
+        validate_ad_opening(scenes)
         ordered = sorted(scenes, key=lambda scene: scene["source_start_frame"])
-        hook = scenes[0].get("label")
-        if total != 900 or not hook or hook["start_frame"] > 15 or hook["end_frame"] < 60:
-            raise VisualResponseFormatError(
-                "El anuncio necesita 30 segundos y un gancho desde la apertura"
-            )
         if any(
             a["source_end_frame"] > b["source_start_frame"]
             for a, b in zip(ordered, ordered[1:], strict=False)
@@ -221,7 +228,7 @@ def multi_reel_scenes(items, sources, *, ad=False, long_form=False):
     if ad and long_form:
         raise VisualResponseFormatError("El anuncio no admite montaje largo")
     limit = 12 if ad else 32 if long_form else 6
-    if type(items) is not list or not 2 <= len(items) <= limit:
+    if type(items) is not list or not (2 if long_form else 1) <= len(items) <= limit:
         raise VisualResponseFormatError("Cantidad de escenas fuera del contrato")
     scenes, intervals, total = [], {}, 0
     for item in items:
@@ -236,7 +243,11 @@ def multi_reel_scenes(items, sources, *, ad=False, long_form=False):
         ):
             raise VisualResponseFormatError("Tiempo de escena inválido")
         start, end = round(start * 30), round(end * 30)
-        if start < 0 or end > math.floor(sources[identity] * 30) or end - start < 15:
+        if (
+            start < 0
+            or end > math.floor(sources[identity] * 30)
+            or end - start < (15 if long_form else 1)
+        ):
             raise VisualResponseFormatError("Tiempo de escena fuera del material")
         if any(
             start < previous_end and previous_start < end
@@ -249,15 +260,12 @@ def multi_reel_scenes(items, sources, *, ad=False, long_form=False):
             scene["label"] = multi_scene_label(item["rotulo"], end - start, allow_panel=not ad)
         scenes.append(scene)
         total += end - start
-    minimum, maximum = (30, 18000) if long_form else (900, 1350)
-    if not minimum <= total <= maximum or not any("label" in scene for scene in scenes):
+    if not (30 if long_form else 3) <= total <= 18000 or not any(
+        "label" in scene for scene in scenes
+    ):
         raise VisualResponseFormatError("El montaje requiere duración válida y al menos un rótulo")
     if ad:
-        hook = scenes[0].get("label")
-        if total != 900 or not hook or hook["start_frame"] > 15 or hook["end_frame"] < 60:
-            raise VisualResponseFormatError(
-                "El anuncio necesita 30 segundos y un gancho desde la apertura"
-            )
+        validate_ad_opening(scenes)
     return scenes, total
 
 
@@ -272,7 +280,14 @@ def cue_text(group):
     return " ".join(part[2] for part in group)
 
 
+def ad_endcard_frame(frames, *, social=False):
+    return frames - min(150 if social else 120, max(1, frames // 4))
+
+
 def ad_captions(scenes, words):
+    voice_end = ad_endcard_frame(
+        sum(s["source_end_frame"] - s["source_start_frame"] for s in scenes)
+    )
     cues, offset = [], 0
     for scene in scenes:
         start, end = scene["source_start_frame"], scene["source_end_frame"]
@@ -285,7 +300,7 @@ def ad_captions(scenes, words):
                 or first < start
                 or last > end
                 or last <= first
-                or offset + last - start > 780
+                or offset + last - start > voice_end
             ):
                 continue
             first, last = offset + first - start, offset + last - start
@@ -317,8 +332,8 @@ def ad_captions(scenes, words):
             i += 1
             end = cues[i][1]
             text += " " + cues[i][2]
-        following = cues[i + 1][0] if i + 1 < len(cues) else 780
-        end = min(max(end, start + 15), following, 780)
+        following = cues[i + 1][0] if i + 1 < len(cues) else voice_end
+        end = min(max(end, start + 15), following, voice_end)
         if end - start < 9 and result:
             last = result[-1]
             last["end_frame"] = max(last["end_frame"], end)
@@ -332,7 +347,7 @@ def ad_captions(scenes, words):
         raise VisualResponseFormatError(
             "Los subtítulos necesitan pausas para mantener la legibilidad"
         )
-    if not 1 <= len(result) <= 60:
+    if not result:
         raise VisualResponseFormatError(
             "El anuncio requiere subtítulos respaldados por la voz original"
         )
@@ -704,19 +719,24 @@ def plan_request(
         ]
         instructions = (
             "Eres Valeria, directora audiovisual. Usa el encargo, las imágenes con sus tiempos y"
-            " la transcripción como datos. Diseña un reel de 30 a 45 segundos con 2 a 6 tramos"
+            " la transcripción como datos. Diseña un reel con 1 a 6 tramos"
             " reales en orden, sin solapar ni cortar frases. Conserva el sentido de lo dicho."
+            " Respeta la duración indicada en el objetivo si el material permite cumplirla. Si no"
+            " se indicó, elige una duración acorde al contenido. Puedes usar un solo tramo y conservar"
+            " el clip completo. Si no alcanza para la duración solicitada, usa el material disponible"
+            " y explica la diferencia en observacion, sin repetir ni rellenar tomas."
             " Selecciona el ángulo de campaña más fiel. Proporciona segundos de origen desde y"
             " hasta para cada escena. En al menos una escena incluye rotulo con texto breve"
             " (máximo 80), desde y hasta en segundos relativos al comienzo de ESA escena,"
-            " duración entre 0.5 y 6, posicion superior o inferior y tamano normal o grande opcional."
+            " duración de 0.5 a 6 segundos o todo el tramo si es más corto, posicion superior o inferior"
+            " y tamano normal o grande opcional."
             " Da espacio a rostros,"
             " productos y subtítulos existentes. Puedes omitir el rótulo de cualquier otra escena."
             " Devuelve un único JSON con angulo entero de 1 a 3, titulo (máximo 120),"
             " subtitulo (máximo 240), observacion (máximo 600), apto_sin_cambios booleano y"
             " escenas como lista de objetos {desde,hasta,rotulo opcional}. apto_sin_cambios"
             " significa que el reel se puede hacer con estos cortes y rótulos."
-            " Si el encargo exige recursos ausentes o la fuente no llega a 30 segundos,"
+            " Si el encargo exige recursos ausentes indispensables,"
             " devuelve apto_sin_cambios=false. Usa español."
         )
     if reel and brief.get("ad_cta"):
@@ -728,17 +748,18 @@ def plan_request(
             for word in words
         ]
         instructions += (
-            " ANUNCIO GUIADO POR GUION: este encargo sustituye los límites de 2 a 6 cortes por 2 a 12; "
-            "la suma exacta debe ser 30 segundos y puedes reordenar intervalos de origen no solapados. "
+            " ANUNCIO GUIADO POR GUION: puedes usar hasta 12 escenas y reordenar intervalos de origen "
+            "no solapados. Ajusta la duración al objetivo y al material disponible. "
             "Los primeros 3 segundos demuestran un gancho específico. En la primera escena el rótulo "
-            "comienza entre 0 y 0.5 s y dura al menos hasta 2 s. Desarrolla el argumento mediante "
+            "comienza entre 0 y 0.5 s y llega al segundo 2 o al final de la primera escena si es más breve. "
+            "Desarrolla el argumento mediante "
             "frases completas y tomas pertinentes. palabras_por_fotograma contiene [inicio, fin, "
             "palabra] a 30 fps. Divide entre 30 para ubicar las frases. Registra las duraciones "
             "en segundos con al menos dos decimales. Devuelve una escaleta lista para vista previa "
             "cuando el crudo tenga evidencia del producto y voz usable. La sincronía se valida "
             "sobre esa vista previa. La primera toma debe mostrar completo desde el inicio "
             "el objeto que demuestra la promesa, sin depender de un paneo para revelarlo. "
-            "Los últimos cuatro segundos "
+            "Hasta los últimos cuatro segundos, como máximo un cuarto del montaje, "
             "usan una imagen de producto despejada para la marca y el CTA confirmado; el renderer "
             "coloca la marca y la CTA confirmadas y silencia la voz en ese intervalo. "
             "subtitulo sintetiza el argumento y observacion explica el guion."
@@ -1054,17 +1075,20 @@ def multiple_plan_request(
         "con angulo, titulo, subtitulo, observacion, apto_sin_cambios y escenas. Usa texto no vacío "
         "sin saltos de línea en titulo (máximo 120 caracteres), subtitulo (240) y observacion (600). "
         "apto_sin_cambios es un booleano. Usa solo esas claves. Cada escena tiene fuente igual al "
-        "id declarado, desde y hasta numéricos en segundos locales de ese vídeo, con una duración "
-        "mínima de 0,5 s y hasta menor o igual a la duración de su fuente. El rotulo es opcional "
+        "id declarado, desde y hasta numéricos en segundos locales de ese vídeo, con hasta mayor "
+        "que desde y menor o igual a la duración de su fuente. El rotulo es opcional "
         "por escena, con al menos uno en el montaje. Usa {texto,anclaje,posicion,tamano}, con "
         "anclaje inicio o cierre y hasta 80 caracteres en texto. El sistema usa 3 s por defecto, "
         "con duracion opcional entre 0,5 y 6 s, y ajusta la ventana a la escena. Usa posicion "
         "superior o inferior y tamano normal o grande. Solo si el encargo exige un instante "
         "preciso, sustituye anclaje y duracion por desde y hasta en segundos relativos a la escena. "
         + (
-            "Usa 2 a 32 escenas, suma hasta 600 segundos y al menos un segundo, sin cortes superpuestos del mismo video. "
+            "Usa 2 a 32 escenas de al menos 0,5 s cada una, suma hasta 600 segundos y al menos un segundo, "
+            "sin cortes superpuestos del mismo video. "
             if long_form
-            else "Usa 2 a 6 escenas, suma entre 30 y 45 segundos, sin cortes superpuestos del mismo video. "
+            else "Usa 1 a 6 escenas, sin cortes superpuestos, hasta 600 segundos en total. Respeta la duración "
+            "indicada en el objetivo cuando sea viable. Si no se especifica, ajústala al contenido. Si la "
+            "duración solicitada excede el material, explica la diferencia sin repetir ni rellenar tomas. "
         )
         + "Usa cada intervalo en palabras_con_tiempo para cortar sin partir frases. "
         "transcripcion_completa indica que se incluyen todas las palabras reconocidas en esa fuente. "
@@ -1076,9 +1100,9 @@ def multiple_plan_request(
     )
     if brief.get("ad_cta"):
         prompt += (
-            "Para este anuncio usa 2 a 12 escenas y exactamente 30 segundos. La primera dura "
-            "al menos 2 s y tiene un gancho con rótulo anclado al inicio de al menos 2 s. "
-            "Reserva los últimos cuatro segundos para el CTA confirmado. "
+            "Para este anuncio usa 1 a 12 escenas. La primera tiene un gancho con rótulo anclado al inicio "
+            "hasta el segundo 2 o el final de la escena si es más breve. Reserva hasta los últimos cuatro "
+            "segundos, como máximo un cuarto del montaje, para el CTA confirmado. "
         )
     else:
         prompt += (
@@ -1297,7 +1321,7 @@ def prior_rejection(order, brief, revision, output, review):
     leaf = revision_leaf(identity, revision)
     job = f"{identity}-v{revision}"
     art = json.loads(read_regular(LUCAS / leaf, LIMIT))
-    direction = json.loads(read_regular(output / leaf, LIMIT))
+    direction = json.loads(read_regular(output / leaf, DIRECTION_LIMIT))
     digest = hashlib.sha256(canonical(brief)).hexdigest()
     expected = (identity, digest)
     if (
@@ -1320,7 +1344,7 @@ def pending_direction(output, identity, rounds):
         target = output / revision_leaf(identity, revision)
         if not target.exists():
             return revision, target, None
-        saved = json.loads(read_regular(target, LIMIT))
+        saved = json.loads(read_regular(target, DIRECTION_LIMIT))
         if saved["escaleta"]["estado"] == "requiere_revision":
             return revision, target, saved
     return None
@@ -1384,10 +1408,10 @@ def reconcile_adjustment(order, folder, output, token):
     ):
         raise ValueError("El ajuste pendiente no corresponde a esta producción")
     target = output / revision_leaf(identity, revision)
-    previous = read_regular(folder / f"previous-{number}.json", LIMIT)
-    replacement = read_regular(folder / f"candidate-{number}.json", LIMIT)
+    previous = read_regular(folder / f"previous-{number}.json", DIRECTION_LIMIT)
+    replacement = read_regular(folder / f"candidate-{number}.json", DIRECTION_LIMIT)
     before, after = direction_digest(previous), direction_digest(replacement)
-    current = direction_digest(read_regular(target, LIMIT))
+    current = direction_digest(read_regular(target, DIRECTION_LIMIT))
     if (
         before != result["review_sha256"]
         or after != result["direction_sha256"]
@@ -1427,7 +1451,7 @@ def handle_adjustment(receipt, strategy, revision, target, saved, folder, token,
     adjustment = context["adjustment"]
     number = adjustment["number"]
     instructions = adjustment["instructions"]
-    previous = read_regular(target, LIMIT)
+    previous = read_regular(target, DIRECTION_LIMIT)
     if (
         brief is None
         or type(number) is not int
@@ -1457,7 +1481,7 @@ def handle_adjustment(receipt, strategy, revision, target, saved, folder, token,
             direction_request_id(identity, f"valeria-ajuste:v{revision}:{number}", format_round),
             adjustment=instructions,
         )
-    raw = read_regular(candidate, LIMIT)
+    raw = read_regular(candidate, DIRECTION_LIMIT)
     proposed = json.loads(raw)
     state = proposed["escaleta"]["estado"]
     if (
@@ -1544,7 +1568,7 @@ def process_pending(path, strategy, profile, token, output, format_round):
         **extra,
     )
     if not synthetic and target.exists():
-        saved = json.loads(read_regular(target, LIMIT))
+        saved = json.loads(read_regular(target, DIRECTION_LIMIT))
         if saved["escaleta"]["estado"] == "requiere_revision":
             report_manual_review(order, brief, revision, saved, token)
     return True

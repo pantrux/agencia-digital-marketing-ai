@@ -18,12 +18,17 @@ export const AD_MUSIC_ID = 'carefree-usuan1400037' as const;
 export type SocialChannel = 'facebook' | 'instagram' | 'whatsapp';
 export interface AdDestination {channel: SocialChannel; url: string}
 export interface ScriptedAd {engine?: 'hyperframes'; destination?: AdDestination; cta: string; brand: string; captions: AdCaption[]; soundtrack?: typeof AD_MUSIC_ID}
-export const AD_ENDCARD_FRAME = 780;
-export const SOCIAL_ENDCARD_FRAME = 750;
-export const SOCIAL_FADE_FRAME = 864;
-export const AD_FRAMES = 900;
 export const LABEL_ENTRANCE_FRAMES = 8;
-export const SOCIAL_ENTRANCE_FRAMES = 12;
+export function adTiming(frames: number) {
+  const closing = Math.max(1, Math.floor(frames / 4));
+  const socialFrames = Math.min(150, closing);
+  return {
+    voiceEnd: frames - Math.min(120, closing),
+    socialStart: frames - socialFrames,
+    fadeStart: frames - Math.min(36, Math.max(1, Math.floor(socialFrames / 3))),
+    entranceFrames: Math.min(12, Math.max(1, Math.floor(socialFrames / 3))),
+  };
+}
 export interface EditScene {source_start_frame: number; source_end_frame: number; source_id?: string; audio_source_start_frame?: number; label?: SceneLabel}
 export interface MultiSourceScene extends EditScene {source_id: string}
 export interface RenderSource {id: string; video_path: string; audio_path?: string}
@@ -85,18 +90,16 @@ function frameNumber(value: unknown, minimum: number, maximum: number): number {
   return frame;
 }
 function editScenes(value: unknown, count: number, ad: boolean, sourceIds?: ReadonlySet<string>): EditScene[] {
-  const minimum = sourceIds && !ad ? 30 : 900;
-  const maximum = sourceIds && !ad ? MAX_SEGMENT_SECONDS * 30 : 1350;
   const sceneLimit = ad ? 12 : sourceIds ? 32 : 6;
-  if (!Array.isArray(value) || value.length < 2 || value.length > sceneLimit || count < minimum || count > maximum) {
-    invalid('La cantidad de escenas o la duración no corresponde al montaje.');
+  if (!Array.isArray(value) || value.length < 1 || value.length > sceneLimit) {
+    invalid('La cantidad de escenas no corresponde al montaje.');
   }
   let last = 0, total = 0, labels = 0;
   const scenes = value.map((entry: unknown): EditScene => {
     const item = object(entry, ['source_start_frame', 'source_end_frame', 'audio_source_start_frame', 'label', ...(sourceIds ? ['source_id'] : [])]);
     if (sourceIds && (typeof item.source_id !== 'string' || !sourceIds.has(item.source_id))) invalid('La escena no pertenece a una fuente declarada.');
-    const start = frameNumber(item.source_start_frame, ad || sourceIds ? 0 : last, MAX_SEGMENT_SECONDS * 30 - 15);
-    const end = frameNumber(item.source_end_frame, start + 15, MAX_SEGMENT_SECONDS * 30);
+    const start = frameNumber(item.source_start_frame, ad || sourceIds ? 0 : last, MAX_SEGMENT_SECONDS * 30 - 1);
+    const end = frameNumber(item.source_end_frame, start + 1, MAX_SEGMENT_SECONDS * 30);
     last = end;
     total += end - start;
     if (item.audio_source_start_frame !== undefined && !ad) invalid('El audio alternativo requiere un anuncio.');
@@ -107,8 +110,9 @@ function editScenes(value: unknown, count: number, ad: boolean, sourceIds?: Read
     if (item.label === undefined) return scene;
     const caption = object(item.label, ['text', 'start_frame', 'end_frame', 'position', 'size']);
     const label = text(caption.text, '', 80);
-    const labelStart = frameNumber(caption.start_frame, 0, end - start - 15);
-    const labelEnd = frameNumber(caption.end_frame, labelStart + 15, Math.min(end - start, labelStart + 180));
+    const minimumLabelFrames = Math.min(15, end - start);
+    const labelStart = frameNumber(caption.start_frame, 0, end - start - minimumLabelFrames);
+    const labelEnd = frameNumber(caption.end_frame, labelStart + minimumLabelFrames, Math.min(end - start, labelStart + 180));
     const position = caption.position;
     if (!label.trim() || (position !== 'top' && position !== 'bottom' &&
         !(position === 'panel' && sourceIds && !ad))) {
@@ -122,7 +126,8 @@ function editScenes(value: unknown, count: number, ad: boolean, sourceIds?: Read
   if (ad) {
     const sorted = [...scenes].sort((a,b) => a.source_start_frame - b.source_start_frame);
     if (sorted.some((scene,i) => sorted.slice(0,i).some(previous => previous.source_id === scene.source_id && scene.source_start_frame < previous.source_end_frame))
-      || !scenes[0]?.label || scenes[0].label.start_frame > 15 || scenes[0].label.end_frame < 60) {
+      || !scenes[0]?.label || scenes[0].label.start_frame > 15
+      || scenes[0].label.end_frame < Math.min(60, scenes[0].source_end_frame - scenes[0].source_start_frame)) {
       invalid('El anuncio requiere un gancho al inicio y tramos de origen sin solapamiento.');
     }
   }
@@ -149,18 +154,19 @@ function socialDestination(value: unknown): AdDestination {
   return {channel, url};
 }
 
-function scriptedAd(value: unknown): ScriptedAd {
+function scriptedAd(value: unknown, frames: number): ScriptedAd {
   const input = object(value, ['cta', 'brand', 'captions', 'soundtrack', 'destination', 'engine']);
   if (input.engine !== undefined && input.engine !== 'hyperframes') invalid('El motor de animación no está disponible.');
   if (input.soundtrack !== undefined && input.soundtrack !== AD_MUSIC_ID) invalid('La pista no pertenece al catálogo del anuncio.');
   const cta = text(input.cta, '', 70), brand = text(input.brand, '', 80);
+  const {voiceEnd} = adTiming(frames);
   if (!cta.trim() || !brand.trim() || !Array.isArray(input.captions)
-    || !input.captions.length || input.captions.length > 60) invalid('Falta CTA, marca o subtítulos.');
+    || !input.captions.length || input.captions.length > Math.floor(voiceEnd / 9)) invalid('Falta CTA, marca o subtítulos.');
   let previousEnd = 0;
   const captions = input.captions.map((entry): AdCaption => {
     const cue = object(entry, ['start_frame', 'end_frame', 'text', 'position']);
-    const start_frame = frameNumber(cue.start_frame, previousEnd, AD_ENDCARD_FRAME - 9);
-    const end_frame = frameNumber(cue.end_frame, start_frame + 9, AD_ENDCARD_FRAME);
+    const start_frame = frameNumber(cue.start_frame, previousEnd, voiceEnd - 9);
+    const end_frame = frameNumber(cue.end_frame, start_frame + 9, voiceEnd);
     const caption = text(cue.text, '', 68);
     if (!caption.trim()) invalid('Falta el texto del subtítulo.');
     previousEnd = end_frame;
@@ -230,8 +236,8 @@ function base(value: unknown, stills: boolean): RenderRequest {
     });
   }
   if (input.ad !== undefined) {
-    if (durationInFrames !== 900 || !input.scenes) invalid('El anuncio requiere 30 segundos y escenas.');
-    props.ad = scriptedAd(input.ad);
+    if (!input.scenes) invalid('El anuncio requiere escenas.');
+    props.ad = scriptedAd(input.ad, durationInFrames);
   }
   if (input.scenes !== undefined) {
     if (!props.sources && Boolean(props.video_path) !== (format === 'mp4')) invalid('El MP4 por escenas requiere vídeo y el ProRes solo contiene la gráfica.');

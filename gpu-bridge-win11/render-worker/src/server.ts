@@ -11,6 +11,10 @@ export interface Backend {
 }
 interface Request {method: string; path: string; remoteAddress: string; authorization: string | undefined; body: Buffer; signal?: AbortSignal}
 interface Response {status: number; body: unknown}
+function bodyLimit(path: string): number {
+  return path === '/render' || path === '/stills' ? 1024 * 1024 : 64 * 1024;
+}
+const excessiveBody = () => new WorkerError(413, 'CUERPO_EXCESIVO', 'La solicitud supera el tamaño admitido.');
 export class Application {
   readonly token: string; readonly backend: Backend; readonly slots = new SlotPool(2); readonly shutdown: AbortSignal;
   constructor(token: string, backend: Backend, shutdown = new AbortController().signal) {this.token = token; this.backend = backend; this.shutdown = shutdown;}
@@ -21,7 +25,7 @@ export class Application {
         const health = this.backend.health(); return {status: health.ready ? 200 : 503, body: health};
       }
       if (request.method !== 'POST' || !['/render', '/stills', '/inspect'].includes(request.path)) throw new WorkerError(404, 'RUTA_NO_ENCONTRADA', 'La ruta o método no está disponible.');
-      if (request.body.length > 65536) throw new WorkerError(413, 'CUERPO_EXCESIVO', 'La solicitud supera 64 KiB.');
+      if (request.body.length > bodyLimit(request.path)) throw excessiveBody();
       let data: unknown;
       try {data = JSON.parse(request.body.toString('utf8'));} catch {throw new WorkerError(422, 'JSON_INVALIDO', 'Se requiere JSON válido.');}
       const signal = AbortSignal.any([request.signal ?? new AbortController().signal, this.shutdown]);
@@ -45,9 +49,10 @@ export function createWorkerServer(app: Application): Server {
     try {
       // Rechazar antes de leer o retener datos de clientes ajenos.
       authorize(request.socket.remoteAddress ?? '', request.headers.authorization, app.token);
+      const limit = bodyLimit(request.url ?? '');
       for await (const chunk of request) {
         size += (chunk as Buffer).length;
-        if (size > 65536) throw new WorkerError(413, 'CUERPO_EXCESIVO', 'La solicitud supera 64 KiB.');
+        if (size > limit) throw excessiveBody();
         chunks.push(chunk as Buffer);
       }
       const result = await app.handle({method: request.method ?? '', path: request.url ?? '', remoteAddress: request.socket.remoteAddress ?? '', authorization: request.headers.authorization, body: Buffer.concat(chunks), signal: controller.signal});

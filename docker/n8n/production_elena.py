@@ -22,6 +22,7 @@ from heapq import nlargest
 from pathlib import Path
 
 from production_handoff import (
+    DIRECTION_LIMIT,
     RENDER_SIZES,
     canonical,
     eligible,
@@ -43,6 +44,7 @@ from production_valeria import (
     MAX_JPEG,
     MAX_VISUAL_BYTES,
     VisualResponseFormatError,
+    ad_endcard_frame,
     run_visual,
     sample_frames,
     visual_payload,
@@ -219,7 +221,7 @@ def publish_audit(path, record):
 
 
 def matching_music_window(actual, reference):
-    if len(actual) < 3800 or len(reference) < len(actual):
+    if len(actual) < 64 or len(reference) < len(actual):
         return False
 
     def power(samples):
@@ -230,13 +232,16 @@ def matching_music_window(actual, reference):
         return sum(x * y for x, y in zip(a, b, strict=True)) / norm if norm else 0.0
 
     # Preselecciona posiciones con una muestra dispersa y verifica la forma de onda completa.
-    sparse = actual[::128]
-    sparse_power = power(sparse)
     length = len(actual)
+    stride = min(128, length // 16)
+    sparse = actual[::stride]
+    sparse_power = power(sparse)
     offsets = nlargest(
         32,
         range(len(reference) - length + 1),
-        key=lambda start: similarity(sparse, reference[start : start + length : 128], sparse_power),
+        key=lambda start: similarity(
+            sparse, reference[start : start + length : stride], sparse_power
+        ),
     )
     actual_power = power(actual)
     return any(
@@ -245,13 +250,11 @@ def matching_music_window(actual, reference):
     )
 
 
-def close_music_matches(ff, reference):
+def close_music_matches(ff, reference, closing_window):
     pcm = ["-vn", "-ac", "1", "-ar", "2000", "-f", "s16le", "-"]
     actual = array(
         "h",
-        ff(
-            "ffmpeg", ["-v", "error", "-nostdin"], ["-af", "atrim=start=26.5:end=28.5", *pcm], 30
-        ).stdout,
+        ff("ffmpeg", ["-v", "error", "-nostdin"], ["-af", closing_window, *pcm], 30).stdout,
     )
     original = array(
         "h",
@@ -328,16 +331,22 @@ def decode(
             "peak": float(peak[1]),
         }
         if speech is not None:
+            frames = round(duration * 30)
+            voice_end = ad_endcard_frame(frames) / 30
+            closing = duration - voice_end
+            closing_window = (
+                f"atrim=start={voice_end + closing / 8}:end={voice_end + closing * 5 / 8}"
+            )
             bed = ff(
                 "ffmpeg",
                 ["-hide_banner", "-nostdin"],
-                ["-vn", "-af", "atrim=start=26.5:end=28.5,volumedetect", "-f", "null", "-"],
+                ["-vn", "-af", closing_window + ",volumedetect", "-f", "null", "-"],
                 30,
             ).stderr.decode(errors="replace")
             volume = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB", bed)
             metrics["musica_cierre_dbfs"] = float(volume[1]) if volume else None
             metrics["musica_catalogo"] = (
-                close_music_matches(ff, music_reference)
+                close_music_matches(ff, music_reference, closing_window)
                 if music_reference is not None
                 else probe["format"].get("tags", {}).get("comment") == AD_MUSIC_ID
             )
@@ -349,7 +358,7 @@ def decode(
                     "0:a:0",
                     "-vn",
                     "-t",
-                    "30",
+                    str(duration),
                     "-ar",
                     "16000",
                     "-ac",
@@ -418,19 +427,28 @@ sys.path.insert(0, str(root / "mcp_servers"))
 from call_stdio import runtime_settings
 from speaches_client import transcribe_audio
 token = Path(runtime_settings()["GPU_BRIDGE_TOKEN_FILE"])
-reply = transcribe_audio(Path(sys.argv[1]), token, language="es", total_seconds=70)
+reply = transcribe_audio(Path(sys.argv[1]), token, language="es", total_seconds=int(sys.argv[2]))
 result = {field: reply[field] for field in ("language", "duration", "text")}
 result["words"] = [{field: word[field] for field in ("word", "start", "end")} for word in reply["words"]]
 print(json.dumps(result))
 """
 
 
-def verify_mix_speech(speech, captions):
+def verify_mix_speech(speech, captions, duration):
+    deadline = max(70, math.ceil(duration / 2))
     reply = subprocess.run(
-        [str(MCP / "venv/bin/python"), "-I", "-B", "-c", MCP_MIX_TRANSCRIPT, str(speech)],
+        [
+            str(MCP / "venv/bin/python"),
+            "-I",
+            "-B",
+            "-c",
+            MCP_MIX_TRANSCRIPT,
+            str(speech),
+            str(deadline),
+        ],
         capture_output=True,
         check=True,
-        timeout=82,
+        timeout=deadline + 12,
     )
     if not 0 < len(reply.stdout) <= MAX_TRANSCRIPT:
         raise ValueError("El resultado de voz del anuncio es inválido")
@@ -628,25 +646,35 @@ def review_video(
     ad = props.get("ad")
     destination = ad.get("destination") if ad else None
     animated_endcard = bool(ad and (destination or ad.get("engine") == "hyperframes"))
+    duration = props["duration_seconds"]
     if ad:
+        count = round(duration * 30)
+        voice_end = ad_endcard_frame(count)
+        card_start = ad_endcard_frame(count, social=animated_endcard)
+        last = count - 1
+        card_middle = (voice_end + count) // 2
         cue = max(ad["captions"], key=lambda row: row["end_frame"] - row["start_frame"])
         frame = (cue["start_frame"] + cue["end_frame"]) // 2
-        stamp = (frame * 1000 // 30) / 1000
-        candidates = scene_checks(scenes, required=(frame, 30, 75))
-        mandatory = (0, 1, 2.5, stamp)
+        opening_frames = (0, min(30, card_start - 1), min(75, card_start - 1), frame)
+        candidates = scene_checks(scenes, required=opening_frames)
+        mandatory = {(point * 1000 // 30) / 1000 for point in opening_frames}
+        middle_stamp = (card_middle * 1000 // 30) / 1000
+        final_stamp = (last * 1000 // 30) / 1000
         checks = [item for item in candidates if item["segundo"] in mandatory]
         checks += [
-            item for item in candidates if item["segundo"] not in mandatory and item["segundo"] < 26
+            item
+            for item in candidates
+            if item["segundo"] not in mandatory and item["segundo"] < voice_end / 30
         ][: (6 if animated_endcard else 7) - len(checks)]
         checks.sort(key=lambda item: item["segundo"])
-        checks.append({"segundo": 28, "rotulo_esperado": None})
+        checks.append({"segundo": middle_stamp, "rotulo_esperado": None})
         if animated_endcard:
             checks[0] = {"segundo": 0, "rotulo_esperado": None}
-            checks.append({"segundo": 29.966, "rotulo_esperado": None})
+            if final_stamp != middle_stamp:
+                checks.append({"segundo": final_stamp, "rotulo_esperado": None})
             for check in checks:
-                if check["segundo"] >= 25:
+                if check["segundo"] >= (card_start * 1000 // 30) / 1000:
                     check["rotulo_esperado"] = None
-    duration = props["duration_seconds"]
     decode_options = {"stamps": [check["segundo"] for check in checks]} if checks else {}
     batched = len(checks) > RPC_ATTACHMENT_LIMIT
     if batched:
@@ -668,7 +696,7 @@ def review_video(
             if music_reference is not None:
                 decode_options["music_reference"] = music_reference
             metrics, images = decode(path, digest, duration, speech=speech, **decode_options)
-            audio_check = verify_mix_speech(speech, ad["captions"])
+            audio_check = verify_mix_speech(speech, ad["captions"], duration)
     else:
         metrics, images = decode(path, digest, duration, **decode_options)
     stamps = [second for second, _ in images]
@@ -769,21 +797,21 @@ def review_video(
         if animated_endcard:
             instructions += (
                 " En el fotograma cero debe verse el sujeto del gancho, aunque su rótulo todavía esté entrando. "
-                "A los 29.966 s se espera un fundido a negro, sin texto legible."
+                f" En la muestra final a los {final_stamp:g} s se espera un fundido a negro, sin texto legible."
             )
         if destination:
             evidence["destino_confirmado"] = destination
             instructions += (
                 " Comprueba en el cierre el icono del canal seleccionado y la URL del destino "
-                " confirmado, visible a los 28 s. Se admite mostrarla sin https:// ni www. "
+                f" confirmado, visible en la muestra a los {middle_stamp:g} s. Se admite mostrarla sin https:// ni www. "
                 "Rechaza un destino "
                 "distinto, una URL ilegible o un icono de otro canal."
             )
         instructions += (
             " En este anuncio hay subtítulos separados del rótulo. Revisa el gancho al comienzo "
             "y al menos un subtítulo visible en móvil cuando coincida con la muestra. "
-            "Contrasta el objeto prometido por el gancho con el fotograma inicial y el de un "
-            "segundo: si sólo se ve parcialmente al comenzar o el encuadre tarda en "
+            "Contrasta el objeto prometido por el gancho con el fotograma inicial y las muestras "
+            "de apertura. Si sólo se ve parcialmente al comenzar o el encuadre tarda en "
             "mostrarlo, registra un defecto en apertura. Comprueba si la caja de subtítulos "
             "oculta el elemento destacado o si queda legible sin ocupar una franja vacía. "
             "En la placa de cierre se exige marca y CTA completos en lugar del rótulo de escena. "
@@ -1055,7 +1083,7 @@ def audit_pending(path, version, profile, dispatch, output):
             return False
     if not (brief := lookup(order, dispatch)):
         return False
-    edl = json.loads(read_regular(direction, LIMIT))
+    edl = json.loads(read_regular(direction, DIRECTION_LIMIT))
     rendered = json.loads(read_regular(path, LIMIT))
     if edl["brief_sha256"] != hashlib.sha256(canonical(brief)).hexdigest():
         raise ValueError("El máster no corresponde al brief vigente")
@@ -1192,7 +1220,7 @@ def main():
     receipt = json.loads(read_regular(JOURNAL / source, INTAKE_LIMIT))
     order = receipt["order"]
     validate(order, fixture)
-    edl = json.loads(read_regular(VALERIA / source, LIMIT))
+    edl = json.loads(read_regular(VALERIA / source, DIRECTION_LIMIT))
     rendered = None
     if revision > 1:
         filename = source if revision == 2 else f"{fixture}-v{revision}.json"
