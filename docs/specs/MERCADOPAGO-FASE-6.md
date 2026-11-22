@@ -50,3 +50,5 @@ El 15 de noviembre, las consultas al pago con y sin `X-Scope: stage` devolvieron
 Con autorización del titular, Mercado Pago canceló la suscripción y una consulta independiente confirmó `cancelled`. El reembolso íntegro de 1.000 CLP sigue pendiente. La API rechazó la solicitud con HTTP 401 al usar la credencial de prueba y la consulta del pago devolvió 0 CLP reembolsados. [Registro operativo](../../ESTADO.md#verificación-de-fase-6)
 
 Para un intento pendiente y sin cobertura, «Consultar suscripción» guarda la cancelación a partir del mandato del proveedor. Studio muestra «La suscripción está cancelada». Las conciliaciones con cobertura siguen consultando el pago. La fecha y el importe del reembolso se comprueban por separado en Mercado Pago.
+
+«Consultar suscripción» verifica el pago vinculado a la factura más reciente cuya fecha de débito ya llegó. Una próxima cuota programada o una factura sin pago vinculado queda fuera de esa selección. El pago sigue sujeto al cotejo de suscripción, vendedor, importe y entorno de prueba antes de aplicar cobertura.

@@ -370,7 +370,7 @@ async function reconcile(request: Request, env: BillingEnv, user: PortalIdentity
   const canceledWithoutCoverage = remote.status === "canceled"
     && row.billing_status === "pending" && row.current_period_end === null;
   const invoice = remote.status === "pending" || canceledWithoutCoverage
-    ? null : await client.findLatestInvoice(remote.id);
+    ? null : await client.findLatestDueInvoiceWithPayment(remote.id, now());
   await persist(env, row, remote, await factFor(client, row, remote, invoice));
   const saved = await checkoutBy(env, " AND b.user_id=? AND b.subscription_id=?", user.id, row.subscription_id);
   if (!saved) fail(503, "PAGO_NO_DISPONIBLE");

@@ -116,6 +116,8 @@ function emulate(options: {
   livePayment?: boolean;
   invoiceUnavailable?: boolean;
   invoiceStart?: string;
+  nextInvoice?: "scheduled" | "paid";
+  nextInvoiceStart?: string;
   providerId?: string;
   providerApplication?: string;
 } = {}) {
@@ -158,9 +160,14 @@ function emulate(options: {
     if (path === "/authorized_payments/" + INVOICE) {
       return options.invoiceUnavailable ? new Response(null, { status: 503 }) : Response.json(invoice);
     }
-    if (path === "/authorized_payments/search") return Response.json({
-      paging: { limit: 20, offset: 0, total: 1 }, results: [invoice],
-    });
+    if (path === "/authorized_payments/search") {
+      const results = options.nextInvoice ? [{
+        ...invoice, id: "10000000003", debit_date: options.nextInvoiceStart ?? NEXT,
+        status: options.nextInvoice === "paid" ? "processed" : "scheduled",
+        payment: options.nextInvoice === "paid" ? { id: "10000000004", status: "approved" } : null,
+      }, invoice] : [invoice];
+      return Response.json({ paging: { limit: 20, offset: 0, total: results.length }, results });
+    }
     expect(path).toBe("/v1/payments/" + PAYMENT);
     return Response.json({
       id: PAYMENT, collector_id: MERCHANT, currency_id: "CLP", transaction_amount: 5000, external_reference: reference,
@@ -311,6 +318,44 @@ it("una factura aprobada con pago real no concede derechos en el entorno de prue
   await expect(handleBilling(message("subscription_authorized_payment", INVOICE), env, webhookPath))
     .rejects.toMatchObject({ status: 503 });
   expect(state()).toMatchObject({ status: "pending", billing_status: "pending", current_period_end: null });
+  expect(database.prepare("SELECT count(*) AS n FROM billing_payments").get()?.n).toBe(0);
+});
+
+it.each([
+  { label: "futura sin pago", nextInvoice: "scheduled", nextInvoiceStart: NEXT },
+  { label: "futura con pago", nextInvoice: "paid", nextInvoiceStart: NEXT },
+  { label: "vencida sin pago", nextInvoice: "scheduled", nextInvoiceStart: "2026-11-14T12:30:00.000Z" },
+] as const)("concilia el pago vigente ante otra cuota $label", async ({ nextInvoice, nextInvoiceStart }) => {
+  const scenario = { authorized: false, nextInvoice, nextInvoiceStart };
+  const upstream = emulate(scenario);
+  const { checkout_id } = await (await checkout()).json();
+  scenario.authorized = true;
+  env.MP_SANDBOX_CHECKOUT_ENABLED = "false";
+  upstream.mockClear();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await handleBilling(request("PUT", reconcilePath, { checkout_id }), env, reconcilePath, SESSION);
+    expect(await result.json()).toMatchObject({
+      status: "active", billing_status: "paid", current_period_start: Date.parse(ANCHOR) / 1000,
+      current_period_end: Date.parse(NEXT) / 1000, checkout_enabled: false, checkout_url: null,
+    });
+  }
+  const payments = upstream.mock.calls.map(([url]) => new URL(String(url)).pathname)
+    .filter(pathname => pathname.startsWith("/v1/payments/"));
+  expect(payments).toEqual(["/v1/payments/" + PAYMENT, "/v1/payments/" + PAYMENT]);
+  expect(upstream.mock.calls.every(([, init]) => init?.method === "GET")).toBe(true);
+  expect(database.prepare("SELECT payment_id,invoice_id FROM billing_payments").all())
+    .toEqual([{ payment_id: PAYMENT, invoice_id: INVOICE }]);
+  expect(database.prepare("SELECT count(*) AS n FROM webhook_events").get()?.n).toBe(0);
+});
+
+it("mantiene el mandato sin cobertura si sólo hay una cuota futura", async () => {
+  const scenario = { authorized: false, invoiceStart: NEXT };
+  const upstream = emulate(scenario);
+  const { checkout_id } = await (await checkout()).json();
+  scenario.authorized = true;
+  const result = await handleBilling(request("PUT", reconcilePath, { checkout_id }), env, reconcilePath, SESSION);
+  expect(await result.json()).toMatchObject({ status: "authorized", billing_status: "pending", current_period_end: null });
+  expect(upstream.mock.calls.some(([url]) => new URL(String(url)).pathname.startsWith("/v1/payments/"))).toBe(false);
   expect(database.prepare("SELECT count(*) AS n FROM billing_payments").get()?.n).toBe(0);
 });
 
