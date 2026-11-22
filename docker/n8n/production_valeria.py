@@ -1028,10 +1028,15 @@ def multiple_plan_request(
         "Las observaciones describen fotogramas, no garantizan lo ocurrido entre ellos. "
         "Conserva el sentido de la voz y no inventes contenido. Selecciona un ángulo por su posición "
         "entera de 1 a 3 en la lista y devuelve JSON "
-        "con angulo, titulo, subtitulo, observacion, apto_sin_cambios y escenas. Cada escena debe "
-        "tener fuente igual al id declarado, desde y hasta en segundos locales de ese video y un "
-        "rotulo opcional {texto,desde,hasta,posicion,tamano}; incluye al menos uno. Los rótulos usan "
-        "tiempos relativos a la escena y admiten tamano normal o grande. "
+        "con angulo, titulo, subtitulo, observacion, apto_sin_cambios y escenas. Usa texto no vacío "
+        "sin saltos de línea en titulo (máximo 120 caracteres), subtitulo (240) y observacion (600). "
+        "apto_sin_cambios es un booleano. Usa solo esas claves. Cada escena tiene fuente igual al "
+        "id declarado, desde y hasta numéricos en segundos locales de ese vídeo, con una duración "
+        "mínima de 0,5 s y hasta menor o igual a la duración de su fuente. El rotulo es opcional "
+        "por escena, con al menos uno en el montaje. Usa {texto,desde,hasta,posicion,tamano}. Su "
+        "texto admite hasta 80 caracteres, desde y "
+        "hasta son relativos al inicio de su escena y el rótulo ha de durar entre 0,5 y 6 s sin "
+        "salir de ella. Usa posicion superior o inferior y tamano normal o grande. "
         + (
             "Usa 2 a 32 escenas, suma hasta 600 segundos y al menos un segundo, sin cortes superpuestos del mismo video. "
             if long_form
@@ -1208,8 +1213,9 @@ def process(
             if attempt == 2 or time.monotonic() - started >= 65:
                 raise
             logging.warning(
-                "Valeria vuelve a solicitar la escaleta de %s por formato inválido",
+                "Valeria vuelve a solicitar la escaleta de %s por formato inválido (%s)",
                 order["order_id"],
+                error,
             )
             request["idempotencyKey"] = str(
                 uuid.uuid5(uuid.UUID(request_id), "corregir-formato:v1")
@@ -1566,7 +1572,9 @@ def run_pending(profile, token, output):
                     "Valeria difiere la orden %s durante %d s por %s",
                     path.stem,
                     delay,
-                    type(error).__name__,
+                    f"{type(error).__name__}: {error}"
+                    if isinstance(error, VisualResponseFormatError)
+                    else type(error).__name__,
                 )
                 if time.monotonic() - started >= 15:
                     return
