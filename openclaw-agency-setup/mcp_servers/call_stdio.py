@@ -59,16 +59,19 @@ def runtime_settings() -> dict[str, str]:
     return payload
 
 
-async def call(server: str, tool: str, arguments: dict) -> dict:
-    env = {key: value for key, value in runtime_settings().items() if key in ENV_BY_SERVER[server]}
+def client_for(server: str, config: dict[str, str]) -> Client:
+    env = {key: value for key, value in config.items() if key in ENV_BY_SERVER[server]}
     settings = StdioServerParameters(
         command=sys.executable,
         args=["-E", "-B", str(ROOT / "serve.py"), server],
         cwd=ROOT,
         env=env,
     )
-    async with Client(settings, mode="legacy", read_timeout_seconds=1230) as client:
-        result = await client.call_tool(tool, arguments)
+    return Client(settings, mode="legacy", read_timeout_seconds=1230)
+
+
+async def call_tool(client: Client, server: str, tool: str, arguments: dict) -> dict:
+    result = await client.call_tool(tool, arguments)
     if result.is_error:
         message = getattr(result.content[0], "text", "") if result.content else ""
         if SAFE_ERROR.fullmatch(message.strip()) is None:
@@ -82,6 +85,11 @@ async def call(server: str, tool: str, arguments: dict) -> dict:
                 output["image"] = {"mimeType": images[0].mime_type, "data": images[0].data}
         return output
     return {"error": "MCP_RESPUESTA_INVALIDA"}
+
+
+async def call(server: str, tool: str, arguments: dict) -> dict:
+    async with client_for(server, runtime_settings()) as client:
+        return await call_tool(client, server, tool, arguments)
 
 
 def main() -> None:

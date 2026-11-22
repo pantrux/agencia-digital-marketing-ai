@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import importlib.util
 import io
@@ -608,7 +609,7 @@ def test_sofia_recibe_el_texto_transcrito_como_contexto_limitado(monkeypatch, tm
     text = "Las sansevieras necesitan poca agua. " * 1000
     transcript_order = []
 
-    def transcribe(_receipt, _output, source=None):
+    async def transcribe(_receipt, _output, source, _call):
         transcript_order.append(source["media"]["asset_id"] if source else "principal")
         return {"language": "es", "text": text, "words": ["palabra"]}
 
@@ -654,6 +655,86 @@ def test_sofia_recibe_el_texto_transcrito_como_contexto_limitado(monkeypatch, tm
         + len(multi["materiales_adicionales"][0]["transcripcion"]["texto"])
         == sofia.MAX_BRIEF_TRANSCRIPT
     )
+
+
+def test_sofia_reutiliza_el_inspector_y_reanuda_desde_el_audio_guardado(
+    monkeypatch, tmp_path, order
+):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_sofia as sofia
+
+    if os.name == "nt":
+        monkeypatch.setattr(os, "O_NOFOLLOW", os.O_BINARY, raising=False)
+        monkeypatch.setattr(os, "O_NONBLOCK", 0, raising=False)
+    monkeypatch.setattr(sofia, "MEDIA", tmp_path)
+    project = order["media"]["project_slug"]
+    second = {**order["media"], "asset_id": str(uuid.uuid4())}
+    folder = tmp_path / "proyectos" / project / "03_assets"
+    folder.mkdir(parents=True)
+    output = tmp_path / "brief.json"
+    names = ["intake-source.wav", f"intake-source-{second['asset_id']}.wav"]
+
+    def audio(name):
+        file = folder / name
+        file.write_bytes(name.encode())
+        return {"path": str(file.relative_to(tmp_path)), **sofia.fingerprint(file)}
+
+    additional = {"media": second, "audio": audio(names[1])}
+    receipt = {
+        "order": {**order, "additional_media": [second]},
+        "audio": audio(names[0]),
+    }
+    sources = [(60, 0, None), (30, 1, additional)]
+    events = []
+    unavailable = {names[0]}
+    transcription = {
+        "duration": 1.0,
+        "language": "es",
+        "text": "Hola",
+        "words": [{"word": "Hola", "start": 0.0, "end": 0.8}],
+    }
+
+    class Inspector:
+        async def __aenter__(self):
+            events.append("abrir")
+            return self
+
+        async def __aexit__(self, *_):
+            events.append("cerrar")
+
+    async def tool(client, server, name, arguments):
+        assert isinstance(client, Inspector)
+        assert (server, name) == ("mcp-media-inspector", "transcribir_audio")
+        assert arguments["proyecto"] == project
+        name = Path(arguments["ruta"]).name
+        events.append(name)
+        return {"error": "SPEACHES_TIMEOUT"} if name in unavailable else {"result": transcription}
+
+    def connect(server, settings):
+        assert server == "mcp-media-inspector"
+        assert settings["AGENCY_MEDIA_PROJECTS"] == project
+        return Inspector()
+
+    monkeypatch.setitem(
+        sys.modules,
+        "call_stdio",
+        SimpleNamespace(runtime_settings=lambda: {}, client_for=connect, call_tool=tool),
+    )
+    with pytest.raises(ValueError, match="no confirmó la transcripción"):
+        asyncio.run(sofia.collect_transcripts(receipt, output, sources))
+    assert events == ["abrir", names[1], names[0], "cerrar"]
+    assert output.with_name(f"brief-{second['asset_id']}.transcripcion.json").is_file()
+
+    unavailable.clear()
+    events.clear()
+    assert asyncio.run(sofia.collect_transcripts(receipt, output, sources)) == {
+        0: transcription,
+        1: transcription,
+    }
+    assert events == ["abrir", names[0], "cerrar"]
+    events.clear()
+    asyncio.run(sofia.collect_transcripts(receipt, output, sources))
+    assert events == []
 
 
 def test_escaleta_multiple_conserva_identidad_y_tiempos_de_cada_fuente(handoff, order):
