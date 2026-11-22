@@ -10,12 +10,13 @@ import { storageFits, storageQuotaArguments } from "./storage-quota.js";
 const maxObjectBytes = 1024 ** 3;
 const partSize = 16 * 1024 ** 2;
 const maxParts = maxObjectBytes / partSize;
-const initialPartCount = 3;
+export const partSignBatchSize = 3;
 const sessionTtl = 86400;
 const operationLease = 600;
 const maxXmlBytes = 96 * 1024;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u;
 const uploadRoute = /^\/api\/uploads\/([a-f0-9-]+)(?:\/(complete|parts|part-observations)(?:\/([1-9][0-9]?)\/sign)?)?$/u;
+const uploadBatchRoute = /^\/api\/uploads\/([a-f0-9-]+)\/parts\/sign$/u;
 const mimeTypes = new Map([
   ["mp4", "video/mp4"], ["mov", "video/quicktime"], ["mkv", "video/x-matroska"],
   ["webm", "video/webm"], ["m4v", "video/x-m4v"], ["wav", "audio/wav"],
@@ -140,6 +141,7 @@ function uploadInfo(row: UploadRow, newlyOpened = false, initialParts?: Awaited<
   return response({
     id: row.id, uploadId: row.upload_id, key: row.object_key, status: row.status,
     partSize, partCount: Math.ceil(row.bytes / partSize),
+    ...(row.status === "open" ? { partSignBatchSize } : {}),
     ...(newlyOpened ? { newlyOpened: true } : {}),
     ...(initialParts?.length ? { initialParts } : {}),
     ...(row.status === "completed" ? { etag: row.object_etag, hash_verified: true } : {}),
@@ -291,15 +293,34 @@ export async function signInitialParts(env: IngestEnv, job: Readonly<SyncJob>, u
   mimeType: string, expiresAt: number) {
   const expires = Math.min(60, expiresAt - unix());
   if (!uploadsConfigured(env) || expires < 1) return [];
+  const count = Math.min(partSignBatchSize, Math.ceil(job.bytes / partSize));
+  return signPartGroup(env, job, uploadId, mimeType, expires, Array.from({ length: count }, (_, index) => index + 1));
+}
+
+function signPartGroup(env: IngestEnv, job: Readonly<SyncJob>, uploadId: string,
+  mimeType: string, expires: number, numbers: readonly number[]) {
   const date = amzDate();
   const auth = credentials(env);
-  const count = Math.min(initialPartCount, Math.ceil(job.bytes / partSize));
-  return Promise.all(Array.from({ length: count }, async (_, index) => ({
-    partNumber: index + 1,
+  return Promise.all(numbers.map(async (partNumber) => ({
+    partNumber,
     ...await signR2UploadPart(job, { maxObjectBytes }, auth, date, {
-      uploadId, partNumber: index + 1, bytes: Math.min(partSize, job.bytes - index * partSize), mimeType, expires,
+      uploadId, partNumber, bytes: Math.min(partSize, job.bytes - (partNumber - 1) * partSize), mimeType, expires,
     }),
   })));
+}
+
+export async function signRequestedParts(request: Request, env: IngestEnv, job: Readonly<SyncJob>,
+  uploadId: string, mimeType: string, expiresAt: number): Promise<Response> {
+  const body = await readJson(request, 256);
+  const numbers: unknown = body.partNumbers;
+  const count = Math.ceil(job.bytes / partSize);
+  if (!hasOnly(body, ["partNumbers"]) || !Array.isArray(numbers) || numbers.length < 1
+    || numbers.length > partSignBatchSize || new Set(numbers).size !== numbers.length
+    || !numbers.every((number): number is number => typeof number === "number" && Number.isSafeInteger(number)
+      && number >= 1 && number <= count)) return fail(422, "SUBIDA_PARTES");
+  const expires = Math.min(60, expiresAt - unix());
+  if (expires < 1) return fail(410, "SUBIDA_VENCIDA");
+  return response({ parts: await signPartGroup(env, job, uploadId, mimeType, expires, numbers), expiresIn: expires });
 }
 
 function xmlField(source: string, field: "IsTruncated" | "PartNumber" | "ETag" | "Size"): string | null {
@@ -578,8 +599,12 @@ async function recordPartObservations(request: Request, env: IngestEnv, row: Upl
   return new Response(null, { status: 204 });
 }
 
-export function partAccessTarget(path: string, method: string): { id: string; number?: number } | null {
+type PartAccess = { id: string; number?: number; batch?: true };
+
+export function partAccessTarget(path: string, method: string): PartAccess | null {
   if (method !== "GET" && method !== "POST") return null;
+  const batch = method === "POST" ? uploadBatchRoute.exec(path)?.[1] : undefined;
+  if (isUuid(batch)) return { id: batch, batch: true };
   const route = uploadRoute.exec(path);
   if (route?.[0] !== path || route[2] !== "parts" || !isUuid(route[1])) return null;
   if (method === "GET" && !route[3]) return { id: route[1] };
@@ -603,7 +628,7 @@ async function listUploadParts(env: IngestEnv, row: UploadRow): Promise<Response
 }
 
 export async function handlePartAccess(request: Request, env: AuthEnv & IngestEnv,
-  { id, number }: { id: string; number?: number }): Promise<Response> {
+  { id, number, batch }: PartAccess): Promise<Response> {
   const lookup = await sessionLookup(request, env);
   const [sessions, uploads] = await env.DB.batch<PortalIdentity | UploadRow>([
     lookup.statement(env.DB),
@@ -612,6 +637,10 @@ export async function handlePartAccess(request: Request, env: AuthEnv & IngestEn
   if (!sessions?.results[0]) return fail(401, "AUTENTICACION_REQUERIDA");
   const upload = uploads?.results[0];
   if (!upload || !("upload_id" in upload)) return fail(404, "SUBIDA_NO_ENCONTRADA");
+  if (batch) {
+    active(upload);
+    return signRequestedParts(request, env, syncJob(upload), upload.upload_id, upload.mime_type, upload.expires_at);
+  }
   return number === undefined ? listUploadParts(env, upload) : signPart(env, upload, number);
 }
 

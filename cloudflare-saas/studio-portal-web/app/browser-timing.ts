@@ -3,7 +3,8 @@ const routes: Readonly<Record<string, string>> = {
   "/api/dashboard": "panel",
   "/api/uploads": "multipart_inicio",
 };
-const partPath = /^\/api\/uploads\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\/parts\/[1-9][0-9]*\/sign$/u;
+const id = "[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}";
+const partPath = new RegExp(`^/api/(?:uploads/${id}|orders/${id}/sources/${id})/parts/(?:[1-9][0-9]*/)?sign$`, "u");
 const batchSize = 12;
 type Sample = [route: string, status: number, milliseconds: number, reused: boolean];
 

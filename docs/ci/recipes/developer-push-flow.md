@@ -22,6 +22,8 @@ Para verificar el p95 de entregas automáticas, compara una orden entregada sin 
 
 Para activar las firmas iniciales de multipart, despliega primero el Worker y después el portal. Comprueba con un archivo y con varias fuentes que el primer grupo comienza sin pedir cada firma por separado. Una reapertura debe listar las partes existentes y, si un PUT falla, el navegador debe solicitar una firma nueva para esa parte.
 
+El Worker anuncia si admite solicitudes para hasta tres partes. El portal pide cada lote cuando necesita su primera firma y reanuda solo las partes pendientes. Usa una firma individual si la del lote caducó, si debe reintentar un PUT o si la versión del Worker solo firma partes individualmente. Comprueba la autorización de ambas rutas, el límite del lote, la caducidad de las firmas y los PUT reales en R2. Cuenta las solicitudes de firma por carga y conserva la medición de latencia de cada solicitud.
+
 Al cambiar el acceso a las partes de una producción con varias fuentes, coteja que tanto el listado como la firma individual verifiquen la sesión y la fuente en un lote de D1. Ensaya una sesión revocada y una fuente de otra cuenta antes de activar el Worker.
 
 Al cambiar el aprovisionador de DSM, el monitor de D1 o la cola de la bóveda, ejecuta además `python -m pytest tests/test_r2_sync_provision.py tests/test_d1_backup_metrics.py tests/test_vault_changes.py`. Las pruebas por descriptor del aprovisionador se ejecutan en Linux. Para cambiar el manifiesto o el pipeline, valida también la lista del cambio con `python scripts/ci/check_docs.py --changed-files <archivo-json>` e incluye esta receta y el diagrama.

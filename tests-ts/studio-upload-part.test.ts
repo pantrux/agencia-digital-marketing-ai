@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { uploadMissingParts, uploadPart } from "../cloudflare-saas/studio-portal-web/app/upload-part.js";
+import { partSigners, uploadMissingParts, uploadPart } from "../cloudflare-saas/studio-portal-web/app/upload-part.js";
 
 const origin = "https://" + "a".repeat(32) + ".r2.cloudflarestorage.com";
 const segment = new Blob(["segmento"]);
@@ -14,6 +14,65 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+function signed(number: number) {
+  return { partNumber: number, url: `${origin}/parte?numero=${number}`, headers: {} };
+}
+
+it("reduce de 35 a 12 las solicitudes de firma de 38 partes con las tres primeras firmadas", async () => {
+  const signOne = vi.fn(async (number: number) => signed(number));
+  const signBatch = vi.fn(async (numbers: number[]) => ({ parts: numbers.map(signed), expiresIn: 60 }));
+  const sign = partSigners(38, new Map(), [1, 2, 3].map(signed), signOne, signBatch);
+  const parts = new Map<number, string>();
+  await uploadMissingParts(38, parts, async (number) => {
+    expect(await sign(number)()).toEqual(signed(number));
+    return `"parte-${number}"`;
+  }, vi.fn());
+  expect(parts.size).toBe(38);
+  expect(signOne).not.toHaveBeenCalled();
+  expect(signBatch).toHaveBeenCalledTimes(12);
+  expect(signBatch).toHaveBeenNthCalledWith(1, [4, 5, 6]);
+  expect(signBatch).toHaveBeenLastCalledWith([37, 38]);
+});
+
+it("evita firmar partes ya recibidas y pide una firma individual después de un rechazo de R2", async () => {
+  const existing = new Map([[2, '"guardada"'], [4, '"guardada"']]);
+  const signOne = vi.fn(async (number: number) => ({ url: signed(number).url + "&nueva=1", headers: {} }));
+  const signBatch = vi.fn(async (numbers: number[]) => ({ parts: numbers.map(signed), expiresIn: 60 }));
+  const sign = partSigners(6, existing, [], signOne, signBatch);
+  const transfer = vi.fn().mockResolvedValueOnce(new Response(null, { status: 403 }))
+    .mockResolvedValueOnce(new Response(null, { headers: { ETag: '"confirmada"' } }));
+  vi.stubGlobal("fetch", transfer);
+
+  const done = uploadPart(sign(3), segment);
+  await vi.runAllTimersAsync();
+  await expect(done).resolves.toBe('"confirmada"');
+  expect(signBatch.mock.calls).toEqual([[[1, 3, 5]]]);
+  expect(signOne.mock.calls).toEqual([[3]]);
+  expect(transfer.mock.calls.map(([url]) => String(url))).toEqual([signed(3).url, signed(3).url + "&nueva=1"]);
+});
+
+it("pide una firma nueva antes de enviar una parte que esperó a que su lote venciera", async () => {
+  const signOne = vi.fn(async (number: number) => ({ url: signed(number).url + "&nueva=1", headers: {} }));
+  const signBatch = vi.fn(async (numbers: number[]) => ({ parts: numbers.map(signed), expiresIn: 60 }));
+  const sign = partSigners(3, new Map(), [], signOne, signBatch);
+  expect(await sign(1)()).toEqual(signed(1));
+  const transfer = vi.fn().mockResolvedValue(new Response(null, { headers: { ETag: '"confirmada"' } }));
+  vi.stubGlobal("fetch", transfer);
+
+  await vi.advanceTimersByTimeAsync(60_000);
+  await expect(uploadPart(sign(2), segment)).resolves.toBe('"confirmada"');
+  expect(signBatch.mock.calls).toEqual([[[1, 2, 3]]]);
+  expect(signOne.mock.calls).toEqual([[2]]);
+  expect(transfer.mock.calls.map(([url]) => String(url))).toEqual([signed(2).url + "&nueva=1"]);
+});
+
+it("rechaza una firma de lote que no corresponde a la parte solicitada", async () => {
+  const signOne = vi.fn(async (number: number) => signed(number));
+  const sign = partSigners(2, new Map(), [], signOne, async () => ({ parts: [signed(2), signed(1)], expiresIn: 60 }));
+  await expect(sign(1)()).rejects.toThrow("CARGA_NO_DISPONIBLE");
+  expect(signOne).not.toHaveBeenCalled();
 });
 
 it("vuelve a firmar la misma parte tras un rechazo de R2 y un corte de red", async () => {

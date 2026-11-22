@@ -1180,7 +1180,7 @@ describe("Ingesta R2 multipart", () => {
         STUDIO_JWT_SESSION_SECRET: secret, R2_ACCOUNT_ID: credentials.accountId,
         R2_ACCESS_KEY_ID: credentials.accessKeyId, R2_SECRET_ACCESS_KEY: credentials.secretAccessKey,
       } as Parameters<typeof worker.fetch>[1];
-      const file = { extension: "mp4", bytes: 7, sha256: digest };
+      const file = { extension: "mp4", bytes: 2 * 16 * 1024 ** 2 + 7, sha256: digest };
       let created: Response;
       if (type === "fuente") {
         const manifest = ["primero.mp4", "segundo.mp4"].map((name) => ({ name, ...file }));
@@ -1194,13 +1194,18 @@ describe("Ingesta R2 multipart", () => {
           order_id: order, project_slug: job.project_slug, ...file, content_type: "video/mp4",
         }), env, "user", "/api/uploads");
       }
-      const { id } = await created.json();
+      const { id, partSignBatchSize } = await created.json();
+      expect(partSignBatchSize).toBe(3);
       const path = type === "fuente" ? `/api/orders/${order}/sources/${id}/parts` : `/api/uploads/${id}/parts`;
       const batch = vi.spyOn(env.DB, "batch");
       const sessions = vi.spyOn(env.DB, "withSession");
       const sign = (part: number, settings = env, cookie = "__Host-studio_session=" + token) => worker.fetch(new Request(
         origin + `${path}/${part}/sign`, { method: "POST", headers: { Origin: origin, Cookie: cookie } },
       ), settings, { waitUntil: vi.fn() });
+      const signBatch = (partNumbers: unknown, cookie = "__Host-studio_session=" + token) => worker.fetch(new Request(
+        origin + `${path}/sign`, { method: "POST", headers: { Origin: origin, Cookie: cookie, "Content-Type": "application/json" },
+          body: JSON.stringify({ partNumbers }) },
+      ), env, { waitUntil: vi.fn() });
       const list = (settings = env, cookie = "__Host-studio_session=" + token) => worker.fetch(new Request(
         origin + path, { headers: { Cookie: cookie } },
       ), settings, { waitUntil: vi.fn() });
@@ -1214,6 +1219,23 @@ describe("Ingesta R2 multipart", () => {
       expect(batch).toHaveBeenCalledTimes(1);
       expect(batch.mock.calls[0]?.[0]).toHaveLength(2);
       expect(sessions).not.toHaveBeenCalled();
+      batch.mockClear();
+      const group = await signBatch([1, 2, 3]);
+      expect(group.status).toBe(200);
+      expect(batch).toHaveBeenCalledTimes(1);
+      expect(batch.mock.calls[0]?.[0]).toHaveLength(2);
+      const body = await group.json() as { parts: { partNumber: number; url: string }[]; expiresIn: number };
+      expect(body.expiresIn).toBe(60);
+      expect(body.parts.map((part) => part.partNumber)).toEqual([1, 2, 3]);
+      for (const part of body.parts) {
+        const url = new URL(part.url);
+        expect(url.searchParams.get("uploadId")).toBe(uploadId);
+        expect(url.searchParams.get("partNumber")).toBe(String(part.partNumber));
+        expect(url.searchParams.get("X-Amz-Expires")).toBe("60");
+      }
+      for (const invalid of [[], [1, 1], [1, 2, 3, 4], [4], ["1"]]) {
+        expect((await signBatch(invalid)).status).toBe(422);
+      }
       const r2 = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(
         `<ListPartsResult><IsTruncated>false</IsTruncated><Part><PartNumber>1</PartNumber>
         <Size>7</Size><ETag>"${etag}"</ETag></Part></ListPartsResult>`,
@@ -1238,17 +1260,20 @@ describe("Ingesta R2 multipart", () => {
       expect(forbidden.status).toBe(404);
       expect(await forbidden.json()).toEqual({ error: type === "fuente" ? "MATERIAL_NO_ENCONTRADO" : "SUBIDA_NO_ENCONTRADA" });
       expect((await list(env, "__Host-studio_session=" + otherToken)).status).toBe(404);
+      expect((await signBatch([1, 2], "__Host-studio_session=" + otherToken)).status).toBe(404);
       expect((await list({ ...env, BILLING_MODE: "sandbox" })).status).toBe(404);
-      expect((await sign(2)).status).toBe(405);
+      expect((await sign(4)).status).toBe(405);
       expect((await sign(1, { ...env, BILLING_MODE: "sandbox" })).status).toBe(404);
       batch.mockClear();
       expect((await sign(1, env, "")).status).toBe(401);
+      expect((await signBatch([1, 2], "")).status).toBe(401);
       expect((await list(env, "")).status).toBe(401);
       expect(batch).not.toHaveBeenCalled();
       db.exec("UPDATE sessions SET revoked_at=unixepoch() WHERE user_id='user'");
       const revoked = await sign(1);
       expect(revoked.status).toBe(401);
       expect(await revoked.json()).toEqual({ error: "AUTENTICACION_REQUERIDA" });
+      expect((await signBatch([1, 2])).status).toBe(401);
       expect((await list()).status).toBe(401);
       expect(r2).toHaveBeenCalledTimes(1);
       if (type === "fuente") {

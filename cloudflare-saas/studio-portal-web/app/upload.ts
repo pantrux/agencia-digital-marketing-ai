@@ -1,7 +1,7 @@
 import Uppy from "@uppy/core";
 import { createSHA256 } from "hash-wasm";
 import { validateVideoDuration, videoDuration } from "./upload-duration";
-import { uploadMissingParts, uploadPart, type SignedPart } from "./upload-part";
+import { partSigners, uploadMissingParts, uploadPart, type NumberedSignedPart, type SignedPart, type SignedPartBatch } from "./upload-part";
 
 type Api = <T>(path: string, init?: RequestInit) => Promise<T>;
 type Order = { id: string; project_slug: string };
@@ -9,7 +9,7 @@ export type OutputResolution = "1080p" | "4k";
 export type OutputFormat = "mp4" | "prores4444";
 export type OutputEdit = "full" | "reel";
 type Session = { id: string; uploadId: string; key: string; partSize: number; partCount: number; status: string;
-  newlyOpened?: true; initialParts?: (SignedPart & { partNumber: number })[] };
+  newlyOpened?: true; initialParts?: NumberedSignedPart[]; partSignBatchSize?: number };
 type Part = { PartNumber: number; ETag: string };
 const files = { mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm" };
 const maximum = 1024 ** 3;
@@ -23,13 +23,11 @@ function openUpload(data?: unknown): RequestInit {
   return { ...init, headers: { ...init.headers, "X-Studio-Prefirmar-Partes": "1" } };
 }
 
-function partSigner(api: Api, path: string, upload: Session, number: number) {
-  let initial = upload.newlyOpened ? upload.initialParts?.find((part) => part.partNumber === number) : undefined;
-  return () => {
-    const part = initial;
-    initial = undefined;
-    return part ? Promise.resolve(part) : api<SignedPart>(`${path}/parts/${number}/sign`, post());
-  };
+function uploadSigners(api: Api, path: string, upload: Session, parts: ReadonlyMap<number, string>) {
+  return partSigners(upload.partCount, parts, upload.newlyOpened ? upload.initialParts ?? [] : [],
+    (number) => api<SignedPart>(`${path}/parts/${number}/sign`, post()),
+    upload.partSignBatchSize === 3
+      ? (partNumbers) => api<SignedPartBatch>(`${path}/parts/sign`, post({ partNumbers })) : undefined);
 }
 
 async function sha256(file: File): Promise<string> {
@@ -91,11 +89,12 @@ export async function uploadVideo(
       }
       const saved = upload.newlyOpened === true ? [] : (await api<{ parts: Part[] }>(path + "/parts")).parts;
       const parts = new Map(saved.map((part) => [part.PartNumber, part.ETag]));
+      const sign = uploadSigners(api, path, upload, parts);
       const observations = { http_403: false, sin_respuesta: false };
       try {
         await uploadMissingParts(upload.partCount, parts, (number) => {
           const offset = (number - 1) * upload.partSize;
-          return uploadPart(partSigner(api, path, upload, number), media.slice(offset, offset + upload.partSize),
+          return uploadPart(sign(number), media.slice(offset, offset + upload.partSize),
             (seen) => { observations[seen] = true; });
         }, report);
       } finally {
@@ -185,9 +184,10 @@ export async function uploadVideos(
       }
       const saved = upload.newlyOpened === true ? [] : (await api<{ parts: Part[] }>(`${path}/parts`)).parts;
       const parts = new Map(saved.map((part) => [part.PartNumber, part.ETag]));
+      const sign = uploadSigners(api, path, upload, parts);
       await uploadMissingParts(upload.partCount, parts, (number) => {
         const offset = (number - 1) * upload.partSize;
-        return uploadPart(partSigner(api, path, upload, number), file.slice(offset, offset + upload.partSize));
+        return uploadPart(sign(number), file.slice(offset, offset + upload.partSize));
       }, (percentage) => {
         progress[index] = percentage;
         report(Math.floor(progress.reduce((sum, value, i) => sum + value * items[i]!.file.size, 0) / totalBytes));

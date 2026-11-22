@@ -9,6 +9,7 @@ flowchart TB
     %% CI GPU: estilo, tipos y pruebas aisladas; no CUDA, pesos, servicios ni acceso al host .6.
     %% Control 6 separa Python dev/contratos CPU (27), métricas (4), Immich runtime (70)/build (8) y Whisper (94).
     %% Control 4 coteja los histogramas de Whisper con el filtro y límite del colector GPU.
+    %% Control 4 valida firma individual y por lote para cargas de uno o varios archivos.
     %% npm audita raíz y renderer; runtime Immich tiene 69 consultas OSV incluido ORT CUDA 12 y una fuente exceptuada.
     %% El validador exige cuatro JSON y cuatro stderr; avisos OSV incompletos bloquean aunque pip-audit devuelva 0.
     %% Un 502, 503 o 504 de OSV con JSON ausente admite dos reintentos y conserva sus trazas.

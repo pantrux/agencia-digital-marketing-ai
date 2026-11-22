@@ -1,7 +1,7 @@
 import { validateSyncJob, type SyncJob } from "../../../src/media/sync-contract.js";
 import { signR2UploadPart } from "../../../src/media/r2-signing.js";
 import type { PortalIdentity, sessionLookup } from "./identity.js";
-import { listMultipartParts, requestedParts, signInitialParts, uploadsConfigured, verifyDigest, type IngestEnv, type MultipartObserver } from "./ingest.js";
+import { listMultipartParts, partSignBatchSize, requestedParts, signInitialParts, signRequestedParts, uploadsConfigured, verifyDigest, type IngestEnv, type MultipartObserver } from "./ingest.js";
 import { HttpError, ownerId, prepareOwnedStatement, readJson, response } from "./platform.js";
 import { storageFits, storageQuotaArguments } from "./storage-quota.js";
 
@@ -59,6 +59,7 @@ export async function createSourceUpload(env: IngestEnv, owner: SourceOwner, ord
   const now = Math.floor(Date.now() / 1000);
   const info = (value: UploadRow, newlyOpened = false, initialParts?: Awaited<ReturnType<typeof signInitialParts>>) => response({ id: source.id, uploadId: value.upload_id,
     key: value.object_key, status: value.status, partSize, partCount: Math.ceil(source.bytes / partSize),
+    ...(value.status === "open" ? { partSignBatchSize } : {}),
     ...(newlyOpened ? { newlyOpened: true } : {}), ...(initialParts?.length ? { initialParts } : {}) });
   const reusable = (value: UploadRow): Response | undefined => {
     if (value.object_key !== key) throw new HttpError(409, "MATERIAL_EN_CONFLICTO");
@@ -158,6 +159,7 @@ function sourcePartJob(order: string, row: SourceRow & UploadRow): SyncJob {
 /** Lista o firma partes tras verificar la sesión y la fuente en un solo lote de D1. */
 export async function handleSourcePartAccess(
   env: IngestEnv, owner: Awaited<ReturnType<typeof sessionLookup>>, order: string, sourceId: string, number?: number,
+  batch?: Request,
 ): Promise<Response> {
   const [sessions, uploads] = await env.DB.batch<PortalIdentity | (SourceRow & UploadRow)>([
     owner.statement(env.DB),
@@ -178,6 +180,11 @@ export async function handleSourcePartAccess(
   const now = Math.floor(Date.now() / 1000);
   if (row.expires_at <= now) throw new HttpError(410, "SUBIDA_VENCIDA");
   if (row.status !== "open" || !row.upload_id) throw new HttpError(409, "SUBIDA_NO_ABIERTA");
+  if (batch) {
+    const contentType = mime[row.extension];
+    if (!contentType) throw new HttpError(422, "MATERIAL_INVALIDO");
+    return signRequestedParts(batch, env, sourcePartJob(order, row), row.upload_id, contentType, row.expires_at);
+  }
   if (number === undefined) {
     return response({ parts: await listMultipartParts(env, sourcePartJob(order, row), row.upload_id) });
   }

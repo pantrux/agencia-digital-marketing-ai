@@ -40,7 +40,7 @@ const measuredRoutes = new Map([
 ]);
 
 const browserRoutes = new Set(["auth_me", "panel", "multipart_inicio", "multipart_firma"]);
-const sourceUploadRoute = /^\/api\/orders\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/sources\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/(upload|complete|parts(?:\/([1-9][0-9]?)\/sign)?)$/u;
+const sourceUploadRoute = /^\/api\/orders\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/sources\/([a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12})\/(upload|complete|parts(?:\/(?:([1-9][0-9]?)\/)?sign)?)$/u;
 type BrowserSample = [string, number, number, boolean];
 
 function observeMultipart(env: WorkerEnv, route: "multipart_inicio_etapas" | "multifuente_inicio_etapas"): MultipartObserver | undefined {
@@ -156,11 +156,12 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
       return result;
     }
     const signingSourcePart = request.method === "POST" && sourceUpload?.[4];
-    if (sourceUpload && (signingSourcePart || (request.method === "GET" && sourceUpload[3] === "parts"))
+    const signingSourceBatch = request.method === "POST" && sourceUpload?.[3] === "parts/sign";
+    if (sourceUpload && (signingSourcePart || signingSourceBatch || (request.method === "GET" && sourceUpload[3] === "parts"))
       && uploadsConfigured(env)) {
       const owner = await sessionLookup(request, env);
       return await handleSourcePartAccess(env, owner, sourceUpload[1]!, sourceUpload[2]!,
-        signingSourcePart ? Number(signingSourcePart) : undefined);
+        signingSourcePart ? Number(signingSourcePart) : undefined, signingSourceBatch ? request : undefined);
     }
     const user = await identity(request, env);
     if (path === "/api/metrics/ttfb" && request.method === "POST") {
@@ -219,9 +220,9 @@ export default {
     const metrics = env.STUDIO_HTTP_METRICS;
     if (!metrics) return route(request, env, ctx);
     const url = new URL(request.url);
-    const sourceOpening = request.method === "POST" && !url.search && sourceUploadRoute.exec(url.pathname)?.[3] === "upload";
-    const label = measuredRoutes.get(`${request.method} ${url.pathname}`) ?? (sourceOpening ? "multifuente_inicio" : null)
-      ?? (request.method === "POST" && partAccessTarget(url.pathname, request.method) ? "multipart_firma" : null);
+    const sourceAction = request.method === "POST" && !url.search ? sourceUploadRoute.exec(url.pathname)?.[3] : undefined;
+    const label = measuredRoutes.get(`${request.method} ${url.pathname}`) ?? (sourceAction === "upload" ? "multifuente_inicio" : null)
+      ?? (request.method === "POST" && (partAccessTarget(url.pathname, request.method) || sourceAction?.endsWith("/sign")) ? "multipart_firma" : null);
     if (!label || url.origin !== env.PUBLIC_ORIGIN) return route(request, env, ctx);
     const start = performance.now();
     const reply = await route(request, env, ctx);
