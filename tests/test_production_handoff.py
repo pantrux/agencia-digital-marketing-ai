@@ -2695,8 +2695,13 @@ def test_elena_reintenta_el_rechazo_guardado_sin_repetir_la_auditoria(monkeypatc
 
     monkeypatch.setattr(elena, "audit", audit)
     monkeypatch.setattr(elena, "dispatch_request", dispatch)
+    now = 1_794_680_000
+    monkeypatch.setattr(elena.time, "time", lambda: now)
     with pytest.raises(TimeoutError):
         elena.run_pending(profile, "a" * 64, reviewed)
+    elena.run_pending(profile, "a" * 64, reviewed)
+    assert len(calls) == 1
+    now += 60
     elena.run_pending(profile, "a" * 64, reviewed)
     assert audits == [review]
     assert calls == [calls[0], calls[0]]
@@ -2714,6 +2719,66 @@ def test_elena_reintenta_el_rechazo_guardado_sin_repetir_la_auditoria(monkeypatc
     with pytest.raises(ValueError, match="revisión vigente"):
         elena.run_pending(profile, "a" * 64, reviewed)
     assert len(calls) == 2
+
+
+def test_elena_difiere_un_recibo_invalido_y_audita_la_siguiente_orden(
+    monkeypatch, tmp_path, order, caplog
+):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_elena as elena
+
+    journal, direction, rendered, reviewed = (
+        tmp_path / name for name in ("ingesta", "escaleta", "render", "qa")
+    )
+    for folder in (journal, direction, rendered, reviewed):
+        folder.mkdir()
+    for attribute, folder in (("JOURNAL", journal), ("VALERIA", direction), ("LUCAS", rendered)):
+        monkeypatch.setattr(elena, attribute, folder)
+    brief = {"objective": "Presentar el producto"}
+    monkeypatch.setattr(elena, "lookup", lambda *_: brief)
+    monkeypatch.setattr(elena.time, "time", lambda: 1_794_680_000)
+    profile = {"owner": order["user_id"], "fixture": str(uuid.uuid4())}
+    digest = hashlib.sha256(elena.canonical(brief)).hexdigest()
+    first, second = sorted((order["order_id"], str(uuid.uuid4())))
+    asset = order["media"]["asset_id"]
+    receipt = elena.canonical({"master": {"sha256": "a" * 64}})
+    for identity in (first, second):
+        item = {
+            **order,
+            "order_id": identity,
+            "media": {
+                **order["media"],
+                "job_id": identity,
+                "project_slug": "job-" + identity.replace("-", ""),
+                "object_key": f"ingest/{identity}/{asset}.mp4",
+            },
+        }
+        leaf = f"{identity}.json"
+        (journal / leaf).write_bytes(elena.canonical({"order": item}))
+        (direction / leaf).write_bytes(elena.canonical({"brief_sha256": digest}))
+        (rendered / leaf).write_bytes(b"invalido" if identity == first else receipt)
+
+    approved = []
+
+    def audit(item, _edl, _digest, _request, target, *_args, **_kwargs):
+        approved.append(item["order_id"])
+        review = {"dictamen": {"decision": "aprobado"}}
+        target.write_bytes(elena.canonical(review))
+        return review
+
+    monkeypatch.setattr(elena, "audit", audit)
+    with pytest.raises(json.JSONDecodeError):
+        elena.run_pending(profile, "a" * 64, reviewed)
+    assert approved == [second]
+    reference = hashlib.sha256(first.encode("ascii")).hexdigest()[:16]
+    assert reference in caplog.text and first not in caplog.text
+    elena.run_pending(profile, "a" * 64, reviewed)
+    assert approved == [second]
+    (rendered / f"{first}.json").write_bytes(receipt)
+    elena.run_pending(profile, "a" * 64, reviewed)
+    assert approved == [second, first]
+    with closing(sqlite3.connect(reviewed / "reintentos" / "elena.sqlite3")) as inbox:
+        assert inbox.execute("SELECT count(*) FROM retries").fetchone() == (0,)
 
 
 @pytest.mark.parametrize("escenario", ["prueba", "titular", "titular_designado"])

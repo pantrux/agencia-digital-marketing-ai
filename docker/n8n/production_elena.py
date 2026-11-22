@@ -7,12 +7,15 @@ import logging
 import math
 import os
 import re
+import sqlite3
 import stat
 import subprocess
 import tempfile
+import time
 import unicodedata
 import uuid
 from array import array
+from contextlib import closing
 from difflib import SequenceMatcher
 from heapq import nlargest
 from pathlib import Path
@@ -32,7 +35,7 @@ from production_handoff import (
 )
 from production_inbox import MEDIA, UUID, matches, render_resolution
 from production_intake import identity
-from production_mateo import dispatch_request, lookup
+from production_mateo import ORDER_ERRORS, dispatch_request, lookup
 from production_sofia import INTAKE_LIMIT, JOURNAL, LIMIT, MAX_TRANSCRIPT, MCP, validate_transcript
 from production_valeria import (
     AD_MUSIC_ID,
@@ -53,6 +56,7 @@ BAND_COMPARISON_BYTES = 22000
 VALERIA = Path("/var/lib/agency-production-valeria")
 LUCAS = Path("/var/lib/agency-production-lucas")
 FIELDS = {"puntaje", "marca_free", "observaciones", "defectos"}
+AUDIT_ERRORS = (*ORDER_ERRORS, IndexError, StopIteration, subprocess.SubprocessError)
 
 
 def paired_band_samples(originals, masters):
@@ -864,76 +868,135 @@ def report_rejection(order, brief, rendered, review, dispatch, revision):
         raise ValueError("Studio no confirmó el rechazo de calidad")
 
 
-def run_pending(profile, dispatch, output):
-    for path in sorted(LUCAS.glob("*.json")):
-        if not (version := revision_from_stem(path.stem)):
-            continue
-        identity, revision = version
-        intake = JOURNAL / f"{identity}.json"
-        direction = VALERIA / path.name
-        target = output / path.name
-        if not direction.is_file() or not intake.is_file():
-            continue
-        order = json.loads(read_regular(intake, INTAKE_LIMIT))["order"]
-        validate(order, identity)
-        synthetic = is_test_order(order, profile)
-        if not eligible(order, profile) or revision > qa_rounds(order, profile):
-            continue
-        terminal = not synthetic and revision == qa_rounds(order, profile)
-        review = None
-        if target.exists():
-            if not terminal:
-                continue
-            review = json.loads(read_regular(target, LIMIT))
-            if review["dictamen"]["decision"] != "rechazado":
-                continue
-        if not (brief := lookup(order, dispatch)):
-            continue
-        edl = json.loads(read_regular(direction, LIMIT))
-        rendered = json.loads(read_regular(path, LIMIT))
-        if edl["brief_sha256"] != hashlib.sha256(canonical(brief)).hexdigest():
-            raise ValueError("El máster no corresponde al brief vigente")
-        asset = rendered.get("master") or rendered.get("preview")
-        if not isinstance(asset, dict):
-            raise ValueError("Lucas no acreditó un artefacto revisable")
-        digest = asset["sha256"]
-        if not re.fullmatch(r"[a-f0-9]{64}", digest):
-            raise ValueError("Huella de máster inválida")
-        if review is None and "master" not in rendered:
-            raw = read_regular(path.with_suffix(".preview-review.receipt"), LIMIT)
-            review = json.loads(raw)
-            if (
-                order.get("output_edit") != "reel"
-                or hashlib.sha256(raw).hexdigest() != rendered["preview_review_sha256"]
-                or review["fase"] != "vista_previa"
-                or review["dictamen"]["decision"] != "rechazado"
-                or (
-                    review["order_id"],
-                    review["job_id"],
-                    review["brief_sha256"],
-                    review["master_sha256"],
-                )
-                != (identity, f"{identity}-v{revision}", edl["brief_sha256"], digest)
-                or review["direction_sha256"] != hashlib.sha256(canonical(edl)).hexdigest()
-            ):
-                raise ValueError("La vista previa rechazada no corresponde a esta revisión")
-            publish(target, raw)
-        elif review is None:
-            request_id = str(uuid.uuid5(uuid.UUID(identity), f"elena:v{revision}:" + digest))
-            review = audit(
-                order,
-                edl,
-                digest,
-                request_id,
-                target,
-                rendered,
-                revision,
-                synthetic=synthetic,
-                objective=brief["objective"],
+def audit_pending(path, version, profile, dispatch, output):
+    identity, revision = version
+    intake = JOURNAL / f"{identity}.json"
+    direction = VALERIA / path.name
+    target = output / path.name
+    if not direction.is_file() or not intake.is_file():
+        return False
+    order = json.loads(read_regular(intake, INTAKE_LIMIT))["order"]
+    validate(order, identity)
+    synthetic = is_test_order(order, profile)
+    if not eligible(order, profile) or revision > qa_rounds(order, profile):
+        return False
+    terminal = not synthetic and revision == qa_rounds(order, profile)
+    review = None
+    if target.exists():
+        if not terminal:
+            return False
+        review = json.loads(read_regular(target, LIMIT))
+        if review["dictamen"]["decision"] != "rechazado":
+            return False
+    if not (brief := lookup(order, dispatch)):
+        return False
+    edl = json.loads(read_regular(direction, LIMIT))
+    rendered = json.loads(read_regular(path, LIMIT))
+    if edl["brief_sha256"] != hashlib.sha256(canonical(brief)).hexdigest():
+        raise ValueError("El máster no corresponde al brief vigente")
+    asset = rendered.get("master") or rendered.get("preview")
+    if not isinstance(asset, dict):
+        raise ValueError("Lucas no acreditó un artefacto revisable")
+    digest = asset["sha256"]
+    if not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise ValueError("Huella de máster inválida")
+    if review is None and "master" not in rendered:
+        raw = read_regular(path.with_suffix(".preview-review.receipt"), LIMIT)
+        review = json.loads(raw)
+        if (
+            order.get("output_edit") != "reel"
+            or hashlib.sha256(raw).hexdigest() != rendered["preview_review_sha256"]
+            or review["fase"] != "vista_previa"
+            or review["dictamen"]["decision"] != "rechazado"
+            or (
+                review["order_id"],
+                review["job_id"],
+                review["brief_sha256"],
+                review["master_sha256"],
             )
-        if terminal and review["dictamen"]["decision"] == "rechazado":
-            report_rejection(order, brief, rendered, review, dispatch, revision)
-        break
+            != (identity, f"{identity}-v{revision}", edl["brief_sha256"], digest)
+            or review["direction_sha256"] != hashlib.sha256(canonical(edl)).hexdigest()
+        ):
+            raise ValueError("La vista previa rechazada no corresponde a esta revisión")
+        publish(target, raw)
+    elif review is None:
+        request_id = str(uuid.uuid5(uuid.UUID(identity), f"elena:v{revision}:" + digest))
+        review = audit(
+            order,
+            edl,
+            digest,
+            request_id,
+            target,
+            rendered,
+            revision,
+            synthetic=synthetic,
+            objective=brief["objective"],
+        )
+    if terminal and review["dictamen"]["decision"] == "rechazado":
+        report_rejection(order, brief, rendered, review, dispatch, revision)
+    return True
+
+
+def run_pending(profile, dispatch, output):
+    # El directorio de reintentos mantiene los cambios de SQLite fuera de los dictámenes.
+    state = (output / "reintentos").absolute()
+    state.mkdir(mode=0o700, exist_ok=True)
+    database = state / "elena.sqlite3"
+    if state.resolve(strict=True) != state or database.is_symlink():
+        raise ValueError("Directorio de reintentos de auditoría inválido")
+    deferred_error = None
+    with closing(sqlite3.connect(database)) as db:
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS retries (
+                revision_id TEXT PRIMARY KEY, receipt TEXT NOT NULL,
+                failures INTEGER NOT NULL, due_at INTEGER NOT NULL
+            ) STRICT"""
+        )
+        for path in sorted(LUCAS.glob("*.json")):
+            if not (version := revision_from_stem(path.stem)):
+                continue
+            try:
+                info = path.stat(follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            receipt = f"{info.st_ino}:{info.st_mtime_ns}:{info.st_size}"
+            previous = db.execute(
+                "SELECT receipt,failures,due_at FROM retries WHERE revision_id=?", (path.stem,)
+            ).fetchone()
+            if previous and previous[0] == receipt and previous[2] > int(time.time()):
+                continue
+            started = time.monotonic()
+            try:
+                advanced = audit_pending(path, version, profile, dispatch, output)
+            except AUDIT_ERRORS as error:
+                failures = min(previous[1] + 1, 4) if previous and previous[0] == receipt else 1
+                delay = min(60 * 2 ** (failures - 1), 300)
+                with db:
+                    db.execute(
+                        """INSERT INTO retries (revision_id,receipt,failures,due_at) VALUES (?,?,?,?)
+                        ON CONFLICT(revision_id) DO UPDATE SET receipt=excluded.receipt,
+                        failures=excluded.failures,due_at=excluded.due_at""",
+                        (path.stem, receipt, failures, int(time.time()) + delay),
+                    )
+                reference = hashlib.sha256(path.stem.encode("ascii")).hexdigest()[:16]
+                logging.error(
+                    "Elena difiere la revisión %s durante %d s por %s",
+                    reference,
+                    delay,
+                    type(error).__name__,
+                )
+                # Una auditoría larga ya consumió el turno de este disparo.
+                if deferred_error is not None or time.monotonic() - started >= 15:
+                    raise
+                deferred_error = error
+                continue
+            if previous:
+                with db:
+                    db.execute("DELETE FROM retries WHERE revision_id=?", (path.stem,))
+            if advanced:
+                break
+    if deferred_error is not None:
+        raise deferred_error
 
 
 def main():
@@ -977,14 +1040,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (
-        OSError,
-        ValueError,
-        TypeError,
-        KeyError,
-        IndexError,
-        StopIteration,
-        subprocess.SubprocessError,
-    ) as error:
+    except (*AUDIT_ERRORS, sqlite3.Error) as error:
         logging.error("Falló la auditoría audiovisual de Elena (%s)", type(error).__name__)
         raise SystemExit(1) from None
