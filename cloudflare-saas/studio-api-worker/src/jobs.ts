@@ -20,6 +20,7 @@ export interface JobEnv {
 const policy = { maxObjectBytes: 1024 ** 3 };
 const syncUrl = "https://api-studio.e-scale.cl/v1/sync";
 const pollIntervalMs = 10_000;
+const outboxLeaseSeconds = 60;
 // Un worker local tiene hasta 300 s. Dos mensajes consecutivos caben en los 900 s de Queues.
 const syncBudgetMs = 330_000;
 const queueBudgetMs = 850_000;
@@ -55,24 +56,24 @@ async function awaitSync(job: SyncJob, secret: string, send: typeof fetch,
 
 export async function dispatchSourceOutbox(env: JobEnv, sourceId?: string): Promise<void> {
   if (!env.JOBS || env.HOMELAB_SYNC_ORIGIN !== "https://api-studio.e-scale.cl") return;
-  const now = Math.floor(Date.now() / 1000);
+  // D1 fija available_at al confirmar la carga. Usa su reloj también al seleccionar y reservar.
   const rows = await env.DB.withSession("first-primary").prepare(`SELECT q.source_id,s.order_id,q.payload,q.attempts
     FROM production_source_outbox q JOIN production_sources s ON s.id=q.source_id JOIN orders o ON o.id=s.order_id
-    WHERE q.dispatched_at IS NULL AND q.available_at<=? AND q.synced_at IS NULL AND o.status='queued'
+    WHERE q.dispatched_at IS NULL AND q.available_at<=unixepoch() AND q.synced_at IS NULL AND o.status='queued'
       ${sourceId === undefined ? "" : "AND q.source_id=?"}
     ORDER BY o.queue_priority DESC,q.available_at,s.position LIMIT 20`)
-    .bind(now, ...(sourceId === undefined ? [] : [sourceId])).all<SourceOutboxRow>();
+    .bind(...(sourceId === undefined ? [] : [sourceId])).all<SourceOutboxRow>();
   for (const row of rows.results) {
-    const claim = await env.DB.prepare(`UPDATE production_source_outbox SET available_at=?,attempts=attempts+1
-      WHERE source_id=? AND available_at<=? AND attempts=? AND dispatched_at IS NULL AND synced_at IS NULL`)
-      .bind(now + 60, row.source_id, now, row.attempts).run();
+    const claim = await env.DB.prepare(`UPDATE production_source_outbox SET available_at=unixepoch()+?,attempts=attempts+1
+      WHERE source_id=? AND available_at<=unixepoch() AND attempts=? AND dispatched_at IS NULL AND synced_at IS NULL`)
+      .bind(outboxLeaseSeconds, row.source_id, row.attempts).run();
     if (claim.meta.changes !== 1) continue;
     try {
       const job = validateSyncJob(JSON.parse(row.payload), policy);
       if (job.job_id !== row.order_id || job.asset_id !== row.source_id) continue;
       await env.JOBS.send({ kind: "production_source", job });
-      await env.DB.prepare("UPDATE production_source_outbox SET dispatched_at=? WHERE source_id=? AND dispatched_at IS NULL")
-        .bind(now, row.source_id).run();
+      await env.DB.prepare("UPDATE production_source_outbox SET dispatched_at=unixepoch() WHERE source_id=? AND dispatched_at IS NULL")
+        .bind(row.source_id).run();
     } catch { /* El cron reintenta después del vencimiento de la concesión. */ }
   }
 }
@@ -121,24 +122,23 @@ async function syncSource(body: unknown, env: JobEnv, secret: string, send: type
 
 export async function dispatchOutbox(env: JobEnv, orderId?: string): Promise<void> {
   if (!env.JOBS || env.HOMELAB_SYNC_ORIGIN !== "https://api-studio.e-scale.cl") return;
-  const time = Math.floor(Date.now() / 1000);
   const rows = await env.DB.withSession("first-primary").prepare(`SELECT j.order_id,j.payload,j.attempts
     FROM job_outbox j JOIN orders o ON o.id=j.order_id
-    WHERE j.dispatched_at IS NULL AND j.available_at<=? AND o.status='queued'
+    WHERE j.dispatched_at IS NULL AND j.available_at<=unixepoch() AND o.status='queued'
       ${orderId === undefined ? "" : "AND j.order_id=?"}
     ORDER BY o.queue_priority DESC,j.available_at,j.order_id LIMIT 20`)
-    .bind(time, ...(orderId === undefined ? [] : [orderId])).all<OutboxRow>();
+    .bind(...(orderId === undefined ? [] : [orderId])).all<OutboxRow>();
   for (const row of rows.results) {
-    const claimed = await env.DB.prepare(`UPDATE job_outbox SET available_at=?,attempts=attempts+1
-      WHERE order_id=? AND available_at<=? AND attempts=? AND dispatched_at IS NULL`)
-      .bind(time + 60, row.order_id, time, row.attempts).run();
+    const claimed = await env.DB.prepare(`UPDATE job_outbox SET available_at=unixepoch()+?,attempts=attempts+1
+      WHERE order_id=? AND available_at<=unixepoch() AND attempts=? AND dispatched_at IS NULL`)
+      .bind(outboxLeaseSeconds, row.order_id, row.attempts).run();
     if (claimed.meta.changes !== 1) continue;
     try {
       const job = validateSyncJob(JSON.parse(row.payload), policy);
       if (job.job_id !== row.order_id) continue;
       await env.JOBS.send(job);
-      await env.DB.prepare("UPDATE job_outbox SET dispatched_at=? WHERE order_id=? AND dispatched_at IS NULL")
-        .bind(time, row.order_id).run();
+      await env.DB.prepare("UPDATE job_outbox SET dispatched_at=unixepoch() WHERE order_id=? AND dispatched_at IS NULL")
+        .bind(row.order_id).run();
     } catch {
       // Vuelve a ser elegible al vencer la reserva. El consumidor es idempotente.
     }

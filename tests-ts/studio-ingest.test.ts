@@ -12,7 +12,7 @@ import { handleProductionBrief } from "../cloudflare-saas/studio-api-worker/src/
 import worker from "../cloudflare-saas/studio-api-worker/src/index.js";
 import { describePlan, listOrders, reserveOrder } from "../cloudflare-saas/studio-api-worker/src/orders.js";
 import { completeSourceUpload, createSourceUpload } from "../cloudflare-saas/studio-api-worker/src/source-upload.js";
-import { dispatchSourceOutbox, syncQueue, type JobEnv, type JobMessage } from "../cloudflare-saas/studio-api-worker/src/jobs.js";
+import { dispatchOutbox, dispatchSourceOutbox, syncQueue, type JobEnv, type JobMessage } from "../cloudflare-saas/studio-api-worker/src/jobs.js";
 
 const order = "10b4d244-3ae5-4ea8-b56e-ddd35bfbdeed";
 const asset = "2037baa2-5189-4616-b6cc-cd9819e75543";
@@ -1086,8 +1086,9 @@ describe("Ingesta R2 multipart", () => {
   }
 
   it.each([
-    ["archivo", false], ["fuente", false], ["archivo", true], ["fuente", true],
-  ] as const)("confirma %s después del intento de envío, con fallo de cola %s", async (kind, failFirst) => {
+    ["archivo", false, 0], ["fuente", false, 0], ["archivo", true, 0], ["fuente", true, 0],
+    ["archivo", false, -4000], ["fuente", false, -4000],
+  ] as const)("confirma %s después del intento de envío (fallo %s, desfase de Worker %d ms)", async (kind, failFirst, offset) => {
     const db = databaseForIngest();
     const bytes = new TextEncoder().encode("fixture");
     const sha256 = createHash("sha256").update(bytes).digest("hex");
@@ -1102,6 +1103,8 @@ describe("Ingesta R2 multipart", () => {
       await queueAvailable.promise;
       if (failFirst) throw new Error("Cola temporalmente inaccesible");
     });
+    const localNow = Date.now;
+    const clock = vi.spyOn(Date, "now");
     let requestPending: Promise<Response> | undefined;
     try {
       const origin = "https://studio.e-scale.cl";
@@ -1148,6 +1151,7 @@ describe("Ingesta R2 multipart", () => {
         db.prepare("UPDATE production_source_uploads SET status='completed',object_etag=? WHERE source_id=?").run(etag, unrelated);
       }
 
+      clock.mockImplementation(() => localNow() + offset);
       let responded = false;
       requestPending = post(complete, { parts: [{ PartNumber: 1, ETag: `"${etag}"` }] }).then((reply) => {
         responded = true;
@@ -1167,9 +1171,15 @@ describe("Ingesta R2 multipart", () => {
         expect(firstSend).toHaveBeenCalledOnce();
       } else {
         expect(query.get(dispatchKey)).toEqual({ attempts: 1, dispatched_at: null });
-        db.prepare(`UPDATE ${queueTable} SET available_at=unixepoch()-1 WHERE ${keyColumn}=?`).run(dispatchKey);
         const retry = vi.fn(async () => {});
-        worker.scheduled({}, { ...env, JOBS: { send: retry } }, { waitUntil: scheduled });
+        const retryEnv = { ...env, JOBS: { send: retry } };
+        clock.mockImplementation(() => localNow() + 120_000);
+        await (kind === "archivo" ? dispatchOutbox : dispatchSourceOutbox)(retryEnv, dispatchKey);
+        expect(retry).not.toHaveBeenCalled();
+        expect(query.get(dispatchKey)).toEqual({ attempts: 1, dispatched_at: null });
+        clock.mockImplementation(localNow);
+        db.prepare(`UPDATE ${queueTable} SET available_at=unixepoch()-1 WHERE ${keyColumn}=?`).run(dispatchKey);
+        worker.scheduled({}, retryEnv, { waitUntil: scheduled });
         await Promise.all(scheduled.mock.calls.map(([task]) => task));
         expect(query.get(dispatchKey)).toEqual({ attempts: 2, dispatched_at: expect.any(Number) });
         expect(retry).toHaveBeenCalledTimes(unrelated ? 2 : 1);
@@ -1177,6 +1187,7 @@ describe("Ingesta R2 multipart", () => {
     } finally {
       queueAvailable.resolve();
       await requestPending?.catch(() => {});
+      clock.mockRestore();
       listing.mockRestore();
       restore();
       db.close();
