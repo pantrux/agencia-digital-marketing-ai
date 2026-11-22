@@ -12,6 +12,8 @@ locales de las subidas. No necesita credenciales ni acceso a R2.
 
 La última captura sigue disponible para deduplicar y las pendientes conservan su ubicación. El registro `operations/quota-live-plan-v2.json` identifica la operación pendiente de confirmar si un movimiento se interrumpe. La siguiente ejecución verifica el mismo plan y completa el recibo. El archivo se conserva en el mismo volumen y libera cuota de la cola activa.
 
+Al seleccionar una captura para mantenimiento preventivo, una prueba de subida incompleta deja esa captura y sus comprobantes en la cola. La tarea continúa buscando otra captura con prueba completa. Una diferencia de huella, permisos o estructura sigue deteniendo la operación. La aplicación y reanudación de un plan ya fijado exigen verificar toda su prueba.
+
 Para instalar la tarea, usa el SHA-256 del archivador documentado en `BACKUP_VAULT_QUOTA_LIVE_ARCHIVER_SHA256`.
 
 ```powershell

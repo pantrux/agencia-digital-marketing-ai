@@ -137,6 +137,27 @@ class ArchiveTests(unittest.TestCase):
         self.assertTrue((self.root / "captures" / self.old).is_dir())
         self.assertFalse((self.root / "operations/uploader.lock.json").exists())
 
+    def test_live_archive_retains_incomplete_proof_and_releases_quota(self):
+        proof = self.root / f"operations/{self.old}-backup.stderr"
+        proof.write_bytes(b"aviso de la copia")
+        candidate = self.root / "captures" / self.old / "candidate.env"
+        original = candidate.read_bytes()
+        result = self.live()
+        self.assertEqual((result["state"], result["newly_moved"]), ("archivada", 1))
+        self.assertFalse((self.root / "captures" / self.newer).exists())
+        self.assertEqual(candidate.read_bytes(), original)
+        self.assertEqual(proof.read_bytes(), b"aviso de la copia")
+        self.assertTrue((self.root / "captures" / self.latest).is_dir())
+        self.assertTrue((self.root / "captures" / self.pending).is_dir())
+
+    def test_live_archive_stops_when_a_candidate_digest_differs(self):
+        candidate = self.root / "captures" / self.old / "candidate.env"
+        candidate.write_bytes(b"contenido alterado")
+        with self.assertRaisesRegex(ARCHIVER.Rejected, "CANDIDATE_SHA_OR_SIZE"):
+            self.live()
+        self.assertTrue((self.root / "captures" / self.newer).is_dir())
+        self.assertFalse((self.root / ARCHIVER.LIVE_PLAN).exists())
+
     def test_live_batch_retries_after_the_writer_releases_its_lock(self):
         busy = self.store.lock("observador")
         busy.__enter__()
