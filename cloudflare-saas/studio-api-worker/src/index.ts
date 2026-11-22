@@ -4,7 +4,7 @@ import { brandRoute, handleBrands } from "./brands.js";
 import { handleSofiaChat, type ChatEnv } from "./chat.js";
 import { readConversation } from "./conversation.js";
 import { deliveryRevisionRoute, handleDeliveryRevisions, type DeliveryRevisionEnv } from "./delivery-revisions.js";
-import { expireAbandonedReservations, handleIngest, handlePartAccess, handleUploadCreation, partAccessTarget, uploadsConfigured, type IngestEnv, type MultipartObserver } from "./ingest.js";
+import { expireAbandonedReservations, handleIngest, handlePartAccess, handleUploadCreation, initialPartsHeader, partAccessTarget, uploadsConfigured, type IngestEnv, type MultipartObserver } from "./ingest.js";
 import { dispatchOutbox, dispatchSourceOutbox, syncQueue, type JobEnv, type JobMessage } from "./jobs.js";
 import { handleKits, kitView, prepareKits, type KitRow } from "./kits.js";
 import { handleKitProducer, kitProducerPath, type KitProducerEnv } from "./kit-producer.js";
@@ -151,7 +151,7 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
     if (request.method === "POST" && sourceUpload?.[3] === "upload") {
       const owner = await sessionLookup(request, env);
       const result = await createSourceUpload(env, owner, sourceUpload[1]!, sourceUpload[2]!,
-        observeMultipart(env, "multifuente_inicio_etapas"));
+        observeMultipart(env, "multifuente_inicio_etapas"), request.headers.get(initialPartsHeader) === "1");
       ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));
       return result;
     }

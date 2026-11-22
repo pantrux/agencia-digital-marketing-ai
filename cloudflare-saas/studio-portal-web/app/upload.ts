@@ -8,13 +8,28 @@ type Order = { id: string; project_slug: string };
 export type OutputResolution = "1080p" | "4k";
 export type OutputFormat = "mp4" | "prores4444";
 export type OutputEdit = "full" | "reel";
-type Session = { id: string; uploadId: string; key: string; partSize: number; partCount: number; status: string; newlyOpened?: true };
+type Session = { id: string; uploadId: string; key: string; partSize: number; partCount: number; status: string;
+  newlyOpened?: true; initialParts?: (SignedPart & { partNumber: number })[] };
 type Part = { PartNumber: number; ETag: string };
 const files = { mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm" };
 const maximum = 1024 ** 3;
 
 function post(data?: unknown): RequestInit {
   return { method: "POST", headers: data ? { "Content-Type": "application/json" } : {}, body: data ? JSON.stringify(data) : null };
+}
+
+function openUpload(data?: unknown): RequestInit {
+  const init = post(data);
+  return { ...init, headers: { ...init.headers, "X-Studio-Prefirmar-Partes": "1" } };
+}
+
+function partSigner(api: Api, path: string, upload: Session, number: number) {
+  let initial = upload.newlyOpened ? upload.initialParts?.find((part) => part.partNumber === number) : undefined;
+  return () => {
+    const part = initial;
+    initial = undefined;
+    return part ? Promise.resolve(part) : api<SignedPart>(`${path}/parts/${number}/sign`, post());
+  };
 }
 
 async function sha256(file: File): Promise<string> {
@@ -65,7 +80,7 @@ export async function uploadVideo(
     const transfer = uppy.getFile(id);
     const media = transfer?.data;
     if (!(media instanceof Blob)) throw new Error("ARCHIVO_INVALIDO");
-    const upload = await api<Session>("/uploads", post({
+    const upload = await api<Session>("/uploads", openUpload({
       order_id: order.id, project_slug: order.project_slug, bytes: file.size, sha256: digest,
       content_type: files[extension], extension,
     }));
@@ -79,9 +94,8 @@ export async function uploadVideo(
       const observations = { http_403: false, sin_respuesta: false };
       try {
         await uploadMissingParts(upload.partCount, parts, (number) => {
-          const signPath = path + "/parts/" + number + "/sign";
           const offset = (number - 1) * upload.partSize;
-          return uploadPart(() => api<SignedPart>(signPath, post()), media.slice(offset, offset + upload.partSize),
+          return uploadPart(partSigner(api, path, upload, number), media.slice(offset, offset + upload.partSize),
             (seen) => { observations[seen] = true; });
         }, report);
       } finally {
@@ -164,7 +178,7 @@ export async function uploadVideos(
   await mapTwo(items.length, async (index) => {
     const { file } = items[index]!;
     const path = `${root}/${encodeURIComponent(response.assets[index]!.id)}`;
-    const upload = await api<Session>(`${path}/upload`, post());
+    const upload = await api<Session>(`${path}/upload`, openUpload());
     if (upload.status !== "completed") {
       if (upload.status !== "open" || upload.partSize !== 16 * 1024 ** 2 || upload.partCount !== Math.ceil(file.size / upload.partSize)) {
         throw new Error("CARGA_NO_DISPONIBLE");
@@ -173,7 +187,7 @@ export async function uploadVideos(
       const parts = new Map(saved.map((part) => [part.PartNumber, part.ETag]));
       await uploadMissingParts(upload.partCount, parts, (number) => {
         const offset = (number - 1) * upload.partSize;
-        return uploadPart(() => api<SignedPart>(`${path}/parts/${number}/sign`, post()), file.slice(offset, offset + upload.partSize));
+        return uploadPart(partSigner(api, path, upload, number), file.slice(offset, offset + upload.partSize));
       }, (percentage) => {
         progress[index] = percentage;
         report(Math.floor(progress.reduce((sum, value, i) => sum + value * items[i]!.file.size, 0) / totalBytes));
