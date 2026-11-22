@@ -16,12 +16,13 @@ const santiago = new Intl.DateTimeFormat('en-CA', {
 const utf8 = new TextEncoder();
 
 export async function publishD1Request(scheduledTime: number, env: D1ClockEnv) {
-  if (!Number.isSafeInteger(scheduledTime) || scheduledTime % 60_000 !== 0) return 'fuera-de-horario';
-  const parts = Object.fromEntries(santiago.formatToParts(scheduledTime).map(({ type, value }) => [type, value]));
+  if (!Number.isSafeInteger(scheduledTime) || scheduledTime < 0) return 'fuera-de-horario';
+  const scheduledMinute = scheduledTime - scheduledTime % 60_000;
+  const parts = Object.fromEntries(santiago.formatToParts(scheduledMinute).map(({ type, value }) => [type, value]));
   const minute = Number(parts.minute);
   if (parts.hour !== '03' || ![0, 2, 5].includes(minute)) return 'fuera-de-horario';
   const day = `${parts.year}-${parts.month}-${parts.day}`;
-  const scheduled = scheduledTime - minute * 60_000;
+  const scheduled = scheduledMinute - minute * 60_000;
   if (!/^[a-f0-9]{64}$/.test(env.TRIGGER_KEY_HEX)) throw new Error('CLAVE_DE_PROGRAMACION');
 
   const keyBytes = Uint8Array.from(env.TRIGGER_KEY_HEX.match(/../g)!, (hex) => parseInt(hex, 16));
