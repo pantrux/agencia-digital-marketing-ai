@@ -179,7 +179,7 @@ jobs:
       - name: Ejecutar contratos del renderizador sin GPU ni servicios
         run: |
           browser=$(realpath "$(command -v google-chrome)")
-          GPU_REMOTION_BROWSER_PATH="$browser" npm --prefix gpu-bridge-win11/render-worker test
+          GPU_REMOTION_BROWSER_PATH="$browser" timeout 150s npm --prefix gpu-bridge-win11/render-worker test
       - name: Instalar dependencias Python fijadas de las pruebas
         run: python -m pip install -r requirements-dev.txt
       - name: Preparar insumos públicos fijados de las pruebas
