@@ -31,7 +31,9 @@ flowchart TB
     %% La copia integral conserva cron a las 03:30 y usa un temporizador para recuperar el día tras el arranque.
     %% Ruff y formato incluyen docker/.
     %% Los controles de Worker, ingress y portal se ejecutan cuando existen sus fuentes de entrada.
-    INICIO["Solicitud de cambio a main, actualización de main o ejecución manual"]
+    PR["Solicitud de cambio hacia main"] --> INICIO["GitHub Actions ejecuta los controles"]
+    ACTUALIZA["Actualización de main o ejecución manual"] --> INICIO
+    PR --> GREPTILE["Resultado Greptile Review"]
     INICIO --> G1["1. Secretos: Gitleaks y plantilla de variables"]
     INICIO --> G2["2. Estilo y formato, incluidos ingress y Worker; sintaxis del workflow"]
     INICIO --> G3["3. Tipos de raíz, Worker y renderer; tipos y exportación estática del portal"]
@@ -48,6 +50,11 @@ flowchart TB
     G7 --> TODOS
     TODOS -->|"No"| ERROR["Bloquear calidad y corregir la causa"]
     TODOS -->|"Sí"| CALIDAD["quality-gates aprobado"]
+    CALIDAD -->|"Resultado del PR"| MAIN["GitHub exige ambos resultados y rama al día"]
+    GREPTILE --> MAIN
+    GREPTILE --> COTEJO["El responsable coteja 5/5 en el último commit"]
+    MAIN --> FUSION["Fusionar por PR y verificar el commit resultante"]
+    COTEJO --> FUSION
     CALIDAD --> LIMITE["Manifiesto Fase 7 con CD deshabilitado"]
     GPU["Cierre GPU: CUDA, formatos 1080p y 4K con alfa, salud LAN, dos slots y YuNet/AuraFace"] -->|"Evidencia operativa"| LIMITE
     LIMITE --> FASE4["Fase 4: aplicaciones, observabilidad y restauración desde NAS y R2"]
