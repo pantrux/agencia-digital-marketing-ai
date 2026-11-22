@@ -66,6 +66,8 @@ flowchart TB
     FASE6 -. "Verificar antes de activar" .-> CONVERSA["Conversación, referencias públicas y carga de varias fuentes"]
     CONVERSA --> SOFIAASR["Una sesión del inspector por producción y un recibo por audio"]
     CONVERSA --> MULTIQA["Verificar transcripción, montaje y aprobación de Elena en entorno aislado"]
+    MULTIQA --> ESCMULTI["Cotejar los límites de escenas y rótulos del encargo de Valeria con su validador"]
+    ESCMULTI --> FORMATO["El diario identifica el motivo del fallo de formato"]
     MULTIQA -. "Verificar arranque de la unidad y cola vacía" .-> REVISION["Revisiones de entrega con publicación inmutable"]
     FASE6 --> BANDQA["Montaje con banda: Elena compara original y máster a la misma escala en cada instante"]
     BANDQA --> BANDTYPE["El renderer ajusta el título y el subtítulo a la banda sin invadir el encuadre"]
