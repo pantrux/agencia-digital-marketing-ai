@@ -11,7 +11,7 @@ import { handleProductionDispatch, productionDispatchPath } from "../cloudflare-
 import { handleProductionBrief } from "../cloudflare-saas/studio-api-worker/src/production-brief.js";
 import worker from "../cloudflare-saas/studio-api-worker/src/index.js";
 import { describePlan, listOrders, reserveOrder } from "../cloudflare-saas/studio-api-worker/src/orders.js";
-import { completeSourceUpload, createSourceUpload, listSourceParts, signSourcePart } from "../cloudflare-saas/studio-api-worker/src/source-upload.js";
+import { completeSourceUpload, createSourceUpload } from "../cloudflare-saas/studio-api-worker/src/source-upload.js";
 import { dispatchSourceOutbox, syncQueue, type JobEnv, type JobMessage } from "../cloudflare-saas/studio-api-worker/src/jobs.js";
 
 const order = "10b4d244-3ae5-4ea8-b56e-ddd35bfbdeed";
@@ -1161,7 +1161,8 @@ describe("Ingesta R2 multipart", () => {
     } finally { db.close(); }
   });
 
-  it.each([1, 2])("coteja la sesión de versión %s y la carga en una llamada a D1 para firmar o listar", async (version) => {
+  it.each([[1, "archivo"], [2, "archivo"], [1, "fuente"], [2, "fuente"]] as const)(
+    "coteja la sesión de versión %s y el tipo %s en una llamada a D1 para firmar o listar", async (version, type) => {
     const db = databaseForIngest();
     try {
       const origin = "https://studio.invalid";
@@ -1179,22 +1180,39 @@ describe("Ingesta R2 multipart", () => {
         STUDIO_JWT_SESSION_SECRET: secret, R2_ACCOUNT_ID: credentials.accountId,
         R2_ACCESS_KEY_ID: credentials.accessKeyId, R2_SECRET_ACCESS_KEY: credentials.secretAccessKey,
       } as Parameters<typeof worker.fetch>[1];
-      const created = await handleIngest(request("/api/uploads", "POST", {
-        order_id: order, project_slug: job.project_slug, extension: "mp4", bytes: 7, sha256: digest, content_type: "video/mp4",
-      }), env, "user", "/api/uploads");
+      const file = { extension: "mp4", bytes: 7, sha256: digest };
+      let created: Response;
+      if (type === "fuente") {
+        const manifest = ["primero.mp4", "segundo.mp4"].map((name) => ({ name, ...file }));
+        db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+          .run(order, JSON.stringify(manifest), digest);
+        const { id: sourceId } = db.prepare("SELECT id FROM production_sources WHERE order_id=? ORDER BY position")
+          .get(order) as { id: string };
+        created = await createSourceUpload(env, "user", order, sourceId);
+      } else {
+        created = await handleIngest(request("/api/uploads", "POST", {
+          order_id: order, project_slug: job.project_slug, ...file, content_type: "video/mp4",
+        }), env, "user", "/api/uploads");
+      }
       const { id } = await created.json();
+      const path = type === "fuente" ? `/api/orders/${order}/sources/${id}/parts` : `/api/uploads/${id}/parts`;
       const batch = vi.spyOn(env.DB, "batch");
       const sessions = vi.spyOn(env.DB, "withSession");
       const sign = (part: number, settings = env, cookie = "__Host-studio_session=" + token) => worker.fetch(new Request(
-        origin + `/api/uploads/${id}/parts/${part}/sign`, { method: "POST", headers: { Origin: origin, Cookie: cookie } },
+        origin + `${path}/${part}/sign`, { method: "POST", headers: { Origin: origin, Cookie: cookie } },
       ), settings, { waitUntil: vi.fn() });
       const list = (settings = env, cookie = "__Host-studio_session=" + token) => worker.fetch(new Request(
-        origin + `/api/uploads/${id}/parts`, { headers: { Cookie: cookie } },
+        origin + path, { headers: { Cookie: cookie } },
       ), settings, { waitUntil: vi.fn() });
       const signed = await sign(1);
       expect(signed.status).toBe(200);
-      expect(new URL((await signed.json()).url).searchParams.get("partNumber")).toBe("1");
+      const signature = await signed.json() as { url: string; headers: object };
+      expect(new URL(signature.url).searchParams.get("uploadId")).toBe(uploadId);
+      expect(new URL(signature.url).searchParams.get("partNumber")).toBe("1");
+      expect(signature.headers).toEqual({ "Content-Type": "video/mp4" });
+      expect(signature.url).not.toContain(credentials.secretAccessKey);
       expect(batch).toHaveBeenCalledTimes(1);
+      expect(batch.mock.calls[0]?.[0]).toHaveLength(2);
       expect(sessions).not.toHaveBeenCalled();
       const r2 = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(
         `<ListPartsResult><IsTruncated>false</IsTruncated><Part><PartNumber>1</PartNumber>
@@ -1205,6 +1223,7 @@ describe("Ingesta R2 multipart", () => {
       expect(listed.status).toBe(200);
       expect(await listed.json()).toEqual({ parts: [{ PartNumber: 1, ETag: etag, Size: 7 }] });
       expect(batch).toHaveBeenCalledTimes(1);
+      expect(batch.mock.calls[0]?.[0]).toHaveLength(2);
       expect(sessions).not.toHaveBeenCalled();
       expect(r2).toHaveBeenCalledTimes(1);
       db.exec("INSERT INTO users(id,google_sub,email) VALUES('otro','google-otro','otro@example.invalid')");
@@ -1217,7 +1236,7 @@ describe("Ingesta R2 multipart", () => {
         .run(createHash("sha256").update(otherToken).digest("hex"), otherNonce, exp);
       const forbidden = await sign(1, env, "__Host-studio_session=" + otherToken);
       expect(forbidden.status).toBe(404);
-      expect(await forbidden.json()).toEqual({ error: "SUBIDA_NO_ENCONTRADA" });
+      expect(await forbidden.json()).toEqual({ error: type === "fuente" ? "MATERIAL_NO_ENCONTRADO" : "SUBIDA_NO_ENCONTRADA" });
       expect((await list(env, "__Host-studio_session=" + otherToken)).status).toBe(404);
       expect((await list({ ...env, BILLING_MODE: "sandbox" })).status).toBe(404);
       expect((await sign(2)).status).toBe(405);
@@ -1232,6 +1251,11 @@ describe("Ingesta R2 multipart", () => {
       expect(await revoked.json()).toEqual({ error: "AUTENTICACION_REQUERIDA" });
       expect((await list()).status).toBe(401);
       expect(r2).toHaveBeenCalledTimes(1);
+      if (type === "fuente") {
+        const misconfigured = { ...env, R2_ACCESS_KEY_ID: "" };
+        expect((await sign(1, misconfigured, "__Host-studio_session=" + otherToken)).status).toBe(503);
+        expect((await sign(1, misconfigured)).status).toBe(401);
+      }
     } finally {
       vi.restoreAllMocks();
       db.close();
@@ -1321,20 +1345,6 @@ describe("Ingesta R2 multipart", () => {
       expect(await (await createSourceUpload(env, "user", order, opened.id, observe)).json())
         .toMatchObject({ id: opened.id, uploadId: opened.uploadId, status: "open" });
       expect(observe.mock.calls).toEqual([[expect.any(Number), expect.any(Number), expect.any(Number), false]]);
-      await expect(signSourcePart(env, "otro", order, opened.id, 1)).rejects.toMatchObject({ status: 404 });
-      await expect(signSourcePart(env, "user", order, opened.id, 2)).rejects.toMatchObject({ status: 405 });
-      const signed = await (await signSourcePart(env, "user", order, opened.id, 1)).json() as { url: string; headers: object };
-      expect(new URL(signed.url).searchParams.get("partNumber")).toBe("1");
-      expect(signed.headers).toEqual({ "Content-Type": "video/mp4" });
-      expect(signed.url).not.toContain(credentials.secretAccessKey);
-      const remote = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(
-        `<ListPartsResult><IsTruncated>false</IsTruncated><Part><PartNumber>1</PartNumber>
-        <Size>7</Size><ETag>"${etag}"</ETag></Part></ListPartsResult>`));
-      try {
-        await expect(listSourceParts(env, "otro", order, opened.id)).rejects.toMatchObject({ status: 404 });
-        expect(await (await listSourceParts(env, "user", order, opened.id)).json())
-          .toEqual({ parts: [{ PartNumber: 1, Size: 7, ETag: etag }] });
-      } finally { remote.mockRestore(); }
       expect(bucket.createMultipartUpload).toHaveBeenCalledTimes(1);
     } finally { db.close(); }
   });

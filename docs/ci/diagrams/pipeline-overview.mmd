@@ -61,6 +61,7 @@ flowchart TB
     FASE6 --> BANDQA["Montaje con banda: Elena compara el máster y el original en los mismos instantes"]
     FASE6 --> SLOENTREGAS["Medir el p95 de entregas automáticas y contar las recuperadas por separado"]
     FASE6 --> FIRMAPARTES["Abrir multipart, devolver las firmas iniciales e iniciar la carga directa a R2"]
+    FIRMAPARTES --> PARTESFUENTE["Listar o firmar partes tras verificar la sesión y la fuente en un lote de D1"]
     REVISION --> REVQA{"¿Elena aprobó el render?"}
     REVQA -->|"Sí"| VERSION["Publicar la versión aprobada y conservar la anterior"]
     REVQA -->|"No, con rondas disponibles"| ITERA["Valeria corrige con el dictamen y Lucas vuelve a renderizar"]
