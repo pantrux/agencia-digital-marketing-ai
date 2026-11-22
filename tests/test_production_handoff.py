@@ -820,6 +820,36 @@ def test_valeria_inspecciona_cada_fuente_en_lotes_separados(handoff, order, monk
         director.sample_source_batches({**receipt, "additional_sources": []})
 
 
+def test_rotulos_multifuente_respetan_los_fotogramas_de_cada_corte(handoff, order):
+    from production_valeria import VisualResponseFormatError, multi_reel_scenes
+
+    first, second = order["media"]["asset_id"], str(uuid.uuid4())
+    sources = {first: 70, second: 30}
+    hook = {"texto": "Descubre nuestras plantas", "anclaje": "inicio", "posicion": "superior"}
+    closing = {"texto": "La colección", "anclaje": "cierre", "posicion": "inferior", "duracion": 4}
+    scenes = [
+        {"fuente": first, "desde": 19, "hasta": 48, "rotulo": hook},
+        {"fuente": second, "desde": 12, "hasta": 13, "rotulo": closing},
+    ]
+    output, frames = multi_reel_scenes(scenes, sources, ad=True)
+    assert frames == 900
+    assert [(item["label"]["start_frame"], item["label"]["end_frame"]) for item in output] == [
+        (0, 90),
+        (0, 30),
+    ]
+    assert [item["source_start_frame"] for item in output] == [570, 360]
+    closing["duracion"] = 0.5
+    output, _ = multi_reel_scenes(scenes, sources, ad=True)
+    assert output[1]["label"]["start_frame"] == 15 and output[1]["label"]["end_frame"] == 30
+    closing["hasta"] = 1
+    with pytest.raises(VisualResponseFormatError, match="Anclaje de rótulo inválido"):
+        multi_reel_scenes(scenes, sources, ad=True)
+    del closing["hasta"]
+    hook["anclaje"] = "cierre"
+    with pytest.raises(VisualResponseFormatError, match="gancho desde la apertura"):
+        multi_reel_scenes(scenes, sources, ad=True)
+
+
 def test_analisis_visual_multiple_rechaza_muestras_no_examinadas(handoff, order, monkeypatch):
     import production_valeria as director
 
@@ -892,7 +922,8 @@ def test_escaleta_multiple_usa_todas_las_palabras_si_caben_en_el_contexto(
 
     complete = plan()
     assert "duración mínima de 0,5 s" in complete["message"]
-    assert "el rótulo ha de durar entre 0,5 y 6 s" in complete["message"]
+    assert "anclaje inicio o cierre" in complete["message"]
+    assert "duracion opcional entre 0,5 y 6 s" in complete["message"]
     assert "hasta menor o igual a la duración de su fuente" in complete["message"]
     assert "apto_sin_cambios es un booleano" in complete["message"]
     first_source, second_source = facts(complete)
