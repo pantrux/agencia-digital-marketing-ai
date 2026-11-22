@@ -243,6 +243,8 @@ Para revisar localmente los contratos PowerCLI, con la cadena del SDK fijada en 
 
 Una solicitud de cambio hacia `main`, una actualización de `main` o la ejecución manual disparan los siete controles en paralelo. El control 4 instala `requirements-dev.txt` antes de ejecutar pytest e incluye las pruebas Node del renderer. Los trabajos 2 y 3 revisan los componentes presentes, incluidos ingress, Worker y portal. El trabajo 5 utiliza la fase del manifiesto y conserva el contraste con PowerCLI `13.5.0.25380678` en Fases 1 a 7, sin secretos ni conexión al laboratorio. El trabajo 6 conserva separados los grafos de desarrollo, métricas, Immich runtime/build y Whisper, consulta ORT dentro de runtime OSV y audita los locks npm de raíz, renderer y portal presente. `quality-gates` solo aprueba si los siete terminan correctamente.
 
+Las pruebas de Whisper cotejan el histograma general, sus rangos de duración y el filtro y límite de muestras del colector. Tras modificar la instrumentación, valida la configuración con el binario de OpenTelemetry instalado y confirma que una transcripción completa incrementa ambos histogramas en Prometheus con el mismo rango y el mismo tiempo por minuto.
+
 1. Abre un PR hacia `main` y consulta sus verificaciones en GitHub.
 2. Coteja que `Greptile Review` y `Los siete controles bloqueantes` estén aprobados, que el PR esté al día con `main` y que Greptile haya dado 5/5 al último commit del PR. Repite el cotejo después de cada actualización.
 3. Fusiona mediante el PR y verifica el commit resultante en `main`. Parte de ese commit para la publicación operativa y aplica las verificaciones del servicio implicado. El manifiesto mantiene `deployment_enabled: false` para la entrega continua del workflow.

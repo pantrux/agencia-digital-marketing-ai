@@ -36,6 +36,8 @@ receivers:
         - job_name: agency-whisper
           metrics_path: /metrics
           follow_redirects: false
+          # 18 muestras del total y 18 por cada uno de los cuatro rangos.
+          sample_limit: 112
           authorization:
             type: Bearer
             credentials_file: ${env:CREDENTIALS_DIRECTORY}/gpu-token
@@ -43,7 +45,7 @@ receivers:
             - targets: ["192.168.0.6:8000"]
           metric_relabel_configs:
             - source_labels: [__name__]
-              regex: "agency_whisper_inference_seconds_per_minute_(bucket|sum|count)"
+              regex: "agency_whisper_inference_seconds_per_minute(_by_audio_duration)?_(bucket|sum|count)"
               action: keep
 
 processors:
