@@ -350,12 +350,11 @@ def make_edl(receipt, angles, answer, *, brief=None, transcript=None, transcript
             raise VisualResponseFormatError("Texto fuera del contrato de escaleta")
     band = answer.get("rotulo_en_banda", False)
     if band and (
-        answer.get("subtitulo_ampliado")
-        or len(answer["titulo"].encode("utf-16-le")) // 2 > 42
+        len(answer["titulo"].encode("utf-16-le")) // 2 > 42
         or len(answer["subtitulo"].encode("utf-16-le")) // 2 > 64
     ):
         raise VisualResponseFormatError(
-            "La banda requiere título de hasta 42 y subtítulo de 64 caracteres con tamaño estándar"
+            "La banda requiere título de hasta 42 y subtítulo de 64 caracteres"
         )
     reasons = []
     if not answer["apto_sin_cambios"]:
@@ -651,7 +650,8 @@ def plan_request(
         "inicio. Si el texto fijo tapa el rostro o producto, usa rotulo_en_banda=true. La banda "
         "superior queda fuera de la imagen y ajusta el plano completo al espacio restante sin "
         "recortar nada. En la banda, escribe un título de hasta 42 caracteres y un subtítulo de "
-        "hasta 64; no uses subtitulo_ampliado. Si la banda resuelve el encuadre, el plano continuo "
+        "hasta 64. Puedes activar subtitulo_ampliado=true en la banda y mantener una frase breve "
+        "para mejorar su lectura. Si la banda resuelve el encuadre, el plano continuo "
         "puede pasar a render. Si todavía se necesitan cortes, ocultaciones o B-roll para cumplir "
         "el encargo, devuelve apto_sin_cambios=false. "
         "Devuelve un único objeto JSON con angulo (1, 2 o 3), titulo (máximo 120), subtitulo "
@@ -764,9 +764,11 @@ def plan_request(
                 if user_revision
                 else "En esta revisión automática, conserva el ángulo previo y "
                 "corrige título y subtítulo según el dictamen de Elena. Si el subtítulo requiere "
-                "aumentar de tamaño, incluye subtitulo_ampliado=true en el JSON. Esta opción usa "
-                "texto de 64 píxeles sobre el diseño base de 1080p. Si necesitas volver a 50 píxeles, "
-                "indica subtitulo_ampliado=false. Si el rótulo tapa la imagen, usa rotulo_en_banda=true. "
+                "aumentar de tamaño, incluye subtitulo_ampliado=true en el JSON. Esta opción "
+                "también funciona dentro de la banda. Si la banda ya preserva el encuadre, "
+                "conserva rotulo_en_banda=true al corregir el texto. Si necesitas volver al tamaño "
+                "estándar, indica subtitulo_ampliado=false. Si el rótulo tapa la imagen, "
+                "usa rotulo_en_banda=true. "
                 "Si la solución exige cortes u ocultaciones, indica apto_sin_cambios=false. "
             )
     request = visual_request(
@@ -1193,9 +1195,9 @@ def process(
             answer = run_visual(request)
             if type(answer) is dict and prior is not None:
                 previous = prior["render"]["props"]
-                if previous.get("title_layout") == "band" and not answer.get("subtitulo_ampliado"):
+                if previous.get("title_layout") == "band":
                     answer.setdefault("rotulo_en_banda", True)
-                if previous.get("subtitle_size") == "large" and not answer.get("rotulo_en_banda"):
+                if previous.get("subtitle_size") == "large":
                     answer.setdefault("subtitulo_ampliado", True)
             edl = make_edl(
                 receipt, angles, answer, brief=brief, transcript=transcript, transcripts=transcripts

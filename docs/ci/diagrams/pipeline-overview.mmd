@@ -59,6 +59,7 @@ flowchart TB
     CONVERSA --> MULTIQA["Verificar transcripción, montaje y aprobación de Elena en entorno aislado"]
     MULTIQA -. "Verificar arranque de la unidad y cola vacía" .-> REVISION["Revisiones de entrega con publicación inmutable"]
     FASE6 --> BANDQA["Montaje con banda: Elena compara original y máster a la misma escala en cada instante"]
+    BANDQA --> BANDTYPE["El renderer ajusta el título y el subtítulo a la banda sin invadir el encuadre"]
     FASE6 --> SLOENTREGAS["Medir el p95 de entregas automáticas y contar las recuperadas por separado"]
     FASE6 --> FIRMAPARTES["Abrir multipart, devolver las firmas iniciales e iniciar la carga directa a R2"]
     FIRMAPARTES --> PARTESFUENTE["Listar o firmar partes tras verificar la sesión y la fuente en un lote de D1"]

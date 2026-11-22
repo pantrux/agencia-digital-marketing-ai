@@ -1290,6 +1290,14 @@ def test_escaleta_de_valeria_exige_fuente_confirmada_y_preserva_el_plan(
         make_edl(receipt, angles, {**answer, "rotulo_en_banda": True, "titulo": "a" * 43})
     expanded = make_edl(receipt, angles, {**answer, "subtitulo_ampliado": True})
     assert expanded["render"]["props"] == {**props, "subtitle_size": "large"}
+    expanded_band = make_edl(
+        receipt, angles, {**answer, "rotulo_en_banda": True, "subtitulo_ampliado": True}
+    )
+    assert expanded_band["render"]["props"] == {
+        **props,
+        "title_layout": "band",
+        "subtitle_size": "large",
+    }
     assert props["duration_seconds"] == 4.0 and edl["render"]["plan"] == plan
     assert (edl["render"]["format"], edl["render"]["resolution"]) == ("mp4", "1080p")
     if plan_id in ("ultra", "ilimitado"):

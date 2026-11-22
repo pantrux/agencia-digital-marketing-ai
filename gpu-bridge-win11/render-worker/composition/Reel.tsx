@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useLayoutEffect, useRef} from 'react';
 import {AbsoluteFill, Easing, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {AD_ENDCARD_FRAME, LABEL_ENTRANCE_FRAMES, SOCIAL_ENDCARD_FRAME, TITLE_BAND_BACKGROUND, TITLE_BAND_HEIGHT, TITLE_FADE_FRAMES, TITLE_PANEL_FRACTION, type EditScene, type Resolution, type ScriptedAd} from '../src/contracts.ts';
 import {graphicLabelTiming, sceneLength, socialFadeProgress} from '../src/timeline.ts';
@@ -6,6 +6,41 @@ import {SocialEndcard} from './SocialEndcard.tsx';
 
 export interface ReelProps extends Record<string, unknown> {title: string; subtitle: string; subtitle_size?: 'large'; title_layout?: 'band'; duration_seconds: number; background: string; accent: string; watermark: boolean; video_file: string | null; resolution: Resolution; transparent: boolean; overlay_only?: boolean; video_is_montage?: boolean; scenes?: EditScene[]; ad?: ScriptedAd}
 const videoStyle = {width: '100%', height: '100%', objectFit: 'cover'} as const;
+const bandPaddingY = 16;
+
+type TitleBandProps = Pick<ReelProps, 'title' | 'subtitle' | 'accent'> & {expanded: boolean; opacity: number};
+
+const TitleBand: React.FC<TitleBandProps> = ({title, subtitle, expanded, accent, opacity}) => {
+  const content = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const element = content.current;
+    if (!element) return;
+    const availableHeight = TITLE_BAND_HEIGHT - 2 * bandPaddingY;
+    let scale = 100;
+    element.style.setProperty('--band-type-scale', '1');
+    while (element.offsetHeight > availableHeight && scale > 50) {
+      scale -= 5;
+      element.style.setProperty('--band-type-scale', String(scale / 100));
+    }
+  }, [title, subtitle, expanded]);
+
+  return <div style={{
+    position: 'absolute', top: 0, left: 0, width: 1080, height: TITLE_BAND_HEIGHT, backgroundColor: TITLE_BAND_BACKGROUND,
+    boxSizing: 'border-box', display: 'flex', alignItems: 'center', padding: `${bandPaddingY}px 72px`,
+  }}>
+    <div ref={content} style={{
+      opacity, borderLeft: `6px solid ${accent}`, paddingLeft: 26, width: '100%', minWidth: 0, overflowWrap: 'anywhere',
+      boxSizing: 'border-box',
+    }}>
+      <h1 style={{fontSize: 'calc(54px * var(--band-type-scale, 1))', lineHeight: 1.08, margin: 0}}>{title}</h1>
+      {subtitle && <p style={{
+        fontSize: `calc(${expanded ? 48 : 42}px * var(--band-type-scale, 1))`,
+        lineHeight: 1.12, margin: '10px 0 0', color: '#dce7dd',
+      }}>{subtitle}</p>}
+    </div>
+  </div>;
+};
 
 function cutVideo(file: string, scenes: EditScene[]) {
   let from = 0;
@@ -50,13 +85,10 @@ export const Reel: React.FC<ReelProps> = (props) => {
         : <OffthreadVideo src={staticFile(props.video_file)} transparent={props.transparent} muted style={videoStyle} />)}
     {!props.scenes && !band && !(props.transparent && !props.overlay_only) && <AbsoluteFill style={{background: 'linear-gradient(180deg,rgba(0,0,0,.45),transparent 55%,rgba(0,0,0,.8))'}} />}
     <AbsoluteFill style={{width: 1080, height: 1920, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
-    {band && <div style={{position:'absolute',top:0,left:0,width:1080,height:TITLE_BAND_HEIGHT,backgroundColor:TITLE_BAND_BACKGROUND,
-      boxSizing:'border-box',display:'flex',alignItems:'center',padding:'16px 72px'}}>
-      <div style={{opacity,borderLeft:`6px solid ${props.accent}`,paddingLeft:26,width:'100%',minWidth:0,overflowWrap:'anywhere'}}>
-        <h1 style={{fontSize:props.title.length > 32 ? 40 : 46,lineHeight:1.08,margin:0}}>{props.title}</h1>
-        {props.subtitle && <p style={{fontSize:32,lineHeight:1.12,margin:'10px 0 0',color:'#dce7dd'}}>{props.subtitle}</p>}
-      </div>
-    </div>}
+    {band && <TitleBand
+      title={props.title} subtitle={props.subtitle} expanded={props.subtitle_size === 'large'}
+      accent={props.accent} opacity={opacity}
+    />}
     {!props.scenes && !band && <div style={{position: 'absolute', left: 60, right: 120, top: 200, opacity, backgroundColor: '#141714', padding: '32px 38px', borderRadius: 20}}>
       <div style={{height: 8, width: 120, backgroundColor: props.accent, marginBottom: 32}} />
       <h1 style={{fontSize: 76, lineHeight: 1.1, margin: 0, overflowWrap: 'anywhere'}}>{props.title}</h1>
