@@ -40,6 +40,10 @@ class Rejected(ValueError):
     pass
 
 
+class IncompleteUploadProof(Rejected):
+    """La captura existe, pero algún proceso de copia no dejó una prueba completa."""
+
+
 def require(condition, code):
     if not condition:
         raise Rejected(code)
@@ -117,10 +121,8 @@ def automatic_ack_proof(runtime, provider, row, files):
         for extension in (".job.json", ".stdout", ".stderr"):
             relative = name + extension
             logs[stage + extension], evidence[relative] = file_bytes(runtime, operations / relative)
-        require(
-            job_complete(decode(logs[stage + ".job.json"])) and not logs[stage + ".stderr"],
-            "INCOMPLETE_UPLOAD_PROOF",
-        )
+        if not job_complete(decode(logs[stage + ".job.json"])) or logs[stage + ".stderr"]:
+            raise IncompleteUploadProof("INCOMPLETE_UPLOAD_PROOF")
     ack = decode(files["uploaded.json"])
     result = decode(files["result.json"])
     attempt = decode(files["attempt.json"])
@@ -241,7 +243,7 @@ def generation_proof(runtime, provider, directory, row):
     return {"row": row, "directory": directory_id, "files": fingerprints, "jobs": evidence}
 
 
-def confirmed_entries(runtime, rows, limit):
+def confirmed_entries(runtime, rows, limit, *, retain_incomplete=False):
     store = runtime.store
     provider = runtime.backup_helpers()
     entries = []
@@ -254,7 +256,13 @@ def confirmed_entries(runtime, rows, limit):
         raw, _info = file_bytes(runtime, directory / "result.json")
         if runtime.state.decode(raw).get("success") is not True:
             continue
-        entries.append(generation_proof(runtime, provider, directory, row))
+        try:
+            proof = generation_proof(runtime, provider, directory, row)
+        except IncompleteUploadProof:
+            if retain_incomplete:
+                continue
+            raise
+        entries.append(proof)
         if len(entries) == limit:
             break
     return entries
@@ -426,7 +434,7 @@ def maintain_once(runtime):
                 and len(rows) * 10 < runtime.config["maximum_generations"] * 9
             ):
                 return {"state": "dentro-de-cuota", "newly_moved": 0}
-            entries = confirmed_entries(runtime, rows, 1)
+            entries = confirmed_entries(runtime, rows, 1, retain_incomplete=True)
             if not entries:
                 return {"state": "sin-confirmadas", "newly_moved": 0}
             published = record_plan(runtime, uuid.uuid4().hex, rows[-1]["generation_id"], entries)

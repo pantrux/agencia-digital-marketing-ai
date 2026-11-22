@@ -92,6 +92,7 @@ flowchart TB
     TANDAS4["Cotejar asignaciones acumuladas tras tres tandas con las colas drenadas"] --> CARAS4
     R2NAS4["Verificar montaje NFS, identidad del volumen y carpeta compartida por los materiales de una orden"] -->|Evidencia operativa| FASE4
     COPIAS4["Cotejar recibos de D1 y restauración de la bóveda desde R2"] -->|Evidencia operativa| FASE4
+    CUOTABOVEDA["Conservar capturas con prueba incompleta y archivar sólo las confirmadas"] -->|"Mantenimiento de la bóveda Windows"| FASE7
     COPIAS4 --> PRELECTURA["Reintentar la lectura del propietario de R2 antes de respaldar"]
     ALERT4["Verificar TLS mutuo de Prometheus a Alertmanager y el acceso SMTP desde su bridge"] -->|Evidencia operativa| FASE4
     ARRANQUE4["Ensayar y reponer los filtros de DSM antes de iniciar Prometheus y Alertmanager"] --> ALERT4
