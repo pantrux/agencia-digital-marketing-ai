@@ -871,6 +871,7 @@ class VaultChangeTests(unittest.TestCase):
         runtime, _calls = self.fake_upload_runtime(bad_listing=True)
         result = worker.upload_child(runtime, row["generation_id"], attempt["child_nonce"])
         self.assertFalse(result["success"])
+        self.assertEqual(result["stage"], "listado_restic")
         self.assertEqual(result["snapshot_id"], "2" * 64)
         self.assertTrue(result["requires_manual_reconciliation"])
         self.assertEqual(
@@ -881,6 +882,71 @@ class VaultChangeTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             self.queue.next_pending()
+
+    def test_preflight_de_r2_reintenta_sin_duplicar_el_respaldo(self):
+        with self.store.lock("fixture"):
+            row = self.queue.enqueue(vault("preflight"), "ROOT_CANDIDATE")
+        attempt = self.queue.begin_attempt(
+            row["generation_id"],
+            {"repository_id": "1" * 64, "sha256": row["sha256"], "publication_status": "PREPARED"},
+        )
+        runtime, calls = self.fake_upload_runtime()
+        verify = mock.Mock(
+            side_effect=[ValueError("R2 rechazó la operación HTTP 500.")] * 2 + [None]
+        )
+        runtime.backup_helpers().S3.OwnerClient = mock.Mock(
+            return_value=SimpleNamespace(verify=verify)
+        )
+        with mock.patch.object(worker.time, "sleep") as pause:
+            report = worker.upload_child(runtime, row["generation_id"], attempt["child_nonce"])
+        self.assertTrue(report["success"])
+        self.assertEqual(verify.call_count, 3)
+        self.assertEqual(pause.call_args_list, [mock.call(1), mock.call(3)])
+        self.assertEqual(sum("backup" in arguments for arguments, _ in calls), 1)
+
+    def test_fallo_de_propietario_o_autorizacion_no_inicia_restic(self):
+        for message, status in (
+            ("El marcador R2 no pertenece a esta operación.", None),
+            ("R2 rechazó la operación HTTP 403.", 403),
+            ("R2 rechazó la operación HTTP 503.", 503),
+        ):
+            with self.subTest(status=status):
+                with self.store.lock("fixture"):
+                    row = self.queue.enqueue(vault(str(status)), "ROOT_CANDIDATE")
+                attempt = self.queue.begin_attempt(
+                    row["generation_id"],
+                    {
+                        "repository_id": "1" * 64,
+                        "sha256": row["sha256"],
+                        "publication_status": "PREPARED",
+                    },
+                )
+                runtime, calls = self.fake_upload_runtime()
+                verify = mock.Mock(side_effect=ValueError(message))
+                runtime.backup_helpers().S3.OwnerClient = mock.Mock(
+                    return_value=SimpleNamespace(verify=verify)
+                )
+                with mock.patch.object(worker.time, "sleep") as pause:
+                    report = worker.upload_child(
+                        runtime, row["generation_id"], attempt["child_nonce"]
+                    )
+                self.assertFalse(report["success"])
+                self.assertEqual(report["stage"], "propietario_r2")
+                self.assertEqual(report.get("http_status"), status)
+                self.assertEqual(verify.call_count, 4 if status == 503 else 1)
+                self.assertEqual(pause.call_count, 3 if status == 503 else 0)
+                self.assertEqual(calls, [])
+
+    def test_la_lectura_previa_respeta_el_plazo_del_reintento(self):
+        verify = mock.Mock(side_effect=ValueError("R2 rechazó la operación HTTP 504."))
+        with (
+            mock.patch.object(worker.time, "monotonic", side_effect=[0, 11]),
+            mock.patch.object(worker.time, "sleep") as pause,
+            self.assertRaisesRegex(ValueError, r"HTTP 504"),
+        ):
+            worker.verify_upload_owner(SimpleNamespace(verify=verify), b"marcador")
+        verify.assert_called_once_with(b"marcador")
+        pause.assert_not_called()
 
     def test_child_limits_require_exact_immediate_job(self):
         limits = SimpleNamespace(

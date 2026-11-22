@@ -23,6 +23,7 @@ MAX_CAPTURE_NS = (1 << 63) - 1
 MAX_GENERATION = (1 << 128) - 1
 RECOVERY_NAMESPACE = "recovery-receipts-v1/"
 RECOVERY_DOMAIN = b"e-scale:vault-recovery-receipts:v1:"
+OWNER_HTTP_ERROR = re.compile(r"R2 rechazó la operación HTTP ([1-5][0-9]{2})\.")
 
 
 def proposal():
@@ -345,6 +346,25 @@ def restic_call(runtime, provider, environment, generation, stage, arguments, ti
     return result.stdout
 
 
+def verify_upload_owner(client, owner):
+    """Reintenta solo la lectura inicial del titular ante errores transitorios de R2."""
+    next_attempt_before = time.monotonic() + 12
+    for delay in (1, 3, 6, None):
+        try:
+            client.verify(owner)
+            return
+        except ValueError as error:
+            status = OWNER_HTTP_ERROR.fullmatch(str(error))
+            if (
+                status is None
+                or status[1] not in {"500", "502", "503", "504"}
+                or delay is None
+                or time.monotonic() + delay >= next_attempt_before
+            ):
+                raise
+            time.sleep(delay)
+
+
 def upload_child(runtime, generation, nonce):
     """No llama al controlador monouso: compone sólo sus validadores y entorno."""
     queue = runtime.queue
@@ -387,13 +407,16 @@ def upload_child(runtime, generation, nonce):
         "sha256": metadata["sha256"],
         "publication_status": subject["publication_status"],
     }
+    stage = "propietario_r2"
     try:
-        owner_client().verify(expected_owner)
+        verify_upload_owner(owner_client(), expected_owner)
+        stage = "configuracion_restic"
         config = restic_call(
             runtime, provider, environment, generation, "cat", ["cat", "config"], 60
         )
         provider.parse_config(config, runtime.config["repository_id"])
         capture = str(runtime.store.root / queue.path(generation, "candidate.env"))
+        stage = "respaldo_restic"
         output = restic_call(
             runtime,
             provider,
@@ -417,12 +440,14 @@ def upload_child(runtime, generation, nonce):
                 "publication_status": subject["publication_status"],
             },
         )
+        stage = "listado_restic"
         listing = restic_call(
             runtime, provider, environment, generation, "ls", ["ls", snapshot], 60
         )
         provider.parse_listing(listing, snapshot, capture, len(raw))
         queue.candidate(generation)
         if subject["publication_status"] in ("OBSERVED", "COMMITTED"):
+            stage = "acuse_r2"
             recovery = {
                 "repository_id": runtime.config["repository_id"],
                 "generation_id": generation,
@@ -443,7 +468,11 @@ def upload_child(runtime, generation, nonce):
                 )
         record["success"] = True
     except Exception as error:
-        record.update(error_type=type(error).__name__, requires_manual_reconciliation=True)
+        record.update(
+            error_type=type(error).__name__, stage=stage, requires_manual_reconciliation=True
+        )
+        if stage == "propietario_r2" and (status := OWNER_HTTP_ERROR.fullmatch(str(error))):
+            record["http_status"] = int(status[1])
     queue.record(generation, "result.json", record)
     return record
 

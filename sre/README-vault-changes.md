@@ -172,6 +172,14 @@ quedan cubiertas por observación, con los límites anteriores.
 
 ## Carga, recursos y reconciliación
 
+La lectura inicial del marcador de propietario en R2 admite hasta tres
+reintentos para HTTP 500, 502, 503 o 504. Las esperas son de uno, tres y seis
+segundos y el último reintento debe empezar dentro de doce segundos. La
+comprobación ocurre antes de iniciar Restic. Un propietario distinto, falta
+de autorización o un fallo persistente conserva el bloqueo de publicación.
+El recibo privado de fallo registra la etapa y, si R2 lo devolvió durante esa
+lectura, el código HTTP.
+
 El cargador usa un bloqueo distinto del bloqueo corto de captura. Cada
 generación reserva `attempt.json` y un nonce antes de arrancar su hijo. El hijo
 crea `claim.json` exclusivo antes de la red, comprueba el marcador del repositorio

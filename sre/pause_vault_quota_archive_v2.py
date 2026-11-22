@@ -20,6 +20,7 @@ WATCH_PLAN_V7_SHA = "a41b6d1a7ae83281ecf8108b06c8cc2f17ed03b130873d933c0df9c5411
 WATCH_PLAN_V8_SHA = "bfc1f1d305a5a9c1f7ba6d38c988b5aa392a2d158a5197875149b1594715a508"
 WATCH_PLAN_V9_SHA = "cbd572d63cfeaeac67eba31bad50eb0a5d29e623ba41ba79ca40073d9ddc77cc"
 WATCH_PLAN_V10_SHA = "0f1f9abd53fa28c1a01d0755e9848cd9d20c9c47428d0d18efe76c3fd03b2463"
+WATCH_PLAN_V11_SHA = "02b126f6c81842f3413222d244d30275066241ba8193c6aad07bbffe5e78a220"
 POWERSHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 LOCK_WAIT_SECONDS = 450
 TASK_CONTROL = r"""
@@ -117,6 +118,10 @@ def load_archiver():
 
 def watch_plan(archiver, runtime):
     candidates = (
+        (
+            archiver.CODE.with_name("vault-changes-code-v11") / "watch-plan-v11.json",
+            WATCH_PLAN_V11_SHA,
+        ),
         (
             archiver.CODE.with_name("vault-changes-code-v10") / "watch-plan-v10.json",
             WATCH_PLAN_V10_SHA,
