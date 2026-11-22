@@ -1013,6 +1013,34 @@ describe("Ingesta R2 multipart", () => {
     [2, "fixture@example.invalid", "production", "ensayo"],
   ] as const;
 
+  it("firma la clave reservada al recuperar una apertura que falló en R2", async () => {
+    const db = databaseForIngest();
+    try {
+      const { bucket } = mockMedia(new Uint8Array(7));
+      vi.mocked(bucket.createMultipartUpload).mockRejectedValueOnce(new Error("R2 temporalmente inaccesible"));
+      const env: IngestEnv = { DB: sqliteAdapter(db), MEDIA: bucket, BILLING_MODE: "production",
+        R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
+        R2_SECRET_ACCESS_KEY: credentials.secretAccessKey };
+      const path = "/api/uploads";
+      const open = () => {
+        const req = request(path, "POST", { order_id: order, project_slug: job.project_slug, extension: "mp4",
+          bytes: 7, sha256: digest, content_type: "video/mp4" });
+        req.headers.set("X-Studio-Prefirmar-Partes", "1");
+        return handleIngest(req, env, "user", path);
+      };
+      await expect(open()).rejects.toMatchObject({ code: "R2_NO_DISPONIBLE" });
+      const reserved = db.prepare("SELECT id,object_key,status FROM upload_sessions WHERE order_id=?").get(order)!;
+      expect(reserved.status).toBe("creating");
+      const revived = await (await open()).json();
+      expect(revived).toMatchObject({ id: reserved.id, key: reserved.object_key, status: "open", newlyOpened: true });
+      const signed = new URL(revived.initialParts[0].url);
+      expect(signed.pathname).toBe(`/studio-media-bucket/${revived.key}`);
+      expect(signed.searchParams.get("uploadId")).toBe(uploadId);
+      expect(bucket.createMultipartUpload).toHaveBeenNthCalledWith(1, reserved.object_key, expect.anything());
+      expect(bucket.createMultipartUpload).toHaveBeenNthCalledWith(2, reserved.object_key, expect.anything());
+    } finally { db.close(); }
+  });
+
   function measuredSession(db: DatabaseSync, version: number, email: string, mode: string, secret: string): string {
     db.prepare("UPDATE users SET email=? WHERE id='user'").run(email);
     db.prepare("UPDATE orders SET provider_mode=? WHERE id=?").run(mode, order);

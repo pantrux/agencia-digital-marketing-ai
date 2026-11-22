@@ -278,7 +278,7 @@ async function createUpload(
   observe?.(storageStarted - started, confirmationStarted - storageStarted, performance.now() - confirmationStarted,
     Boolean(caller && "email" in caller && caller.email.toLowerCase().endsWith(".invalid")));
   const initialParts = request.headers.get(initialPartsHeader) === "1"
-    ? await signInitialParts(env, job, handle.uploadId, content_type, row.expires_at) : undefined;
+    ? await signInitialParts(env, syncJob(row), handle.uploadId, content_type, row.expires_at) : undefined;
   return uploadInfo({ ...row, status: "open", upload_id: handle.uploadId }, true, initialParts);
 }
 
