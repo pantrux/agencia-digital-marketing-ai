@@ -10,6 +10,9 @@ describe('Cron del respaldo D1', () => {
     ['2026-07-15T07:00:00Z', '2026-07-15', '2026-07-15T07:00:00Z'],
     ['2026-11-15T06:02:00Z', '2026-11-15', '2026-11-15T06:00:00Z'],
     ['2026-07-15T07:05:00Z', '2026-07-15', '2026-07-15T07:00:00Z'],
+    ['2026-11-21T06:00:16Z', '2026-11-21', '2026-11-21T06:00:00Z'],
+    ['2026-11-21T06:02:16.821Z', '2026-11-21', '2026-11-21T06:00:00Z'],
+    ['2026-07-15T07:05:59.999Z', '2026-07-15', '2026-07-15T07:00:00Z'],
   ])('firma la misma orden de las 03:00 para %s', async (instant, day, scheduled) => {
     const put = vi.fn(async () => ({}));
     const millis = Date.parse(scheduled);
@@ -22,7 +25,7 @@ describe('Cron del respaldo D1', () => {
     });
   });
 
-  it.each(['2026-11-15T07:00:00Z', '2026-07-15T06:00:00Z', '2026-11-15T06:00:01Z',
+  it.each(['2026-11-15T07:00:00Z', '2026-07-15T06:00:00Z', '2026-11-15T05:59:59.999Z',
     '2026-11-15T06:06:00Z', '2026-11-15T06:04:00Z'])('omite otros instantes %s', async (instant) => {
     const put = vi.fn();
     await expect(publishD1Request(Date.parse(instant), { REQUESTS: { put }, TRIGGER_KEY_HEX: key })).resolves.toBe('fuera-de-horario');

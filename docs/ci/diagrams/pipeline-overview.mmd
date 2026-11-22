@@ -101,6 +101,8 @@ flowchart TB
     AUDIOS["Sofía guarda un recibo de transcripción por audio"] --> LECTURA["Valeria reutiliza los recibos verificados"]
     LECTURA --> GUION
     ARRANQUED1["VM de medios arranca después de la ventana diaria"] --> COPIAD1["Recuperar la copia de D1 con la fecha actual"]
+    CROND1["Cloudflare acepta disparos en los minutos habilitados"] --> ORDEND1["Firmar una sola orden diaria de las 03:00"]
+    ORDEND1 --> DESTINOSD1
     COPIAD1 --> DESTINOSD1["Cotejar los recibos de Synology y R2"]
     GUION --> CTASOC["CTA opcional: validar tres perfiles y pasar un destino al renderer"]
     CTASOC --> QAAD["Vista previa con subtítulos y mezcla"]

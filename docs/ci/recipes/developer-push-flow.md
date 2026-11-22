@@ -270,3 +270,6 @@ con su fecha real y confirma que un segundo disparo no duplica el snapshot.
 Verifica la huella del mismo SQL desde Synology y R2.
 Mantén ocupado el bloqueo durante el primer intento y comprueba el reintento
 al liberarlo. Un envío pendiente de conciliación debe mantenerse detenido.
+Prueba también un disparo de Cloudflare que llegue con segundos de desfase.
+Verifica que la orden conserva las 03:00 como hora firmada y que los
+disparos repetidos del día corresponden al mismo objeto de R2.
