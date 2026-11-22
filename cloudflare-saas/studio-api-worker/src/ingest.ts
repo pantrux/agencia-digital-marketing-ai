@@ -167,9 +167,10 @@ function uploadInput(payload: Plain) {
 }
 
 type UploadOwner = string | Awaited<ReturnType<typeof sessionLookup>>;
+export type UploadCommitted = (id: string) => void | Promise<void>;
 
 async function createUpload(
-  request: Request, env: IngestEnv, owner: UploadOwner, onCommitted?: (orderId: string) => void,
+  request: Request, env: IngestEnv, owner: UploadOwner, onCommitted?: UploadCommitted,
   observe?: MultipartObserver,
 ): Promise<Response> {
   async function requireSession() {
@@ -512,7 +513,7 @@ export async function expireAbandonedReservations(env: IngestEnv): Promise<void>
 }
 
 async function complete(
-  request: Request | null, env: IngestEnv, row: UploadRow, onCommitted?: (orderId: string) => void,
+  request: Request | null, env: IngestEnv, row: UploadRow, onCommitted?: UploadCommitted,
 ): Promise<Response> {
   const job = syncJob(row);
   const count = Math.ceil(row.bytes / partSize);
@@ -564,7 +565,7 @@ async function complete(
       .bind(JSON.stringify(job), row.id, row.user_id, object.etag),
   ]);
   if (committed[0]?.meta.changes !== 1) return fail(409, "SUBIDA_EN_TRANSICION");
-  onCommitted?.(row.order_id);
+  await onCommitted?.(row.order_id);
   return uploadInfo({ ...row, status: "completed", object_etag: object.etag });
 }
 
@@ -645,13 +646,13 @@ export async function handlePartAccess(request: Request, env: AuthEnv & IngestEn
 }
 
 export async function handleUploadCreation(
-  request: Request, env: AuthEnv & IngestEnv, onCommitted?: (orderId: string) => void, observe?: MultipartObserver,
+  request: Request, env: AuthEnv & IngestEnv, onCommitted?: UploadCommitted, observe?: MultipartObserver,
 ): Promise<Response> {
   return await createUpload(request, env, await sessionLookup(request, env), onCommitted, observe);
 }
 
 export async function handleIngest(
-  request: Request, env: IngestEnv, userId: string, path: string, onCommitted?: (orderId: string) => void,
+  request: Request, env: IngestEnv, userId: string, path: string, onCommitted?: UploadCommitted,
 ): Promise<Response> {
   const { method } = request;
   if (path === "/api/uploads" && method === "POST") return createUpload(request, env, userId, onCommitted);

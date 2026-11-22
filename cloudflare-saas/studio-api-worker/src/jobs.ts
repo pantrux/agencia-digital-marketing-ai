@@ -53,13 +53,15 @@ async function awaitSync(job: SyncJob, secret: string, send: typeof fetch,
   return false;
 }
 
-export async function dispatchSourceOutbox(env: JobEnv): Promise<void> {
+export async function dispatchSourceOutbox(env: JobEnv, sourceId?: string): Promise<void> {
   if (!env.JOBS || env.HOMELAB_SYNC_ORIGIN !== "https://api-studio.e-scale.cl") return;
   const now = Math.floor(Date.now() / 1000);
   const rows = await env.DB.withSession("first-primary").prepare(`SELECT q.source_id,s.order_id,q.payload,q.attempts
     FROM production_source_outbox q JOIN production_sources s ON s.id=q.source_id JOIN orders o ON o.id=s.order_id
     WHERE q.dispatched_at IS NULL AND q.available_at<=? AND q.synced_at IS NULL AND o.status='queued'
-    ORDER BY o.queue_priority DESC,q.available_at,s.position LIMIT 20`).bind(now).all<SourceOutboxRow>();
+      ${sourceId === undefined ? "" : "AND q.source_id=?"}
+    ORDER BY o.queue_priority DESC,q.available_at,s.position LIMIT 20`)
+    .bind(now, ...(sourceId === undefined ? [] : [sourceId])).all<SourceOutboxRow>();
   for (const row of rows.results) {
     const claim = await env.DB.prepare(`UPDATE production_source_outbox SET available_at=?,attempts=attempts+1
       WHERE source_id=? AND available_at<=? AND attempts=? AND dispatched_at IS NULL AND synced_at IS NULL`)

@@ -139,21 +139,18 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
     if (request.method === "POST" && path === "/api/auth/logout") return await logout(request, env, ctx);
     const parts = partAccessTarget(path, request.method);
     if (parts) return await handlePartAccess(request, env, parts);
-    const onUploadCommitted = (id: string) => {
-      ctx.waitUntil(dispatchOutbox(env, id).catch(() => {
-        // El cron recupera una orden si falla el despacho tras confirmar la carga.
-      }));
-    };
+    // La carga ya está confirmada en D1. El cron conserva y reintenta el envío si falla el intento inmediato.
+    const onUploadCommitted = (id: string) => dispatchOutbox(env, id).catch(() => {});
+    const onSourceCommitted = (id: string) => dispatchSourceOutbox(env, id).catch(() => {});
     if (request.method === "POST" && path === "/api/uploads") {
       return await handleUploadCreation(request, env, onUploadCommitted, observeMultipart(env, "multipart_inicio_etapas"));
     }
     const sourceUpload = !url.search ? sourceUploadRoute.exec(path) : null;
     if (request.method === "POST" && sourceUpload?.[3] === "upload") {
       const owner = await sessionLookup(request, env);
-      const result = await createSourceUpload(env, owner, sourceUpload[1]!, sourceUpload[2]!,
-        observeMultipart(env, "multifuente_inicio_etapas"), request.headers.get(initialPartsHeader) === "1");
-      ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));
-      return result;
+      return await createSourceUpload(env, owner, sourceUpload[1]!, sourceUpload[2]!,
+        observeMultipart(env, "multifuente_inicio_etapas"), request.headers.get(initialPartsHeader) === "1",
+        onSourceCommitted);
     }
     const signingSourcePart = request.method === "POST" && sourceUpload?.[4];
     const signingSourceBatch = request.method === "POST" && sourceUpload?.[3] === "parts/sign";
@@ -190,9 +187,7 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
       if (!uploadsConfigured(env)) throw new HttpError(503, "SUBIDA_NO_DISPONIBLE");
       const [, orderId, sourceId, action] = sourceUpload;
       if (request.method === "POST" && action === "complete") {
-        const result = await completeSourceUpload(request, env, user.id, orderId!, sourceId!);
-        ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));
-        return result;
+        return await completeSourceUpload(request, env, user.id, orderId!, sourceId!, onSourceCommitted);
       }
       throw new HttpError(405, "METODO_NO_PERMITIDO");
     }

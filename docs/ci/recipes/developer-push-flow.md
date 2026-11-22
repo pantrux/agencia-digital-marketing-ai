@@ -293,6 +293,11 @@ Para verificar la medición multipart, abre una carga de ensayo, repite
 la misma apertura y comprueba una sola muestra de las tres etapas. Coteja
 la preparación, R2 y la confirmación en la serie `ensayo` de Analytics Engine.
 
+Al confirmar la carga de un archivo o de una fuente, coteja el intento de
+envío a Cloudflare Queues antes de recibir la respuesta. Comprueba que un
+fallo conserva el mensaje en D1 para el reintento programado y que cerrar
+una fuente solo intenta enviar el mensaje de esa fuente.
+
 Para verificar cambios de transcripción, comprueba que Valeria puede leer
 los recibos del audio inicial y de los materiales adicionales. Con recibos
 válidos de Sofía, la lectura debe devolver las marcas de tiempo sin abrir

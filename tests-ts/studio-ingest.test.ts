@@ -1085,6 +1085,104 @@ describe("Ingesta R2 multipart", () => {
     return "__Host-studio_session=" + token;
   }
 
+  it.each([
+    ["archivo", false], ["fuente", false], ["archivo", true], ["fuente", true],
+  ] as const)("confirma %s después del intento de envío, con fallo de cola %s", async (kind, failFirst) => {
+    const db = databaseForIngest();
+    const bytes = new TextEncoder().encode("fixture");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const { bucket } = mockMedia(bytes);
+    const restore = installDigestStream();
+    const listing = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(
+      `<ListPartsResult><IsTruncated>false</IsTruncated><Part><PartNumber>1</PartNumber>
+      <Size>7</Size><ETag>"${etag}"</ETag></Part></ListPartsResult>`,
+    ));
+    const queueAvailable = Promise.withResolvers<void>();
+    const firstSend = vi.fn(async () => {
+      await queueAvailable.promise;
+      if (failFirst) throw new Error("Cola temporalmente inaccesible");
+    });
+    let requestPending: Promise<Response> | undefined;
+    try {
+      const origin = "https://studio.e-scale.cl";
+      const secret = "clave-ficticia-para-el-despacho-de-la-carga";
+      const cookie = measuredSession(db, 2, "despacho@studio.invalid", "sandbox", secret);
+      const env = {
+        DB: sqliteAdapter(db), MEDIA: bucket, PUBLIC_ORIGIN: origin, BILLING_MODE: "sandbox",
+        STUDIO_JWT_SESSION_SECRET: secret, HOMELAB_SYNC_ORIGIN: "https://api-studio.e-scale.cl",
+        JOBS: { send: firstSend },
+        R2_ACCOUNT_ID: credentials.accountId, R2_ACCESS_KEY_ID: credentials.accessKeyId,
+        R2_SECRET_ACCESS_KEY: credentials.secretAccessKey,
+      } as unknown as Parameters<typeof worker.fetch>[1];
+      const scheduled = vi.fn<(promise: Promise<unknown>) => void>();
+      const post = (path: string, body?: Record<string, unknown>) => worker.fetch(new Request(origin + path, {
+        method: "POST", headers: { Origin: origin, Cookie: cookie, "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : null,
+      }), env, { waitUntil: scheduled });
+
+      let complete: string;
+      let dispatchKey: string;
+      let unrelated: string | undefined;
+      const queueTable = kind === "archivo" ? "job_outbox" : "production_source_outbox";
+      const keyColumn = kind === "archivo" ? "order_id" : "source_id";
+      if (kind === "archivo") {
+        const upload = await post("/api/uploads", { order_id: order, project_slug: job.project_slug,
+          extension: "mp4", bytes: bytes.length, sha256, content_type: "video/mp4" });
+        expect(upload.status).toBe(200);
+        complete = `/api/uploads/${((await upload.json()) as { id: string }).id}/complete`;
+        dispatchKey = order;
+      } else {
+        const manifest = ["primero.mp4", "segundo.mp4"].map((name) => ({ name, bytes: bytes.length, sha256, extension: "mp4" }));
+        db.prepare("INSERT INTO production_source_sets(order_id,user_id,manifest,manifest_sha256) VALUES (?,'user',?,?)")
+          .run(order, JSON.stringify(manifest), sha256);
+        const [other, current] = db.prepare("SELECT id FROM production_sources WHERE order_id=? ORDER BY position")
+          .all(order) as { id: string }[];
+        dispatchKey = current!.id;
+        unrelated = other!.id;
+        const root = `/api/orders/${order}/sources/${dispatchKey}`;
+        expect((await post(root + "/upload")).status).toBe(200);
+        complete = root + "/complete";
+        db.prepare(`INSERT INTO production_source_uploads(source_id,object_key,upload_id,status,created_at,expires_at)
+          VALUES (?,?,'multipart','open',unixepoch(),unixepoch()+3600)`)
+          .run(unrelated, `ingest/${order}/${unrelated}.mp4`);
+        db.prepare("UPDATE production_source_uploads SET status='completed',object_etag=? WHERE source_id=?").run(etag, unrelated);
+      }
+
+      let responded = false;
+      requestPending = post(complete, { parts: [{ PartNumber: 1, ETag: `"${etag}"` }] }).then((reply) => {
+        responded = true;
+        return reply;
+      });
+      await vi.waitFor(() => expect(firstSend).toHaveBeenCalledOnce());
+      expect(responded).toBe(false);
+      const query = db.prepare(`SELECT attempts,dispatched_at FROM ${queueTable} WHERE ${keyColumn}=?`);
+      expect(query.get(dispatchKey)).toEqual({ attempts: 1, dispatched_at: null });
+      if (unrelated) expect(query.get(unrelated)).toEqual({ attempts: 0, dispatched_at: null });
+      queueAvailable.resolve();
+      expect((await requestPending).status).toBe(200);
+      expect(scheduled).not.toHaveBeenCalled();
+      if (!failFirst) {
+        expect(query.get(dispatchKey)).toEqual({ attempts: 1, dispatched_at: expect.any(Number) });
+        expect((await post(complete, { parts: [{ PartNumber: 1, ETag: `"${etag}"` }] })).status).toBe(200);
+        expect(firstSend).toHaveBeenCalledOnce();
+      } else {
+        expect(query.get(dispatchKey)).toEqual({ attempts: 1, dispatched_at: null });
+        db.prepare(`UPDATE ${queueTable} SET available_at=unixepoch()-1 WHERE ${keyColumn}=?`).run(dispatchKey);
+        const retry = vi.fn(async () => {});
+        worker.scheduled({}, { ...env, JOBS: { send: retry } }, { waitUntil: scheduled });
+        await Promise.all(scheduled.mock.calls.map(([task]) => task));
+        expect(query.get(dispatchKey)).toEqual({ attempts: 2, dispatched_at: expect.any(Number) });
+        expect(retry).toHaveBeenCalledTimes(unrelated ? 2 : 1);
+      }
+    } finally {
+      queueAvailable.resolve();
+      await requestPending?.catch(() => {});
+      listing.mockRestore();
+      restore();
+      db.close();
+    }
+  });
+
   it.each(measuredAccounts)("abre multipart con la sesión %s de %s en %s y mide %s", async (version, email, mode, cohort) => {
     const db = databaseForIngest();
     try {

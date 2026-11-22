@@ -80,6 +80,8 @@ flowchart TB
     FASE6 --> SLOENTREGAS["Medir el p95 de entregas automáticas y contar las recuperadas por separado"]
     FASE6 --> FIRMAPARTES["Abrir multipart, devolver las firmas iniciales e iniciar la carga directa a R2"]
     FIRMAPARTES --> PARTESFUENTE["Listar o firmar partes tras verificar la sesión y la fuente en un lote de D1"]
+    PARTESFUENTE --> DESPACHOCARGA["Tras confirmar la carga en D1, intentar el envío a Queues antes de responder"]
+    DESPACHOCARGA -. "Recuperar pendientes con el disparo programado" .-> SLOENTREGAS
     FIRMAPARTES --> SLOMULTIPART["Medir aperturas y firmas individuales y por lotes de archivos y fuentes"]
     FASE6 --> KITENTORNO["Cotejar entorno de la orden, ruta R2 del kit y firma al Worker"]
     KITENTORNO --> KITRECIBO["El recibo local activa la publicación y el temporizador recupera pendientes"]
