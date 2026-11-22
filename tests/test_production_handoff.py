@@ -613,7 +613,7 @@ def test_sofia_recibe_el_texto_transcrito_como_contexto_limitado(monkeypatch, tm
         transcript_order.append(source["media"]["asset_id"] if source else "principal")
         return {"language": "es", "text": text, "words": ["palabra"]}
 
-    monkeypatch.setattr(sofia, "transcript_for", transcribe)
+    monkeypatch.setattr(sofia, "transcribe_source", transcribe)
     observed = {}
     reply = {"enfoque": "Plantas", "alcance": "Reel", "pendiente": "Audiencia"}
     meta = {"agentHarnessId": "codex", "model": "gpt-6.1-terra", "provider": "openai"}
@@ -734,6 +734,10 @@ def test_sofia_reutiliza_el_inspector_y_reanuda_desde_el_audio_guardado(
     assert events == ["abrir", names[0], "cerrar"]
     events.clear()
     asyncio.run(sofia.collect_transcripts(receipt, output, sources))
+    from production_valeria import transcript_for
+
+    assert transcript_for(receipt, output) == transcription
+    assert transcript_for(receipt, output, additional) == transcription
     assert events == []
 
 
