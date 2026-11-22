@@ -208,7 +208,7 @@ function base(value: unknown, stills: boolean): RenderRequest {
   if (input.audio_path !== undefined) props.audio_path = mediaPath(input.audio_path, project_id);
   if (input.title_layout !== undefined) {
     if (input.title_layout !== 'band' || input.sources !== undefined || input.scenes !== undefined || input.ad !== undefined
-      || Boolean(props.video_path) !== (format === 'mp4') || props.subtitle_size
+      || Boolean(props.video_path) !== (format === 'mp4')
       || props.title.length > 42 || props.subtitle.length > 64) {
       invalid('La banda de títulos necesita texto breve y un montaje continuo.');
     }

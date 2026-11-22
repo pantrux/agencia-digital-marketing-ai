@@ -28,7 +28,7 @@ return async function scene(options: SceneOptions, frames: number[] | null): Pro
   let browser: Awaited<ReturnType<typeof openBrowser>> | undefined;
   let abort: (() => void) | undefined;
   try {
-    browser = await sdk.openBrowser('chrome', {browserExecutable: options.browser, logLevel: 'error', chromiumOptions: {enableMultiProcessOnLinux: false}});
+    browser = await sdk.openBrowser('chrome', {browserExecutable: options.browser, logLevel: 'error'});
     const {cancel, cancelSignal} = sdk.makeCancelSignal();
     let cancellationRequested = false;
     const cancelRender = (): void => {

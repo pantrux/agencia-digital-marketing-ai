@@ -31,9 +31,18 @@ test('la banda llega al MP4 y a su gráfica ProRes, con un contrato acotado', ()
   const picture = {...props, video_path: 'proyectos/sansevieras/01_raw/video.mp4'};
   assert.equal(compositionInput(parseRender({...order, props: picture}), 'source.mp4').title_layout, 'band');
   assert.equal(compositionInput(parseRender({...order, format: 'prores4444'}), null).title_layout, 'band');
+  const longText = {title: 'W'.repeat(42), subtitle: 'W'.repeat(64), subtitle_size: 'large'};
+  const full = parseRender({...order, props: {...picture, ...longText}});
+  const graphic = parseRender({...order, format: 'prores4444', resolution: '4k', props: {...props, ...longText}});
+  for (const [request, file] of [[full, 'source.mp4'], [graphic, null]] as const) {
+    const input = compositionInput(request, file);
+    assert.equal(input.subtitle_size, 'large');
+    assert.equal(input.title_layout, 'band');
+    assert.equal(input.subtitle, longText.subtitle);
+  }
   assert.throws(() => parseRender(order), /montaje continuo/);
   assert.throws(() => parseRender({...order, props: {...picture, title: 'a'.repeat(43)}}), /texto breve/);
-  assert.throws(() => parseRender({...order, props: {...picture, subtitle_size: 'large'}}), /texto breve/);
+  assert.throws(() => parseRender({...order, props: {...picture, subtitle_size: 'large', subtitle: 'a'.repeat(65)}}), /texto breve/);
   assert.throws(() => parseRender({...order, props: {...picture, scenes: []}}), /montaje continuo/);
 });
 
