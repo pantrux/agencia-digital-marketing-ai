@@ -141,6 +141,29 @@ def scene_label(label, length, *, allow_panel=False):
     }
 
 
+def multi_scene_label(label, length, *, allow_panel):
+    """Convierte un anclaje en tiempos locales usando la longitud real del corte."""
+    if type(label) is not dict or "anclaje" not in label:
+        return scene_label(label, length, allow_panel=allow_panel)
+    anchor = label["anclaje"]
+    if label.keys() - {"duracion", "tamano"} != {"texto", "anclaje", "posicion"} or anchor not in (
+        "inicio",
+        "cierre",
+    ):
+        raise VisualResponseFormatError("Anclaje de rótulo inválido")
+    seconds = label.get("duracion", 3)
+    if type(seconds) not in (int, float) or not 0.5 <= seconds <= 6:
+        raise VisualResponseFormatError("El rótulo debe durar entre 0,5 y 6 segundos")
+    frames = min(length, round(seconds * 30))
+    first = 0 if anchor == "inicio" else length - frames
+    local = {
+        **{key: value for key, value in label.items() if key not in {"anclaje", "duracion"}},
+        "desde": first / 30,
+        "hasta": (first + frames) / 30,
+    }
+    return scene_label(local, length, allow_panel=allow_panel)
+
+
 def reel_scenes(items, duration, *, ad=False):
     def boundary(value, maximum):
         if type(value) not in (int, float) or not 0 <= value <= maximum:
@@ -223,7 +246,7 @@ def multi_reel_scenes(items, sources, *, ad=False, long_form=False):
         intervals.setdefault(identity, []).append((start, end))
         scene = {"source_id": identity, "source_start_frame": start, "source_end_frame": end}
         if "rotulo" in item:
-            scene["label"] = scene_label(item["rotulo"], end - start, allow_panel=not ad)
+            scene["label"] = multi_scene_label(item["rotulo"], end - start, allow_panel=not ad)
         scenes.append(scene)
         total += end - start
     minimum, maximum = (30, 18000) if long_form else (900, 1350)
@@ -1033,10 +1056,11 @@ def multiple_plan_request(
         "apto_sin_cambios es un booleano. Usa solo esas claves. Cada escena tiene fuente igual al "
         "id declarado, desde y hasta numéricos en segundos locales de ese vídeo, con una duración "
         "mínima de 0,5 s y hasta menor o igual a la duración de su fuente. El rotulo es opcional "
-        "por escena, con al menos uno en el montaje. Usa {texto,desde,hasta,posicion,tamano}. Su "
-        "texto admite hasta 80 caracteres, desde y "
-        "hasta son relativos al inicio de su escena y el rótulo ha de durar entre 0,5 y 6 s sin "
-        "salir de ella. Usa posicion superior o inferior y tamano normal o grande. "
+        "por escena, con al menos uno en el montaje. Usa {texto,anclaje,posicion,tamano}, con "
+        "anclaje inicio o cierre y hasta 80 caracteres en texto. El sistema usa 3 s por defecto, "
+        "con duracion opcional entre 0,5 y 6 s, y ajusta la ventana a la escena. Usa posicion "
+        "superior o inferior y tamano normal o grande. Solo si el encargo exige un instante "
+        "preciso, sustituye anclaje y duracion por desde y hasta en segundos relativos a la escena. "
         + (
             "Usa 2 a 32 escenas, suma hasta 600 segundos y al menos un segundo, sin cortes superpuestos del mismo video. "
             if long_form
@@ -1052,8 +1076,8 @@ def multiple_plan_request(
     )
     if brief.get("ad_cta"):
         prompt += (
-            "Para este anuncio usa 2 a 12 escenas y exactamente 30 segundos. La primera tiene "
-            "un gancho con rótulo desde 0 a 0,5 segundos hasta al menos el segundo 2. "
+            "Para este anuncio usa 2 a 12 escenas y exactamente 30 segundos. La primera dura "
+            "al menos 2 s y tiene un gancho con rótulo anclado al inicio de al menos 2 s. "
             "Reserva los últimos cuatro segundos para el CTA confirmado. "
         )
     else:
