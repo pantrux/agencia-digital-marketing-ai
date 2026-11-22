@@ -200,10 +200,34 @@ test('el ProRes por escenas codifica una vez cada estado del rótulo y sincroniz
     assert.equal(master?.[master.indexOf('-c:v') + 1], 'copy');
   } finally {await rm(fixture.root, {recursive:true, force:true});}
 });
-test('pico final fuera de límite rechaza incluso segundo intento y no publica al NAS', async () => {
+test('pico final fuera de límite registra la fase sin publicar ni exponer la ruta', async (t) => {
   const fixture = await setup(true);
   try {
+    const warn = t.mock.method(console, 'warn', () => {});
     await fixture.backend.initialize(); await assert.rejects(fixture.backend.render(request, new AbortController().signal), /audio/);
+    await assert.rejects(access(path.join(fixture.nas, 'proyectos', 'sansevieras', '06_renders', 'prueba')));
+    assert.equal(warn.mock.callCount(), 1);
+    const message = String(warn.mock.calls[0]?.arguments[0]);
+    const entry = JSON.parse(message);
+    assert.equal(entry.operation, 'render'); assert.equal(entry.phase, 'control');
+    assert.equal(entry.error, 'AUDIO_FUERA_DE_OBJETIVO');
+    assert.equal(entry.job, createHash('sha256').update('sansevieras/prueba').digest('hex').slice(0, 16));
+    assert.ok(Number.isFinite(entry.elapsed_ms) && Number.isFinite(Date.parse(entry.utc)));
+    assert.doesNotMatch(message, /sansevieras|voz\.wav|prueba/);
+  } finally {await rm(fixture.root, {recursive: true, force: true});}
+});
+
+test('el límite global se distingue de un rechazo de herramienta', async (t) => {
+  const fixture = await setup(false);
+  try {
+    await fixture.backend.initialize();
+    t.mock.method(AbortSignal, 'timeout', (ms: number) => {
+      assert.equal(ms, 1_200_000);
+      return AbortSignal.abort(new DOMException('Venció el plazo', 'TimeoutError'));
+    });
+    t.mock.method(console, 'warn', () => {});
+    await assert.rejects(fixture.backend.render(request, new AbortController().signal),
+      {code: 'PLAZO_TRABAJO_AGOTADO', status: 504});
     await assert.rejects(access(path.join(fixture.nas, 'proyectos', 'sansevieras', '06_renders', 'prueba')));
   } finally {await rm(fixture.root, {recursive: true, force: true});}
 });

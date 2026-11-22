@@ -14,6 +14,7 @@ export function compositionInput(request: RenderRequest, videoFile: string | nul
 }
 export interface SceneOptions {request: RenderRequest; scratch: string; cacheRoot: string; browser: string; videoSource: string | null; signal: AbortSignal; overlay?: true; preconformed?: true}
 const defaultSdk = {bundle, makeCancelSignal, openBrowser, renderFrames, renderStill, selectComposition};
+const frameInactivityMs = 90_000;
 export type SceneDependencies = typeof defaultSdk;
 export function createSceneRenderer(sdk: SceneDependencies = defaultSdk) {
 return async function scene(options: SceneOptions, frames: number[] | null): Promise<{files: string[]; frameCount: number}> {
@@ -29,7 +30,12 @@ return async function scene(options: SceneOptions, frames: number[] | null): Pro
   try {
     browser = await sdk.openBrowser('chrome', {browserExecutable: options.browser, logLevel: 'error', chromiumOptions: {enableMultiProcessOnLinux: false}});
     const {cancel, cancelSignal} = sdk.makeCancelSignal();
-    abort = (): void => cancel(); options.signal.addEventListener('abort', abort, {once: true});
+    let cancellationRequested = false;
+    const cancelRender = (): void => {
+      if (!cancellationRequested) {cancellationRequested = true; cancel();}
+    };
+    abort = cancelRender;
+    options.signal.addEventListener('abort', abort, {once: true});
     options.signal.throwIfAborted();
     const inputProps = compositionInput(options.request, lease.videoFile);
     if (options.preconformed) inputProps.video_is_montage = true;
@@ -51,14 +57,37 @@ return async function scene(options: SceneOptions, frames: number[] | null): Pro
     const useParallelFrames = options.request.resolution === '1080p'
       && options.videoSource !== null && composition.durationInFrames >= 30 * composition.fps;
     const imageFormat = useParallelFrames && options.request.format === 'mp4' ? 'jpeg' : 'png';
-    const result = await sdk.renderFrames({
-      serveUrl, composition, inputProps, outputDir, imageFormat,
-      ...(imageFormat === 'jpeg' ? {jpegQuality: 95} : {}),
-      imageSequencePattern: 'frame-[frame].[ext]', onStart: () => {}, onFrameUpdate: () => {},
-      muted: true, concurrency: useParallelFrames ? 4 : 1, puppeteerInstance: browser,
-      browserExecutable: options.browser, cancelSignal, logLevel: 'error', timeoutInMilliseconds: 60000,
-    });
-    return {files: [path.join(outputDir, `frame-%0${String(result.frameCount - 1).length}d.${imageFormat}`)], frameCount: result.frameCount};
+    let completed = 0;
+    let stall: WorkerError | undefined;
+    const onStall = (): void => {
+      if (cancellationRequested) return;
+      stall = new WorkerError(504, 'FOTOGRAMAS_SIN_AVANCE', 'Remotion dejó de completar fotogramas.');
+      cancelRender();
+    };
+    let inactivity = setTimeout(onStall, frameInactivityMs);
+    try {
+      const result = await sdk.renderFrames({
+        serveUrl, composition, inputProps, outputDir, imageFormat,
+        ...(imageFormat === 'jpeg' ? {jpegQuality: 95} : {}),
+        imageSequencePattern: 'frame-[frame].[ext]', onStart: () => {},
+        onFrameUpdate: (count) => {
+          if (!cancellationRequested && count > completed) {
+            completed = count;
+            clearTimeout(inactivity);
+            inactivity = setTimeout(onStall, frameInactivityMs);
+          }
+        },
+        muted: true, concurrency: useParallelFrames ? 4 : 1, puppeteerInstance: browser,
+        browserExecutable: options.browser, cancelSignal, logLevel: 'error', timeoutInMilliseconds: 60000,
+      });
+      if (stall) throw stall;
+      options.signal.throwIfAborted();
+      return {files: [path.join(outputDir, `frame-%0${String(result.frameCount - 1).length}d.${imageFormat}`)], frameCount: result.frameCount};
+    } catch (error) {
+      throw stall ?? error;
+    } finally {
+      clearTimeout(inactivity);
+    }
   } finally {
     if (abort) options.signal.removeEventListener('abort', abort);
     try {if (browser) await browser.close({silent: true});}

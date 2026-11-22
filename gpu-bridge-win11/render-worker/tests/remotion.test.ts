@@ -103,6 +103,46 @@ test('la secuencia cacheada limita 4K a un navegador y conserva fotogramas y met
   } finally {await rm(root,{recursive:true,force:true});}
 });
 
+test('el vigilante mide fotogramas nuevos y cancela solo una secuencia detenida', async (t) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'render-frame-progress-'));
+  try {
+    const space = await ScratchSpace.create(root), browser = path.join(root, 'browser.exe');
+    await writeFile(browser, 'navegador controlado');
+    t.mock.timers.enable({apis: ['setTimeout']});
+    let cancelled = 0, closed = 0, hasProgress = true;
+    const sdk = {
+      bundle: async (options: {outDir: string}) => {
+        await mkdir(path.join(options.outDir, 'public'), {recursive: true});
+        return options.outDir;
+      },
+      openBrowser: async () => ({close: async () => {closed += 1;}}),
+      makeCancelSignal: () => ({cancel: () => {cancelled += 1;}, cancelSignal: {}}),
+      selectComposition: async () => ({width: 1080, height: 1920, fps: 30, durationInFrames: 90}),
+      renderFrames: async ({onFrameUpdate}: {onFrameUpdate: (count: number) => void}) => {
+        t.mock.timers.tick(89_000);
+        onFrameUpdate(1);
+        t.mock.timers.tick(89_000);
+        onFrameUpdate(hasProgress ? 2 : 1);
+        assert.equal(cancelled, 0);
+        t.mock.timers.tick(2_000);
+        if (cancelled) throw Error('renderFrames() got cancelled');
+        return {frameCount: 90};
+      },
+    } as unknown as SceneDependencies;
+    const scene = createSceneRenderer(sdk);
+    const request = parseRender({project_id: 'sansevieras', job_id: 'avance', composition: 'AgencyVertical',
+      plan: 'Ilimitado', props: {title: 'Avance de prueba', duration_seconds: 3, audio_path: 'proyectos/sansevieras/03_assets/voz.wav'}});
+    const options = {request, cacheRoot: space.root, browser, videoSource: null, signal: new AbortController().signal};
+    assert.equal((await scene({...options, scratch: await space.job()}, null)).frameCount, 90);
+    t.mock.timers.tick(90_000);
+    assert.equal(cancelled, 0);
+    hasProgress = false;
+    await assert.rejects(scene({...options, scratch: await space.job()}, null), {code: 'FOTOGRAMAS_SIN_AVANCE', status: 504});
+    t.mock.timers.tick(90_000);
+    assert.equal(cancelled, 1); assert.equal(closed, 2);
+  } finally {await rm(root, {recursive: true, force: true});}
+});
+
 test('sólo el MP4 1080p con vídeo crudo de al menos 30 s usa JPEG', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'render-bounded-concurrency-'));
   try {

@@ -96,6 +96,12 @@ Ambos formatos preparan estéreo a 48 kHz antes de medir y antes de normalizar. 
 
 La caché reconstruible tiene marcador de propiedad y guardas antes de borrado; nunca se borra recursivamente en NAS.
 
+## Diagnóstico de fallos
+
+En Windows, `C:\GPU-Bridge\logs\render.log` registra los fallos de `/render` con hora UTC, fase, duración, código y una referencia corta derivada del proyecto y el trabajo. No registra títulos ni rutas de medios. Las fases distinguen la entrada o repetición de un recibo, audio, preparación de video, fotogramas de Remotion o HyperFrames, codificación, control y publicación en Synology.
+
+Mientras Remotion genera una secuencia, cada fotograma nuevo renueva el intervalo de 90 segundos. Si el contador deja de avanzar, el puente solicita la cancelación al SDK y devuelve `FOTOGRAMAS_SIN_AVANCE` después de cerrar el navegador. El límite global de 20 minutos se conserva y devuelve `PLAZO_TRABAJO_AGOTADO` al agotarse. Los dos casos liberan la plaza tras cerrar los recursos del trabajo. [Progreso de fotogramas](https://www.remotion.dev/docs/renderer/render-frames#onframeupdate) · [Cancelación](https://www.remotion.dev/docs/renderer/make-cancel-signal)
+
 ## Evidencia y límites actuales
 
 Las dependencias, el navegador y sus pines no cambian en este incremento. Las pruebas automáticas usan archivos temporales locales y procesos controlados; validan permisos por plan, metadatos, selección de codificador, rechazo de audio/alfa fuera de contrato, coordenadas QA, slots compartidos y compilación única concurrente con limpieza aislada de assets. Las pruebas unitarias no acreditan GPU ni NAS. La publicación y aceptación operativa coordinadas posteriormente sí registraron MP4 Free de tres segundos a -14,15 LUFS/-4,49 dBTP, ProRes de tres segundos en 1080p y 4K con alfa/audio válidos y concurrencia real `[200,200,429]`, con máximo de dos sesiones NVIDIA en 35 muestras. Esos resultados se conservan por separado; no sustituyen la nueva prueba HTTP después de este cambio de audio.
