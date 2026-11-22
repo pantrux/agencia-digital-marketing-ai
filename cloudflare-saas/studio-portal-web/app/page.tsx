@@ -253,8 +253,17 @@ function ConfirmBrief({ order, suggestion }: { order: string; suggestion: {id:st
 
 type ManualState = {
   paused: boolean; available: boolean; included: boolean; remaining: number | null;
+  review_round?: number | null;
   adjustment: { status: "pending" | "ready" | "needs_review" } | null;
 };
+
+function manualReviewStatus(round?: number | null): string {
+  if (round === 1) return "El equipo necesita revisar la escaleta antes de continuar con el montaje.";
+  if (round === 2 || round === 3) {
+    return "La última exportación no pasó el control de calidad. El equipo necesita revisar el siguiente montaje antes de volver a renderizar.";
+  }
+  return "La producción está pausada para que el equipo revise el montaje.";
+}
 
 function ManualAdjustment({ order, onResumed }: { order: string; onResumed: () => Promise<void> }) {
   const path = `/orders/${encodeURIComponent(order)}/manual-adjustment`;
@@ -319,12 +328,14 @@ function ManualAdjustment({ order, onResumed }: { order: string; onResumed: () =
   const status = state?.adjustment?.status;
   return <div className="production-brief">
     <h3>Revisión manual</h3>
+    {state?.paused && <p role="status">{manualReviewStatus(state.review_round)}</p>}
     {fault && <p role="alert">{fault}</p>}
     {status === "pending" && <p role="status">Valeria está revisando tu ajuste.</p>}
     {status === "needs_review" && <p role="status">El ajuste se revisó. La producción todavía requiere intervención.</p>}
     {state?.paused && !state.included && <p>Este plan no incluye ajustes humanos.</p>}
     {state?.paused && state.included && state.remaining === 0 && status !== "pending" && <p>Ya usaste los ajustes disponibles.</p>}
     {state?.available && <form onSubmit={submit}>
+      <p>Si quieres aclarar una preferencia del brief, puedes enviar una indicación a Valeria.</p>
       <label htmlFor="manual-instructions">Instrucciones del ajuste</label>
       <textarea id="manual-instructions" rows={3} required maxLength={800} disabled={sending} value={instructions}
         onChange={(event) => setInstructions(event.currentTarget.value)} />

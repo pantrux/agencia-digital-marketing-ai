@@ -419,12 +419,12 @@ it.each([false, true])("registra el dictamen y expone el motivo al titular sin l
 });
 
 it.each([
-  { plan: "free", priority: 0, limit: 0, outcome: "needs_review" },
-  { plan: "pro", priority: 1, limit: 1, outcome: "needs_review" },
-  { plan: "ultra", priority: 2, limit: 3, outcome: "ready" },
-  { plan: "ultra", priority: 2, limit: 3, outcome: "needs_review" },
-  { plan: "ilimitado", priority: 3, limit: null, outcome: "needs_review" },
-])("aplica el cupo del ajuste y espera el resultado autenticado en $plan", async ({ plan, priority, limit, outcome }) => {
+  { plan: "free", priority: 0, limit: 0, outcome: "needs_review", revision: 1 },
+  { plan: "pro", priority: 1, limit: 1, outcome: "needs_review", revision: 1 },
+  { plan: "ultra", priority: 2, limit: 3, outcome: "ready", revision: 2 },
+  { plan: "ultra", priority: 2, limit: 3, outcome: "needs_review", revision: 2 },
+  { plan: "ilimitado", priority: 3, limit: null, outcome: "needs_review", revision: 3 },
+])("aplica el cupo del ajuste y espera el resultado autenticado en $plan", async ({ plan, priority, limit, outcome, revision }) => {
   const db = databaseForIngest();
   try {
     for (const file of ["0004_production_dispatch.sql", "0005_production_briefs.sql", "0019_brief_ad_cta.sql", "0020_brief_ad_contacts.sql", "0021_brief_ad_engine.sql"]) {
@@ -456,7 +456,7 @@ it.each([
     db.prepare("INSERT INTO production_dispatch(order_id,available_at,received_at) VALUES (?,10,10)").run(orderId);
     db.prepare(`INSERT INTO production_briefs(order_id,user_id,objective,audience,tone,confirmed_at)
       VALUES (?,?,'Presentar colección','Tiendas','Directo',15)`).run(orderId, userId);
-    db.prepare("INSERT INTO production_manual_reviews VALUES (?,1,?,16)").run(orderId, direction);
+    db.prepare("INSERT INTO production_manual_reviews VALUES (?,?,?,16)").run(orderId, revision, direction);
 
     const origin = "https://studio.invalid";
     const env = {
@@ -486,10 +486,13 @@ it.each([
       }), env, { waitUntil: vi.fn() });
     const text = "Usar el título de la colección y subtítulos grandes.";
     expect((await ask(text, "ajuste-1", otherCookie)).status).toBe(404);
-    const current = () => worker.fetch(new Request(origin + "/api/orders/" + orderId + "/manual-adjustment", {
-      headers: { Cookie: ownCookie },
+    const current = (cookie = ownCookie) => worker.fetch(new Request(origin + "/api/orders/" + orderId + "/manual-adjustment", {
+      headers: { Cookie: cookie },
     }), env, { waitUntil: vi.fn() });
-    expect(await (await current()).json()).toMatchObject({ remaining: limit, paused: true, available: plan !== "free" });
+    expect((await current(otherCookie)).status).toBe(404);
+    const state = await (await current()).json();
+    expect(state).toMatchObject({ remaining: limit, paused: true, available: plan !== "free", review_round: revision });
+    expect(JSON.stringify(state)).not.toContain(direction);
     if (plan === "free") {
       expect((await ask(text)).status).toBe(403);
       return;
@@ -509,11 +512,11 @@ it.each([
     const context = { action: "manual_context", order_id: orderId };
     expect((await dispatch(context, "f".repeat(64))).status).toBe(401);
     expect(await (await dispatch(context)).json()).toMatchObject({
-      adjustment: { number: 1, review_sha256: direction, instructions: text, revision: 1 },
+      adjustment: { number: 1, review_sha256: direction, instructions: text, revision },
       brief: { order_id: orderId, confirmed_at: 15, objective: "Presentar colección" },
     });
     const result = { action: "manual_adjustment_result", order_id: orderId, user_id: userId, upload_id: uploadId,
-      source_sha256: digest, revision: 1, brief_confirmed_at: 15, number: 1, review_sha256: direction,
+      source_sha256: digest, revision, brief_confirmed_at: 15, number: 1, review_sha256: direction,
       direction_sha256: corrected, status: outcome };
     expect((await dispatch({ ...result, upload_id: asset })).status).toBe(409);
     expect(await (await dispatch(result)).json()).toEqual({ recorded: true });
@@ -526,8 +529,9 @@ it.each([
       });
       expect((await dispatch({ action: "quality_manual_review", order_id: orderId, user_id: userId,
         upload_id: uploadId, source_sha256: digest, direction_sha256: direction,
-        revision: 1, brief_confirmed_at: 15 })).status).toBe(409);
+        revision, brief_confirmed_at: 15 })).status).toBe(409);
       expect(db.prepare("SELECT * FROM production_manual_reviews WHERE order_id=?").get(orderId)).toBeUndefined();
+      expect(await (await current()).json()).toMatchObject({ paused: false, available: false, review_round: null });
     } else {
       expect(await (await dispatch({ action: "brief", order_id: orderId })).json()).toEqual({ brief: null });
       expect(db.prepare("SELECT direction_sha256 FROM production_manual_reviews WHERE order_id=?").get(orderId))
