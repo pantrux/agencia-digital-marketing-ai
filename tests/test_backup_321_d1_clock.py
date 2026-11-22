@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import sys
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -98,6 +99,27 @@ class D1ClockTests(unittest.TestCase):
                 {"success": True, "status": "antes-de-la-ventana"},
             )
         backup.assert_not_called()
+
+    def test_reinicia_solo_si_el_bloqueo_compartido_esta_ocupado(self):
+        host = SimpleNamespace(sysname="Linux", nodename="vm-media-01")
+        for code, status in (("CORRIDA_EN_CURSO", 75), ("RESPALDO_D1_REQUIERE_CONCILIACION", 1)):
+            with (
+                self.subTest(code=code),
+                patch.object(clock.os, "uname", return_value=host, create=True),
+                patch.object(clock.os, "geteuid", return_value=0, create=True),
+                patch.object(clock.os, "getegid", return_value=0, create=True),
+                patch.object(clock.os, "umask"),
+                patch.object(clock.signal, "signal"),
+                patch.object(clock.signal, "SIGHUP", 1, create=True),
+                patch.object(sys, "path", sys.path.copy()),
+                patch.dict(
+                    sys.modules,
+                    {"backup_321_capture_d1": SimpleNamespace(), "httpx": SimpleNamespace()},
+                ),
+                patch.object(clock, "load_profile"),
+                patch.object(clock, "run_scheduled", side_effect=ValueError(code)),
+            ):
+                self.assertEqual(clock.main(), status)
 
     def test_muestra_el_codigo_seguro_de_captura_en_el_fallo_del_servicio(self):
         def fail_capture(_request, result):

@@ -24,6 +24,7 @@ DESTINATION_NAS = "/mnt/producciones/_backups/d1"
 BUCKET = "studio-backups-bucket"
 WINDOW_MINUTES = 12
 LOCAL_FALLBACK_MINUTE = 8
+LOCK_RETRY_EXIT_STATUS = 75
 FILE = core.D1_FILES[0]
 REPO_SCOPES = {
     "R2_PLATFORM_ACCESS_KEY_ID",
@@ -262,6 +263,8 @@ def main():
     except (OSError, ValueError, subprocess.SubprocessError, KeyboardInterrupt) as error:
         output = {"success": False, "error": core.output_code(error)}
     print(core.encode(output).decode(), flush=True)
+    if output.get("error") == "CORRIDA_EN_CURSO":
+        return LOCK_RETRY_EXIT_STATUS
     return 0 if output["success"] else 1
 
 

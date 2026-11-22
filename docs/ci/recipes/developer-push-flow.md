@@ -268,3 +268,5 @@ Para verificar la recuperación de la copia diaria de D1, prueba el arranque
 de una VM después de la ventana de las 03:00. Coteja el origen del recibo
 con su fecha real y confirma que un segundo disparo no duplica el snapshot.
 Verifica la huella del mismo SQL desde Synology y R2.
+Mantén ocupado el bloqueo durante el primer intento y comprueba el reintento
+al liberarlo. Un envío pendiente de conciliación debe mantenerse detenido.

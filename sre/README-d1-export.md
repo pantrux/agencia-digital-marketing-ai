@@ -95,6 +95,8 @@ Los snapshots llevan las etiquetas `agency-d1-clock` y `run:d1-clock-AAAA-MM-DD`
 
 El temporizador también ejecuta el servicio al arrancar y recupera activaciones de calendario omitidas. Antes de las 03:00 espera la ventana habitual. Si arranca después de las 03:12, captura la base vigente con la fecha local actual y registra `order_origin=temporizador-recuperacion`. Un recibo completo evita duplicar esa captura. Las fechas anteriores sin copia siguen apareciendo como huecos en el historial.
 
+Si otra copia ocupa el bloqueo compartido, systemd vuelve a intentar después de dos minutos. Solo se reinicia automáticamente por ese bloqueo. Los envíos con recibos incompletos siguen pendientes de conciliación.
+
 ```bash
 systemctl list-timers agency-backup-d1-clock.timer
 journalctl -u agency-backup-d1-clock.service --since today
