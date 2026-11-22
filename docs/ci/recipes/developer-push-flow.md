@@ -258,3 +258,8 @@ la señal de error y continúa aplicando la espera de cada orden.
 Para verificar la medición multipart, abre una carga de ensayo, repite
 la misma apertura y comprueba una sola muestra de las tres etapas. Coteja
 la preparación, R2 y la confirmación en la serie `ensayo` de Analytics Engine.
+
+Para verificar cambios de transcripción, comprueba que Valeria puede leer
+los recibos del audio inicial y de los materiales adicionales. Con recibos
+válidos de Sofía, la lectura debe devolver las marcas de tiempo sin abrir
+otra sesión del inspector ni volver a transcribir el audio.
