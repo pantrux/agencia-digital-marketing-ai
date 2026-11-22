@@ -1,7 +1,7 @@
 import { validateSyncJob, type SyncJob } from "../../../src/media/sync-contract.js";
 import { signR2UploadPart } from "../../../src/media/r2-signing.js";
 import type { PortalIdentity, sessionLookup } from "./identity.js";
-import { listMultipartParts, partSignBatchSize, requestedParts, signInitialParts, signRequestedParts, uploadsConfigured, verifyDigest, type IngestEnv, type MultipartObserver } from "./ingest.js";
+import { listMultipartParts, partSignBatchSize, requestedParts, signInitialParts, signRequestedParts, uploadsConfigured, verifyDigest, type IngestEnv, type MultipartObserver, type UploadCommitted } from "./ingest.js";
 import { HttpError, ownerId, prepareOwnedStatement, readJson, response } from "./platform.js";
 import { storageFits, storageQuotaArguments } from "./storage-quota.js";
 
@@ -19,7 +19,7 @@ type SourceOwner = string | Awaited<ReturnType<typeof sessionLookup>>;
 
 /** Reserva y abre la carga de una fuente del pedido. */
 export async function createSourceUpload(env: IngestEnv, owner: SourceOwner, order: string, sourceId: string,
-  observe?: MultipartObserver, preSign = false): Promise<Response> {
+  observe?: MultipartObserver, preSign = false, onCommitted?: UploadCommitted): Promise<Response> {
   const sourceJoins = `FROM production_sources source
     JOIN production_source_sets source_set ON source_set.order_id=source.order_id
     JOIN orders o ON o.id=source_set.order_id AND o.user_id=source_set.user_id
@@ -93,7 +93,7 @@ export async function createSourceUpload(env: IngestEnv, owner: SourceOwner, ord
   if (!row) throw new HttpError(409, "ALMACENAMIENTO_AGOTADO");
   const previous = reusable(row);
   if (previous) return previous;
-  if (row.status === "completing") return completeSourceUpload(null, env, user, order, sourceId);
+  if (row.status === "completing") return completeSourceUpload(null, env, user, order, sourceId, onCommitted);
   let ownsLease = created?.meta.changes === 1;
   if (row.status === "aborted") {
     if (await env.MEDIA.head(key)) throw new HttpError(409, "MATERIAL_EN_CONFLICTO");
@@ -202,7 +202,7 @@ export async function handleSourcePartAccess(
 
 /** Confirma una fuente solo después de comprobar tamaño, metadatos y SHA-256. */
 export async function completeSourceUpload(
-  request: Request | null, env: IngestEnv, user: string, order: string, sourceId: string,
+  request: Request | null, env: IngestEnv, user: string, order: string, sourceId: string, onCommitted?: UploadCommitted,
 ): Promise<Response> {
   const row = await env.DB.withSession("first-primary").prepare(`SELECT source.id,source.order_id,source.bytes,
     source.sha256,source.extension,o.project_slug,o.status AS order_status,ledger.status AS usage_status,
@@ -216,6 +216,7 @@ export async function completeSourceUpload(
   const count = Math.ceil(row.bytes / partSize);
   const parts = request ? requestedParts(await readJson(request), count) : null;
   const readiness = async () => {
+    await onCommitted?.(sourceId);
     const incomplete = await env.DB.withSession("first-primary").prepare(`SELECT COUNT(*) AS count
       FROM production_sources source LEFT JOIN production_source_uploads upload ON upload.source_id=source.id
       WHERE source.order_id=? AND (upload.status IS NULL OR upload.status<>'completed')`)
