@@ -185,7 +185,7 @@ Al probar una escaleta de varias fuentes, coteja que el encargo y el validador a
 
 Comprueba un rótulo anclado al inicio y otro al cierre de una escena corta. El sistema convierte el anclaje a fotogramas locales y limita la duración a la longitud del corte. Un rótulo con tiempos explícitos conserva el intervalo indicado, sujeto a la validación vigente. En anuncios, el gancho de apertura conserva su duración mínima.
 
-Comprueba la auditoría de un montaje con más de ocho fotogramas. Elena recibe los fotogramas individuales a 480 píxeles de ancho mediante lotes que respetan el límite de adjuntos y bytes del cliente RPC. El dictamen usa la puntuación más baja y conserva los defectos con la numeración original de cada fotograma.
+Comprueba la auditoría de un montaje con más de ocho fotogramas. Elena recibe los fotogramas individuales a 480 píxeles de ancho mediante lotes que respetan el límite de adjuntos y bytes del cliente RPC. El dictamen usa la puntuación más baja e incluye las indicaciones que caben en el formato de entrega. Las respuestas completas con su correspondencia de fotogramas se guardan en el recibo de lotes identificado por huella. Un defecto en cualquier lote bloquea la aprobación.
 
 Las pruebas del renderer verifican la cancelación tras 90 segundos sin avance de Remotion o de FFmpeg durante la codificación. Los contadores repetidos se ignoran y los fotogramas nuevos renuevan el intervalo. En FFmpeg también se acepta una marca de tiempo de salida creciente. Un fallo registra la fase y una referencia derivada del trabajo. [Diagnóstico de render](../../../gpu-bridge-win11/render-worker/README.md)
 

@@ -56,6 +56,7 @@ AD_MUSIC_CREDIT = (
 BAND_SAMPLE_BYTES = 12000
 BAND_COMPARISON_BYTES = 22000
 RPC_ATTACHMENT_LIMIT = 8
+FINDING_ARRAY_BYTES = 4_000
 
 VALERIA = Path("/var/lib/agency-production-valeria")
 LUCAS = Path("/var/lib/agency-production-lucas")
@@ -186,6 +187,35 @@ def make_verdict(
         "reglas_duras_incumplidas": failures,
         "decision": "aprobado" if review["puntaje"] >= 85 and not failures else "rechazado",
     }
+
+
+def compact_findings(rows, field):
+    """Limita el resumen operativo sin descartar el texto del recibo de lotes."""
+    selected = []
+    for row in rows:
+        if len(selected) == 8:
+            break
+        if len(canonical([row])) > FINDING_ARRAY_BYTES:
+            row = {**row, field: row[field][:300].rstrip() + "…"}
+        if len(canonical([*selected, row])) <= FINDING_ARRAY_BYTES:
+            selected.append(row)
+    return selected
+
+
+def publish_audit(path, record):
+    details = record.pop("detalle_lotes", None)
+    if details is not None:
+        evidence = canonical({"master_sha256": record["master_sha256"], "lotes": details}) + b"\n"
+        digest = hashlib.sha256(evidence).hexdigest()
+        record["evidencia_lotes_sha256"] = digest
+        raw = canonical(record) + b"\n"
+        if len(raw) > LIMIT:
+            raise ValueError("Dictamen audiovisual fuera del límite de entrega")
+        # La evidencia queda disponible antes de que el dictamen active la siguiente etapa.
+        publish(path.with_name(f"{path.stem}.lotes-{digest}.receipt"), evidence)
+    else:
+        raw = canonical(record) + b"\n"
+    publish(path, raw)
 
 
 def matching_music_window(actual, reference):
@@ -556,8 +586,13 @@ def scene_review_batches(instructions, evidence, images, request_id, verdict_opt
     verdict = make_verdict(
         merged, samples=len(images), evidence_limit=8 * len(batches), **verdict_options
     )
-    mapping = [list(range(first + 1, last + 1)) for first, last, _ in batches]
-    return verdict, mapping
+    for key, field in (("observaciones", "detalle"), ("defectos", "correccion")):
+        verdict[key] = compact_findings(verdict[key], field)
+    details = [
+        {"muestras": list(range(first + 1, last + 1)), "respuesta": review}
+        for (first, last, _), review in zip(batches, reviews, strict=True)
+    ]
+    return verdict, details
 
 
 def review_video(
@@ -800,7 +835,7 @@ def review_video(
         **({"creditos_musica": AD_MUSIC_CREDIT} if metrics.get("musica_catalogo") else {}),
         "dictamen": qa,
         "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
-        **({"lotes_muestras": batches} if batches else {}),
+        **({"detalle_lotes": batches} if batches else {}),
         **(
             {
                 "referencia_original": {
@@ -855,7 +890,7 @@ def audit_preview(order, edl, job, asset, out):
         "runtime": "openclaw",
         "ejecucion": "modelRun",
     }
-    publish(out, canonical(record) + b"\n")
+    publish_audit(out, record)
     return record
 
 
@@ -946,7 +981,7 @@ def audit(
         "runtime": "openclaw",
         "ejecucion": "modelRun",
     }
-    publish(out, canonical(record) + b"\n")
+    publish_audit(out, record)
     return record
 
 

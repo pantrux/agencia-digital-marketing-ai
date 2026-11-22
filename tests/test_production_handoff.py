@@ -2146,7 +2146,7 @@ def test_elena_conserva_todas_las_muestras_al_agrupar_adjuntos(monkeypatch, tmp_
         return {
             "puntaje": 90,
             "marca_free": "",
-            "observaciones": [{"muestra": 1, "detalle": "La toma se entiende"}],
+            "observaciones": [{"muestra": 1, "detalle": "🌱" * 600}],
             "defectos": (
                 [{"muestra": len(numbers), "correccion": "Corregir el encuadre al cierre"}]
                 if numbers[-1] == sample_count
@@ -2168,9 +2168,21 @@ def test_elena_conserva_todas_las_muestras_al_agrupar_adjuntos(monkeypatch, tmp_
     assert review["dictamen"]["decision"] == "rechazado"
     assert review["dictamen"]["defectos"][0]["muestra"] == sample_count
     assert len(review["muestras"]) == sample_count
-    assert [number for batch in review["lotes_muestras"] for number in batch] == list(
+    assert [number for batch in review["detalle_lotes"] for number in batch["muestras"]] == list(
         range(1, sample_count + 1)
     )
+    assert len(review["dictamen"]["observaciones"]) == 1
+    out = tmp_path / "revision.json"
+    elena.publish_audit(out, {"master_sha256": "a" * 64, **review})
+    stored = json.loads(out.read_bytes())
+    assert out.stat().st_size <= elena.LIMIT and "detalle_lotes" not in stored
+    [sidecar] = tmp_path.glob("*.lotes-*.receipt")
+    assert hashlib.sha256(sidecar.read_bytes()).hexdigest() == stored["evidencia_lotes_sha256"]
+    details = json.loads(sidecar.read_bytes())["lotes"]
+    assert [number for batch in details for number in batch["muestras"]] == list(
+        range(1, sample_count + 1)
+    )
+    assert details[-1]["respuesta"]["observaciones"][0]["detalle"] == "🌱" * 600
 
 
 @pytest.mark.parametrize(
