@@ -15,6 +15,7 @@ import time
 import unicodedata
 import uuid
 from array import array
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from difflib import SequenceMatcher
 from heapq import nlargest
@@ -40,9 +41,11 @@ from production_sofia import INTAKE_LIMIT, JOURNAL, LIMIT, MAX_TRANSCRIPT, MCP, 
 from production_valeria import (
     AD_MUSIC_ID,
     MAX_JPEG,
+    MAX_VISUAL_BYTES,
     VisualResponseFormatError,
     run_visual,
     sample_frames,
+    visual_payload,
     visual_request,
 )
 
@@ -53,7 +56,6 @@ AD_MUSIC_CREDIT = (
 BAND_SAMPLE_BYTES = 12000
 BAND_COMPARISON_BYTES = 22000
 RPC_ATTACHMENT_LIMIT = 8
-SHEET_BYTES = 60_000
 
 VALERIA = Path("/var/lib/agency-production-valeria")
 LUCAS = Path("/var/lib/agency-production-lucas")
@@ -125,84 +127,9 @@ def paired_band_samples(originals, masters):
     return pairs
 
 
-def scene_contact_sheets(images):
-    """Agrupa las muestras en el orden original y conserva su numeración de QA."""
-    size = math.ceil(len(images) / RPC_ATTACHMENT_LIMIT)
-    budget = SHEET_BYTES // math.ceil(len(images) / size)
-    sheets = []
-    mapping = []
-    with tempfile.TemporaryDirectory(prefix="studio-qa-muestras-") as directory:
-        for offset in range(0, len(images), size):
-            group = images[offset : offset + size]
-            mapping.append(list(range(offset + 1, offset + len(group) + 1)))
-            if len(group) == 1 and len(group[0][1]) <= budget:
-                sheets.append(group[0])
-                continue
-            inputs = []
-            for index, (_, image) in enumerate(group):
-                source = Path(directory) / f"muestra-{index}.jpg"
-                source.write_bytes(image)
-                inputs.extend(["-protocol_whitelist", "file", "-i", str(source)])
-            for width, quality in ((216, 12), (180, 18), (144, 24), (108, 30)):
-                height = width * 16 // 9
-                columns = min(3, len(group))
-                filters = [
-                    f"[{index}:v]scale={width}:{height},setsar=1[v{index}]"
-                    for index in range(len(group))
-                ]
-                if len(group) > 1:
-                    layout = "|".join(
-                        f"{index % columns * width}_{index // columns * height}"
-                        for index in range(len(group))
-                    )
-                    labels = "".join(f"[v{index}]" for index in range(len(group)))
-                    filters.append(
-                        f"{labels}xstack=inputs={len(group)}:layout={layout}:fill=black[v]"
-                    )
-                output = "[v]" if len(group) > 1 else "[v0]"
-                image = subprocess.run(
-                    [
-                        "/usr/bin/ffmpeg",
-                        "-v",
-                        "error",
-                        "-nostdin",
-                        "-filter_complex_threads",
-                        "1",
-                        *inputs,
-                        "-filter_complex",
-                        ";".join(filters),
-                        "-map",
-                        output,
-                        "-frames:v",
-                        "1",
-                        "-threads",
-                        "1",
-                        "-c:v",
-                        "mjpeg",
-                        "-q:v",
-                        str(quality),
-                        "-f",
-                        "image2pipe",
-                        "pipe:1",
-                    ],
-                    stdin=subprocess.DEVNULL,
-                    check=True,
-                    capture_output=True,
-                    timeout=10,
-                ).stdout
-                if (
-                    4 <= len(image) <= budget
-                    and image.startswith(b"\xff\xd8")
-                    and image.endswith(b"\xff\xd9")
-                ):
-                    sheets.append((group[0][0], image))
-                    break
-            else:
-                raise ValueError("No se pudo preparar la hoja de muestras audiovisuales")
-    return sheets, mapping
-
-
-def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", samples=3):
+def make_verdict(
+    review, metrics, duration, *, plan="Free", resolution="1080p", samples=3, evidence_limit=8
+):
     if (
         type(review) is not dict
         or review.keys() != FIELDS
@@ -211,9 +138,9 @@ def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", 
         or type(review["marca_free"]) is not str
         or len(review["marca_free"]) > 100
         or type(review["observaciones"]) is not list
-        or not 1 <= len(review["observaciones"]) <= 8
+        or not 1 <= len(review["observaciones"]) <= evidence_limit
         or type(review["defectos"]) is not list
-        or len(review["defectos"]) > 8
+        or len(review["defectos"]) > evidence_limit
     ):
         raise ValueError("Dictamen visual inválido")
     for name, key in (("observaciones", "detalle"), ("defectos", "correccion")):
@@ -310,7 +237,15 @@ def close_music_matches(ff, reference):
 
 
 def decode(
-    path, expected, duration, *, stamps=None, speech=None, music_reference=None, sample_bytes=None
+    path,
+    expected,
+    duration,
+    *,
+    stamps=None,
+    speech=None,
+    music_reference=None,
+    sample_bytes=None,
+    sample_width=None,
 ):
     if path.resolve(strict=True) != path:
         raise ValueError("Ruta del máster inválida")
@@ -400,7 +335,11 @@ def decode(
             round(min(duration, metrics["duration"]) * fraction, 5) for fraction in (0.2, 0.5, 0.8)
         ]
         limit = sample_bytes or (min(MAX_JPEG, 63000 // len(checkpoints)) if stamps else MAX_JPEG)
-        sizes = ((360, 5), (360, 8), (288, 10), (192, 16), (144, 22))
+        sizes = (
+            tuple((sample_width, quality) for quality in (8, 12, 18, 24, 31))
+            if sample_width
+            else ((360, 5), (360, 8), (288, 10), (192, 16), (144, 22))
+        )
         for timestamp in checkpoints:
             for width, quality in sizes:
                 image = ff(
@@ -530,6 +469,97 @@ def scene_checks(scenes, *, required=()):
     ]
 
 
+def visual_review(request):
+    try:
+        return run_visual(request)
+    except VisualResponseFormatError:
+        # Un ID distinto evita reutilizar la respuesta anterior del Gateway.
+        corrected = {
+            **request,
+            "idempotencyKey": str(
+                uuid.uuid5(uuid.UUID(request["idempotencyKey"]), "elena:corregir-formato:v1")
+            ),
+            "message": (
+                "Emite el dictamen como un único objeto JSON completo, sin Markdown ni comentarios. "
+                + request["message"]
+            ),
+        }
+        return run_visual(corrected)
+
+
+def scene_review_batches(instructions, evidence, images, request_id, verdict_options):
+    """Audita todos los fotogramas a resolución fija dentro del contrato del cliente RPC."""
+
+    def request_for(first, last):
+        doc = {
+            **evidence,
+            "segundos_de_muestras": evidence["segundos_de_muestras"][first:last],
+            "rotulos_por_muestra": evidence["rotulos_por_muestra"][first:last],
+            "muestras_del_montaje": list(range(first + 1, last + 1)),
+        }
+        prompt = (
+            instructions + f" Esta solicitud abarca solo un lote de {last - first} imágenes. "
+            f"Numera muestra del 1 al {last - first} según el orden local de los adjuntos. "
+            "Usa los segundos y muestras_del_montaje para ubicar cada imagen en el vídeo. "
+        )
+        return visual_request(
+            "agency-critic",
+            prompt + "\n" + json.dumps(doc, ensure_ascii=False),
+            images[first:last],
+            str(uuid.uuid5(uuid.UUID(request_id), f"elena:lote:v1:{first}:{last}")),
+        )
+
+    batches = []
+    first = 0
+    while first < len(images):
+        last = min(first + RPC_ATTACHMENT_LIMIT, len(images))
+        request = request_for(first, last)
+        while len(visual_payload(request)) > MAX_VISUAL_BYTES - 1024:
+            last -= 1
+            if last <= first:
+                raise ValueError("Una muestra de auditoría excede el límite del cliente visual")
+            request = request_for(first, last)
+        batches.append((first, last, request))
+        first = last
+
+    def audit_batch(batch):
+        first, last, request = batch
+        review = visual_review(request)
+        make_verdict(review, samples=last - first, **verdict_options)
+        return review
+
+    with ThreadPoolExecutor(max_workers=3) as workers:
+        reviews = list(workers.map(audit_batch, batches))
+    marks = [row["marca_free"] for row in reviews if row["marca_free"]]
+    mark = next(iter(marks), "")
+    if verdict_options["plan"] == "Free":
+        mark = next(
+            (
+                item
+                for item in marks
+                if re.sub(r"[\W_]+", " ", item.casefold()).strip() == "creado con agencia ai free"
+            ),
+            mark,
+        )
+    merged = {
+        "puntaje": min(row["puntaje"] for row in reviews),
+        "marca_free": mark,
+        **{
+            key: [
+                {**finding, "muestra": first + finding["muestra"]}
+                for (first, _, _), review in zip(batches, reviews, strict=True)
+                for finding in review[key]
+            ]
+            for key in ("observaciones", "defectos")
+        },
+    }
+    verdict = make_verdict(
+        merged, samples=len(images), evidence_limit=8 * len(batches), **verdict_options
+    )
+    mapping = [list(range(first + 1, last + 1)) for first, last, _ in batches]
+    return verdict, mapping
+
+
 def review_video(
     path,
     digest,
@@ -569,6 +599,9 @@ def review_video(
                     check["rotulo_esperado"] = None
     duration = props["duration_seconds"]
     decode_options = {"stamps": [check["segundo"] for check in checks]} if checks else {}
+    batched = len(checks) > RPC_ATTACHMENT_LIMIT
+    if batched:
+        decode_options.update(sample_width=480, sample_bytes=MAX_JPEG)
     band = props.get("title_layout") == "band"
     if band:
         if scenes or source_order is None:
@@ -640,12 +673,16 @@ def review_video(
     if checks:
         evidence["rotulos_por_muestra"] = [check["rotulo_esperado"] for check in checks]
         instructions = (
-            f"Eres Elena, auditora audiovisual. Revisa {len(images)} muestras del montaje en"
-            " el orden suministrado. La primera es la apertura."
+            "Eres Elena, auditora audiovisual. Revisa las muestras suministradas en el orden indicado."
+            + (" La primera es la apertura." if not batched else "")
             + (
-                " Revisa el CTA en la penúltima muestra; la última enseña el fin del fundido."
-                if animated_endcard
-                else " La última es el cierre."
+                (
+                    " Revisa el CTA en la penúltima muestra; la última enseña el fin del fundido."
+                    if animated_endcard
+                    else " La última es el cierre."
+                )
+                if not batched
+                else ""
             )
             + " Usa los segundos y rótulos esperados del JSON. En un intervalo sin rótulo"
             " debe quedar despejado; los textos esperados sólo aparecen en sus tiempos."
@@ -658,7 +695,8 @@ def review_video(
             " Transcribe en marca_free sólo la marca «Creado con Agencia AI Free» si es visible."
             " Usa cadena vacía en otro caso. Devuelve únicamente JSON con puntaje entero de 0 a 100,"
             " marca_free, observaciones (objetos con muestra y detalle) y defectos"
-            f" (objetos con muestra y correccion). muestra es un entero de 1 a {len(images)}."
+            " (objetos con muestra y correccion)."
+            + (f" muestra es un entero de 1 a {len(images)}." if not batched else "")
         )
     if ad:
         for sample in checks:
@@ -703,41 +741,25 @@ def review_video(
         )
     if synthetic:
         instructions += "Considera que el crudo es una demostración técnica con barras de color. "
-    sheets = []
-    if len(attachments) > RPC_ATTACHMENT_LIMIT:
-        attachments, mapping = scene_contact_sheets(attachments)
-        evidence["muestras_por_adjunto"] = mapping
-        sheets = [
-            {"muestras": numbers, "sha256": hashlib.sha256(image).hexdigest()}
-            for numbers, (_, image) in zip(mapping, attachments, strict=True)
-        ]
-        instructions += (
-            " Cada adjunto contiene las muestras indicadas en muestras_por_adjunto, ordenadas "
-            "de izquierda a derecha y de arriba abajo. En el dictamen usa el número original "
-            "de muestra indicado en esa lista. "
+    batches = []
+    verdict_options = {
+        "metrics": metrics,
+        "duration": duration,
+        "plan": plan,
+        "resolution": resolution,
+    }
+    if batched:
+        qa, batches = scene_review_batches(
+            instructions, evidence, attachments, request_id, verdict_options
         )
-    request = visual_request(
-        "agency-critic",
-        instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
-        attachments,
-        request_id,
-    )
-    try:
-        review = run_visual(request)
-    except VisualResponseFormatError:
-        # Repetir con otro ID evita reutilizar la respuesta anterior del Gateway.
-        corrected = {
-            **request,
-            "idempotencyKey": str(uuid.uuid5(uuid.UUID(request_id), "elena:corregir-formato:v1")),
-            "message": (
-                "Emite el dictamen como un único objeto JSON completo, sin Markdown ni comentarios. "
-                + request["message"]
-            ),
-        }
-        review = run_visual(corrected)
-    qa = make_verdict(
-        review, metrics, duration, plan=plan, resolution=resolution, samples=len(images)
-    )
+    else:
+        request = visual_request(
+            "agency-critic",
+            instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
+            attachments,
+            request_id,
+        )
+        qa = make_verdict(visual_review(request), samples=len(images), **verdict_options)
     if audio_check is not None and not audio_check["aprobado"]:
         qa["decision"] = "rechazado"
         qa["reglas_duras_incumplidas"].append("La voz de la mezcla no coincide con los subtítulos")
@@ -778,7 +800,7 @@ def review_video(
         **({"creditos_musica": AD_MUSIC_CREDIT} if metrics.get("musica_catalogo") else {}),
         "dictamen": qa,
         "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
-        **({"hojas_muestras": sheets} if sheets else {}),
+        **({"lotes_muestras": batches} if batches else {}),
         **(
             {
                 "referencia_original": {
