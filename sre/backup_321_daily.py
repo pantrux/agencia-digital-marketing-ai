@@ -8,6 +8,7 @@ import re
 import signal
 import subprocess
 import sys
+import time
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -84,12 +85,24 @@ PROFILE_FIELDS = {
 sync_directory = core.sync_directory
 
 
-def daily_id(now):
+def santiago_time(now):
     try:
         zone = ZoneInfo("America/Santiago")
     except ZoneInfoNotFoundError as error:
         raise ValueError("ZONA_SANTIAGO") from error
-    return "daily-" + now.astimezone(zone).date().isoformat()
+    return now.astimezone(zone)
+
+
+def daily_id(now):
+    return "daily-" + santiago_time(now).date().isoformat()
+
+
+def scheduled_origin(now):
+    local = santiago_time(now)
+    minute = (local.hour, local.minute)
+    if minute < (3, 30):
+        return None
+    return "ventana-diaria" if minute < (3, 35) else "recuperacion"
 
 
 def fields(value, keys, code):
@@ -389,17 +402,55 @@ def verify_openclaw(path, row, started):
     return row
 
 
-def run_daily(profile, run_id, invoke):
+def verified_daily_result(roots, run_id, now):
+    if __package__:
+        from . import backup_321_audit_daily_coverage as coverage
+    else:
+        import backup_321_audit_daily_coverage as coverage
+
+    local = santiago_time(now)
+    report = coverage.observe_day(local.date(), roots, local.tzinfo, now)
+    core.require(
+        report.get("status") == "complete" and report.get("run_id") == run_id,
+        "CORRIDA_DIARIA_POR_RECONCILIAR",
+    )
+    return {
+        "run_id": run_id,
+        "success": True,
+        "backup_set_complete": True,
+        "action": "ya-confirmado",
+    }
+
+
+def deliver_with_lock_retry(invoke, request):
+    for delay in (15, 45):
+        try:
+            return invoke("run", request)
+        except ValueError as error:
+            if str(error) != "CORRIDA_EN_CURSO":
+                raise
+            time.sleep(delay)
+    return invoke("run", request)
+
+
+def run_daily(profile, run_id, invoke, *, scheduled=False):
     roots = {name: Path(path) for name, path in profile["roots"].items()}
     day = roots["daily"] / run_id
     with daily_lock(roots["daily"]):
+        started = datetime.now(UTC)
+        origin = scheduled_origin(started) if scheduled else None
+        if scheduled:
+            core.require(
+                daily_id(started) == run_id and origin is not None, "CORRIDA_FUERA_DE_VENTANA"
+            )
+            if os.path.lexists(day):
+                return verified_daily_result(roots, run_id, started)
         core.require(
             not any(os.path.lexists(path / run_id) for path in roots.values()),
             "CORRIDA_DIARIA_EXISTENTE",
         )
         day.mkdir(mode=0o700)
         sync_directory(day.parent)
-        started = datetime.now(UTC)
         result = {
             "run_id": run_id,
             "success": False,
@@ -408,11 +459,15 @@ def run_daily(profile, run_id, invoke):
             "stages": {},
             "started_at_utc": started.isoformat(),
         }
+        if origin is not None:
+            result["order_origin"] = origin
         core.write_record(day / "intent.json", result)
 
         def call(name, request):
             result["pending_stage"] = name
             core.write_record(day / f"{name}.intent.json", {"run_id": run_id, "stage": name})
+            if name == "run":
+                return deliver_with_lock_retry(invoke, request)
             return invoke(name, request)
 
         try:
@@ -550,6 +605,7 @@ def main():
     parser.add_argument("--profile", type=Path, default=DEFAULT_CONFIG / "profile.json")
     parser.add_argument("--profile-pin", type=Path, default=DEFAULT_CONFIG / "profile.sha256")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--scheduled", action="store_true")
     parser.add_argument("--retention", choices=("off", "audit", "apply"), default="off")
     args = parser.parse_args()
     try:
@@ -564,21 +620,37 @@ def main():
         os.umask(0o077)
         signal.signal(signal.SIGTERM, core.interrupted)
         signal.signal(signal.SIGHUP, core.interrupted)
-        profile, digest = load_profile(args.profile, args.profile_pin)
-        vendor, credentials = preflight(profile)
-        if args.check and args.retention != "off":
-            for basename, expected in RETENTION_PINS.items():
-                verified_pin(RUNTIME / basename, expected)
-        run_id = daily_id(datetime.now(UTC))
-        result = {"success": True, "action": "check", "profile_sha256": digest, "run_id": run_id}
-        if args.check and args.retention != "off":
-            result["retention_mode"] = args.retention
-        if not args.check:
-            result = run_daily(profile, run_id, runner(profile, vendor, credentials))
-            if result["success"] and result["backup_set_complete"] and args.retention != "off":
-                result["retention"] = run_retention(
-                    run_id, args.retention, args.profile, args.profile_pin
+        now = datetime.now(UTC)
+        run_id = daily_id(now)
+        if not args.check and args.scheduled and scheduled_origin(now) is None:
+            result = {"run_id": run_id, "success": True, "action": "pendiente-de-horario"}
+        else:
+            profile, digest = load_profile(args.profile, args.profile_pin)
+            vendor, credentials = preflight(profile)
+            if args.check:
+                result = {
+                    "success": True,
+                    "action": "check",
+                    "profile_sha256": digest,
+                    "run_id": run_id,
+                }
+                if args.retention != "off":
+                    for basename, expected in RETENTION_PINS.items():
+                        verified_pin(RUNTIME / basename, expected)
+                    result["retention_mode"] = args.retention
+            else:
+                result = run_daily(
+                    profile, run_id, runner(profile, vendor, credentials), scheduled=args.scheduled
                 )
+                if (
+                    result["success"]
+                    and result["backup_set_complete"]
+                    and result.get("action") != "ya-confirmado"
+                    and args.retention != "off"
+                ):
+                    result["retention"] = run_retention(
+                        run_id, args.retention, args.profile, args.profile_pin
+                    )
     except (
         OSError,
         ValueError,

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from sre import backup_321_audit_daily_coverage as coverage
 from sre import backup_321_daily as daily
 
 
@@ -20,8 +21,16 @@ def test_run_id_uses_santiago_local_date(monkeypatch):
     assert daily.daily_id(datetime(2026, 11, 14, 3, 0, tzinfo=UTC)) == "daily-2026-11-14"
 
 
-@pytest.mark.parametrize("broken", [False, True])
-def test_daily_chain_uses_one_id_and_never_repeats(tmp_path, monkeypatch, broken):
+@pytest.mark.parametrize(
+    "hour,minute,origin", [(6, 29, None), (6, 30, "ventana-diaria"), (6, 35, "recuperacion")]
+)
+def test_scheduled_origin_follows_santiago(monkeypatch, hour, minute, origin):
+    monkeypatch.setattr(daily, "ZoneInfo", lambda _: timezone(timedelta(hours=-3)))
+    assert daily.scheduled_origin(datetime(2026, 11, 13, hour, minute, tzinfo=UTC)) == origin
+
+
+@pytest.mark.parametrize("broken,scheduled", [(False, False), (True, False), (False, True)])
+def test_daily_chain_uses_one_id_and_never_repeats(tmp_path, monkeypatch, broken, scheduled):
     roots = {name: tmp_path / name for name in daily.ROOT_NAMES}
     for root in roots.values():
         root.mkdir()
@@ -36,6 +45,9 @@ def test_daily_chain_uses_one_id_and_never_repeats(tmp_path, monkeypatch, broken
     }
     day = "daily-2026-11-13"
     calls = []
+    now = datetime(2026, 11, 13, 14, tzinfo=UTC)
+    monkeypatch.setattr(daily, "datetime", SimpleNamespace(now=lambda _: now))
+    monkeypatch.setattr(daily, "ZoneInfo", lambda _: timezone(timedelta(hours=-3)))
     monkeypatch.setattr(daily, "daily_lock", lambda _: nullcontext())
     monkeypatch.setattr(daily, "sync_directory", lambda _: None)
     monkeypatch.setattr(daily.core, "sync_directory", lambda _: None)
@@ -78,9 +90,10 @@ def test_daily_chain_uses_one_id_and_never_repeats(tmp_path, monkeypatch, broken
             },
         }
 
-    out = daily.run_daily(profile, day, invoke)
+    out = daily.run_daily(profile, day, invoke, scheduled=scheduled)
     assert out["success"] is not broken
     assert out["backup_set_complete"] is not broken
+    assert out.get("order_origin") == ("recuperacion" if scheduled else None)
     stages = [name for name, _ in calls]
     assert stages == (
         ["postgres", "d1", "openclaw"]
@@ -91,6 +104,54 @@ def test_daily_chain_uses_one_id_and_never_repeats(tmp_path, monkeypatch, broken
     with pytest.raises(ValueError, match="CORRIDA_DIARIA_EXISTENTE"):
         daily.run_daily(profile, day, invoke)
     assert stages == [name for name, _ in calls]
+
+
+@pytest.mark.parametrize("status", ["complete", "incomplete", "failed", "unverified"])
+def test_scheduled_reuses_only_verified_complete_day(tmp_path, monkeypatch, status):
+    roots = {name: tmp_path / name for name in daily.ROOT_NAMES}
+    run_id = "daily-2026-11-13"
+    now = datetime(2026, 11, 13, 14, tzinfo=UTC)
+    (roots["daily"] / run_id).mkdir(parents=True)
+    monkeypatch.setattr(daily, "datetime", SimpleNamespace(now=lambda _: now))
+    monkeypatch.setattr(daily, "ZoneInfo", lambda _: timezone(timedelta(hours=-3)))
+    monkeypatch.setattr(daily, "daily_lock", lambda _: nullcontext())
+
+    def observe_day(day, current_roots, zone, observed):
+        assert str(day) == "2026-11-13" and current_roots == roots and observed == now
+        return {"status": status, "run_id": run_id}
+
+    def invoke(*_):
+        pytest.fail("Una corrida existente no debe capturar ni enviar datos")
+
+    monkeypatch.setattr(coverage, "observe_day", observe_day)
+    if status == "complete":
+        result = daily.run_daily({"roots": roots}, run_id, invoke, scheduled=True)
+        assert result["action"] == "ya-confirmado" and result["backup_set_complete"]
+    else:
+        with pytest.raises(ValueError, match="CORRIDA_DIARIA_POR_RECONCILIAR"):
+            daily.run_daily({"roots": roots}, run_id, invoke, scheduled=True)
+
+
+@pytest.mark.parametrize("failure,waits", [("CORRIDA_EN_CURSO", [15, 45]), ("DESTINO_FALLO", [])])
+def test_only_contention_before_destination_is_retried(monkeypatch, failure, waits):
+    calls = []
+    sleeps = []
+    request = {"run_id": "daily-2026-11-13"}
+
+    def invoke(name, payload):
+        assert name == "run" and payload is request
+        calls.append(name)
+        if len(calls) < 3:
+            raise ValueError(failure)
+        return {"success": True}
+
+    monkeypatch.setattr(daily.time, "sleep", sleeps.append)
+    if waits:
+        assert daily.deliver_with_lock_retry(invoke, request) == {"success": True}
+    else:
+        with pytest.raises(ValueError, match=failure):
+            daily.deliver_with_lock_retry(invoke, request)
+    assert sleeps == waits and len(calls) == len(waits) + 1
 
 
 def test_openclaw_wrong_path_stops_before_reading(monkeypatch):
@@ -133,7 +194,7 @@ def test_post_copy_retention_keeps_backup_receipt_independent(
     monkeypatch.setattr(daily, "load_profile", lambda *_: ({}, "0" * 64))
     monkeypatch.setattr(daily, "preflight", lambda _: (None, {}))
     monkeypatch.setattr(daily, "daily_id", lambda _: run_id)
-    monkeypatch.setattr(daily, "run_daily", lambda *_: saved.copy())
+    monkeypatch.setattr(daily, "run_daily", lambda *_, scheduled: saved.copy())
 
     def run_retention(run_id, mode, profile, pin):
         calls.append((run_id, mode))

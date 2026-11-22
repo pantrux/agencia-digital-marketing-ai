@@ -215,6 +215,8 @@ Los contratos de almacenamiento utilizan `192.168.0.8:/volume2/producciones` hac
 
 El control de Fase 4 exige las fuentes del supervisor R2 y sus unidades. La aceptación en destino coteja el CID, la exportación NFSv4.1 y su marcador antes de iniciar el contenedor. [Operación del consumidor R2](../../../docker/README-r2-service.md)
 
+El control de Fase 4 exige el cron de la copia 3-2-1 y el temporizador de recuperación. Los contratos prueban la fecha de Santiago, la reutilización de recibos completos y el reintento del bloqueo de entrega antes de producir intentos de destino. [Programación y recuperación de copias](../../../sre/README-backup-321-orchestrator.md#programaci%C3%B3n-diaria)
+
 El control exige la receta y los perfiles de Alertmanager para el NAS. La aceptación en destino comprueba el filtro de red, TLS mutuo desde Prometheus y el acceso SMTP con verificación del servidor. [Observabilidad en Synology](../../../docker/observability/README-nas.md)
 
 Todos los controles aplicables terminan con salida cero. El control 5 valida la fase declarada, admite 0 a 7 y exige CD deshabilitado. `--phase N` exige coincidencia con el manifiesto vigente. `python -m unittest discover -s tests -p 'test_phase.py'` usa manifiestos sintéticos y coteja los mínimos acumulativos hasta producción, publicación y recuperación. Una fase sin implementar, un archivo mínimo ausente o una omisión en `required_files` bloquean. Investigar una falla intermitente antes de repetir la prueba.
