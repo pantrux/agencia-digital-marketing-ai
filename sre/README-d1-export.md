@@ -93,6 +93,10 @@ El ensayo de recuperación usó la base temporal `studio-saas-db-restore-321-202
 
 Los snapshots llevan las etiquetas `agency-d1-clock` y `run:d1-clock-AAAA-MM-DD`. El diario privado en `/var/lib/media-platform/backup-d1-clock-v1/journal` guarda los dos recibos y utiliza `d1_backup_complete` para la copia independiente. Ante una corrida interrumpida, comprueba el resultado y los snapshots ya creados con la etiqueta de esa fecha antes de volver a enviar datos. El servicio acepta una captura local confirmada de la misma corrida y se detiene si un envío previo quedó pendiente de conciliación.
 
+El temporizador también ejecuta el servicio al arrancar y recupera activaciones de calendario omitidas. Antes de las 03:00 espera la ventana habitual. Si arranca después de las 03:12, captura la base vigente con la fecha local actual y registra `order_origin=temporizador-recuperacion`. Un recibo completo evita duplicar esa captura. Las fechas anteriores sin copia siguen apareciendo como huecos en el historial.
+
+Si otra copia ocupa el bloqueo compartido, systemd vuelve a intentar después de dos minutos. Solo se reinicia automáticamente por ese bloqueo. Los envíos con recibos incompletos siguen pendientes de conciliación.
+
 ```bash
 systemctl list-timers agency-backup-d1-clock.timer
 journalctl -u agency-backup-d1-clock.service --since today

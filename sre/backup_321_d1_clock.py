@@ -24,6 +24,7 @@ DESTINATION_NAS = "/mnt/producciones/_backups/d1"
 BUCKET = "studio-backups-bucket"
 WINDOW_MINUTES = 12
 LOCAL_FALLBACK_MINUTE = 8
+LOCK_RETRY_EXIT_STATUS = 75
 FILE = core.D1_FILES[0]
 REPO_SCOPES = {
     "R2_PLATFORM_ACCESS_KEY_ID",
@@ -213,6 +214,33 @@ def produce_backup(day, profile, capture, *, origin="operador"):
     return output
 
 
+def run_scheduled(now, profile_loader, capture, httpx):
+    local = now.astimezone(ZoneInfo("America/Santiago"))
+    if local.hour < 3:
+        return {"success": True, "status": "antes-de-la-ventana"}
+    day = local.date().isoformat()
+    profile = profile_loader()
+    capture.validate_request(
+        {"root": str(ROOT / "capture"), "run_id": f"d1-clock-{day}", **profile["d1"]}
+    )
+    if local.hour > 3 or local.minute > WINDOW_MINUTES:
+        # Un arranque tardío toma el estado vigente del día. No atribuye
+        # la captura a una orden anterior ni reutiliza una firma vencida.
+        return produce_backup(day, profile, capture, origin="temporizador-recuperacion")
+
+    key = bytes.fromhex(read_text(CONFIG / "trigger.key", 64))
+    core.require(len(key) == 32, "ORDEN_CLAVE")
+    try:
+        with httpx.Client(trust_env=False, follow_redirects=False, timeout=10.0) as client:
+            raw = fetch_order(client, day, profile["d1"])
+    except httpx.HTTPError as error:
+        raise ValueError("ORDEN_R2_TRANSPORTE") from error
+    origin = order_origin(raw, key, datetime.now(UTC))
+    if origin is None:
+        return {"success": True, "status": "esperando-orden"}
+    return produce_backup(day, profile, capture, origin=origin)
+
+
 def main():
     try:
         core.require(
@@ -225,35 +253,18 @@ def main():
         signal.signal(signal.SIGTERM, core.interrupted)
         signal.signal(signal.SIGHUP, core.interrupted)
         now = datetime.now(UTC)
-        local = now.astimezone(ZoneInfo("America/Santiago"))
-        if local.hour != 3 or local.minute > WINDOW_MINUTES:
-            return 0
 
         # El árbol de instalación incluye el proveedor HTTPX previamente fijado.
         sys.path.insert(0, str(Path(__file__).resolve().parent / "vendor"))
         import backup_321_capture_d1 as capture
         import httpx
 
-        profile = load_profile()
-        day = local.date().isoformat()
-        capture.validate_request(
-            {"root": str(ROOT / "capture"), "run_id": f"d1-clock-{day}", **profile["d1"]}
-        )
-        key = bytes.fromhex(read_text(CONFIG / "trigger.key", 64))
-        core.require(len(key) == 32, "ORDEN_CLAVE")
-        try:
-            with httpx.Client(trust_env=False, follow_redirects=False, timeout=10.0) as client:
-                raw = fetch_order(client, day, profile["d1"])
-        except httpx.HTTPError as error:
-            raise ValueError("ORDEN_R2_TRANSPORTE") from error
-        origin = order_origin(raw, key, datetime.now(UTC))
-        if origin is None:
-            output = {"success": True, "status": "esperando-orden"}
-        else:
-            output = produce_backup(day, profile, capture, origin=origin)
+        output = run_scheduled(now, load_profile, capture, httpx)
     except (OSError, ValueError, subprocess.SubprocessError, KeyboardInterrupt) as error:
         output = {"success": False, "error": core.output_code(error)}
     print(core.encode(output).decode(), flush=True)
+    if output.get("error") == "CORRIDA_EN_CURSO":
+        return LOCK_RETRY_EXIT_STATUS
     return 0 if output["success"] else 1
 
 
