@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import hashlib
 import importlib.util
 import io
@@ -2100,6 +2101,88 @@ def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
         30.0,
         59.88,
     ]
+
+
+@pytest.mark.parametrize("scene_count", [10, 32])
+def test_elena_conserva_todas_las_muestras_al_agrupar_adjuntos(monkeypatch, tmp_path, scene_count):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_elena as elena
+    from production_valeria import visual_payload
+
+    metrics = {
+        "width": 1080,
+        "height": 1920,
+        "fps": 30,
+        "codec": "h264",
+        "color": "bt709",
+        "duration": scene_count * 2,
+        "lufs": -14,
+        "peak": -2,
+    }
+    scenes = [{"source_start_frame": 0, "source_end_frame": 60} for _ in range(scene_count)]
+    sample_count = scene_count + 2
+
+    def image(number):
+        return b"\xff\xd8" + bytes([number]) * 21_000 + b"\xff\xd9"
+
+    def decode(_path, _digest, _duration, *, stamps, sample_width, sample_bytes):
+        assert len(stamps) == sample_count
+        assert sample_width == 480 and sample_bytes == elena.MAX_JPEG
+        return metrics, [(stamp, image(number)) for number, stamp in enumerate(stamps, 1)]
+
+    def run_visual(request):
+        payload = json.loads(request["message"].rsplit("\n", 1)[1])
+        numbers = payload["muestras_del_montaje"]
+        assert len(numbers) == len(request["attachments"]) <= 8
+        assert (
+            len(payload["segundos_de_muestras"])
+            == len(payload["rotulos_por_muestra"])
+            == len(numbers)
+        )
+        assert [base64.b64decode(item["content"]) for item in request["attachments"]] == [
+            image(number) for number in numbers
+        ]
+        assert len(visual_payload(request)) < 110_000
+        return {
+            "puntaje": 90,
+            "marca_free": "",
+            "observaciones": [{"muestra": 1, "detalle": "🌱" * 600}],
+            "defectos": (
+                [{"muestra": len(numbers), "correccion": "Corregir el encuadre al cierre"}]
+                if numbers[-1] == sample_count
+                else []
+            ),
+        }
+
+    monkeypatch.setattr(elena, "decode", decode)
+    monkeypatch.setattr(elena, "run_visual", run_visual)
+    props = {
+        "title": "Sansevierias",
+        "subtitle": "De interior",
+        "duration_seconds": scene_count * 2,
+        "scenes": scenes,
+    }
+    review = elena.review_video(
+        tmp_path / "master.mp4", "a" * 64, props, 1, "Ilimitado", "1080p", str(uuid.uuid4())
+    )
+    assert review["dictamen"]["decision"] == "rechazado"
+    assert review["dictamen"]["defectos"][0]["muestra"] == sample_count
+    assert len(review["muestras"]) == sample_count
+    assert [number for batch in review["detalle_lotes"] for number in batch["muestras"]] == list(
+        range(1, sample_count + 1)
+    )
+    assert len(review["dictamen"]["observaciones"]) == 1
+    out = tmp_path / "revision.json"
+    elena.publish_audit(out, {"master_sha256": "a" * 64, **review})
+    stored = json.loads(out.read_bytes())
+    assert out.stat().st_size <= elena.LIMIT and "detalle_lotes" not in stored
+    [sidecar] = tmp_path.glob("*.lotes-*.receipt")
+    assert hashlib.sha256(sidecar.read_bytes()).hexdigest() == stored["evidencia_lotes_sha256"]
+    details = json.loads(sidecar.read_bytes())["lotes"]
+    assert [number for batch in details for number in batch["muestras"]] == list(
+        range(1, sample_count + 1)
+    )
+    assert details[-1]["respuesta"]["observaciones"][0]["detalle"] == "🌱" * 600
 
 
 @pytest.mark.parametrize(

@@ -15,6 +15,7 @@ import time
 import unicodedata
 import uuid
 from array import array
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from difflib import SequenceMatcher
 from heapq import nlargest
@@ -40,9 +41,11 @@ from production_sofia import INTAKE_LIMIT, JOURNAL, LIMIT, MAX_TRANSCRIPT, MCP, 
 from production_valeria import (
     AD_MUSIC_ID,
     MAX_JPEG,
+    MAX_VISUAL_BYTES,
     VisualResponseFormatError,
     run_visual,
     sample_frames,
+    visual_payload,
     visual_request,
 )
 
@@ -52,6 +55,8 @@ AD_MUSIC_CREDIT = (
 )
 BAND_SAMPLE_BYTES = 12000
 BAND_COMPARISON_BYTES = 22000
+RPC_ATTACHMENT_LIMIT = 8
+FINDING_ARRAY_BYTES = 4_000
 
 VALERIA = Path("/var/lib/agency-production-valeria")
 LUCAS = Path("/var/lib/agency-production-lucas")
@@ -123,7 +128,9 @@ def paired_band_samples(originals, masters):
     return pairs
 
 
-def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", samples=3):
+def make_verdict(
+    review, metrics, duration, *, plan="Free", resolution="1080p", samples=3, evidence_limit=8
+):
     if (
         type(review) is not dict
         or review.keys() != FIELDS
@@ -132,9 +139,9 @@ def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", 
         or type(review["marca_free"]) is not str
         or len(review["marca_free"]) > 100
         or type(review["observaciones"]) is not list
-        or not 1 <= len(review["observaciones"]) <= 8
+        or not 1 <= len(review["observaciones"]) <= evidence_limit
         or type(review["defectos"]) is not list
-        or len(review["defectos"]) > 8
+        or len(review["defectos"]) > evidence_limit
     ):
         raise ValueError("Dictamen visual inválido")
     for name, key in (("observaciones", "detalle"), ("defectos", "correccion")):
@@ -180,6 +187,35 @@ def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", 
         "reglas_duras_incumplidas": failures,
         "decision": "aprobado" if review["puntaje"] >= 85 and not failures else "rechazado",
     }
+
+
+def compact_findings(rows, field):
+    """Limita el resumen operativo sin descartar el texto del recibo de lotes."""
+    selected = []
+    for row in rows:
+        if len(selected) == 8:
+            break
+        if len(canonical([row])) > FINDING_ARRAY_BYTES:
+            row = {**row, field: row[field][:300].rstrip() + "…"}
+        if len(canonical([*selected, row])) <= FINDING_ARRAY_BYTES:
+            selected.append(row)
+    return selected
+
+
+def publish_audit(path, record):
+    details = record.pop("detalle_lotes", None)
+    if details is not None:
+        evidence = canonical({"master_sha256": record["master_sha256"], "lotes": details}) + b"\n"
+        digest = hashlib.sha256(evidence).hexdigest()
+        record["evidencia_lotes_sha256"] = digest
+        raw = canonical(record) + b"\n"
+        if len(raw) > LIMIT:
+            raise ValueError("Dictamen audiovisual fuera del límite de entrega")
+        # La evidencia queda disponible antes de que el dictamen active la siguiente etapa.
+        publish(path.with_name(f"{path.stem}.lotes-{digest}.receipt"), evidence)
+    else:
+        raw = canonical(record) + b"\n"
+    publish(path, raw)
 
 
 def matching_music_window(actual, reference):
@@ -231,7 +267,15 @@ def close_music_matches(ff, reference):
 
 
 def decode(
-    path, expected, duration, *, stamps=None, speech=None, music_reference=None, sample_bytes=None
+    path,
+    expected,
+    duration,
+    *,
+    stamps=None,
+    speech=None,
+    music_reference=None,
+    sample_bytes=None,
+    sample_width=None,
 ):
     if path.resolve(strict=True) != path:
         raise ValueError("Ruta del máster inválida")
@@ -321,7 +365,11 @@ def decode(
             round(min(duration, metrics["duration"]) * fraction, 5) for fraction in (0.2, 0.5, 0.8)
         ]
         limit = sample_bytes or (min(MAX_JPEG, 63000 // len(checkpoints)) if stamps else MAX_JPEG)
-        sizes = ((360, 5), (360, 8), (288, 10), (192, 16), (144, 22))
+        sizes = (
+            tuple((sample_width, quality) for quality in (8, 12, 18, 24, 31))
+            if sample_width
+            else ((360, 5), (360, 8), (288, 10), (192, 16), (144, 22))
+        )
         for timestamp in checkpoints:
             for width, quality in sizes:
                 image = ff(
@@ -451,6 +499,102 @@ def scene_checks(scenes, *, required=()):
     ]
 
 
+def visual_review(request):
+    try:
+        return run_visual(request)
+    except VisualResponseFormatError:
+        # Un ID distinto evita reutilizar la respuesta anterior del Gateway.
+        corrected = {
+            **request,
+            "idempotencyKey": str(
+                uuid.uuid5(uuid.UUID(request["idempotencyKey"]), "elena:corregir-formato:v1")
+            ),
+            "message": (
+                "Emite el dictamen como un único objeto JSON completo, sin Markdown ni comentarios. "
+                + request["message"]
+            ),
+        }
+        return run_visual(corrected)
+
+
+def scene_review_batches(instructions, evidence, images, request_id, verdict_options):
+    """Audita todos los fotogramas a resolución fija dentro del contrato del cliente RPC."""
+
+    def request_for(first, last):
+        doc = {
+            **evidence,
+            "segundos_de_muestras": evidence["segundos_de_muestras"][first:last],
+            "rotulos_por_muestra": evidence["rotulos_por_muestra"][first:last],
+            "muestras_del_montaje": list(range(first + 1, last + 1)),
+        }
+        prompt = (
+            instructions + f" Esta solicitud abarca solo un lote de {last - first} imágenes. "
+            f"Numera muestra del 1 al {last - first} según el orden local de los adjuntos. "
+            "Usa los segundos y muestras_del_montaje para ubicar cada imagen en el vídeo. "
+        )
+        return visual_request(
+            "agency-critic",
+            prompt + "\n" + json.dumps(doc, ensure_ascii=False),
+            images[first:last],
+            str(uuid.uuid5(uuid.UUID(request_id), f"elena:lote:v1:{first}:{last}")),
+        )
+
+    batches = []
+    first = 0
+    while first < len(images):
+        last = min(first + RPC_ATTACHMENT_LIMIT, len(images))
+        request = request_for(first, last)
+        while len(visual_payload(request)) > MAX_VISUAL_BYTES - 1024:
+            last -= 1
+            if last <= first:
+                raise ValueError("Una muestra de auditoría excede el límite del cliente visual")
+            request = request_for(first, last)
+        batches.append((first, last, request))
+        first = last
+
+    def audit_batch(batch):
+        first, last, request = batch
+        review = visual_review(request)
+        make_verdict(review, samples=last - first, **verdict_options)
+        return review
+
+    with ThreadPoolExecutor(max_workers=3) as workers:
+        reviews = list(workers.map(audit_batch, batches))
+    marks = [row["marca_free"] for row in reviews if row["marca_free"]]
+    mark = next(iter(marks), "")
+    if verdict_options["plan"] == "Free":
+        mark = next(
+            (
+                item
+                for item in marks
+                if re.sub(r"[\W_]+", " ", item.casefold()).strip() == "creado con agencia ai free"
+            ),
+            mark,
+        )
+    merged = {
+        "puntaje": min(row["puntaje"] for row in reviews),
+        "marca_free": mark,
+        **{
+            key: [
+                {**finding, "muestra": first + finding["muestra"]}
+                for (first, _, _), review in zip(batches, reviews, strict=True)
+                for finding in review[key]
+            ]
+            for key in ("observaciones", "defectos")
+        },
+    }
+    verdict = make_verdict(
+        merged, samples=len(images), evidence_limit=8 * len(batches), **verdict_options
+    )
+    for key, field in (("observaciones", "detalle"), ("defectos", "correccion")):
+        verdict[key] = compact_findings(verdict[key], field)
+    details = [
+        {"muestras": list(range(first + 1, last + 1)), "respuesta": review}
+        for (first, last, _), review in zip(batches, reviews, strict=True)
+    ]
+    return verdict, details
+
+
 def review_video(
     path,
     digest,
@@ -490,6 +634,9 @@ def review_video(
                     check["rotulo_esperado"] = None
     duration = props["duration_seconds"]
     decode_options = {"stamps": [check["segundo"] for check in checks]} if checks else {}
+    batched = len(checks) > RPC_ATTACHMENT_LIMIT
+    if batched:
+        decode_options.update(sample_width=480, sample_bytes=MAX_JPEG)
     band = props.get("title_layout") == "band"
     if band:
         if scenes or source_order is None:
@@ -561,12 +708,16 @@ def review_video(
     if checks:
         evidence["rotulos_por_muestra"] = [check["rotulo_esperado"] for check in checks]
         instructions = (
-            f"Eres Elena, auditora audiovisual. Revisa {len(images)} muestras del montaje en"
-            " el orden suministrado. La primera es la apertura."
+            "Eres Elena, auditora audiovisual. Revisa las muestras suministradas en el orden indicado."
+            + (" La primera es la apertura." if not batched else "")
             + (
-                " Revisa el CTA en la penúltima muestra; la última enseña el fin del fundido."
-                if animated_endcard
-                else " La última es el cierre."
+                (
+                    " Revisa el CTA en la penúltima muestra; la última enseña el fin del fundido."
+                    if animated_endcard
+                    else " La última es el cierre."
+                )
+                if not batched
+                else ""
             )
             + " Usa los segundos y rótulos esperados del JSON. En un intervalo sin rótulo"
             " debe quedar despejado; los textos esperados sólo aparecen en sus tiempos."
@@ -579,7 +730,8 @@ def review_video(
             " Transcribe en marca_free sólo la marca «Creado con Agencia AI Free» si es visible."
             " Usa cadena vacía en otro caso. Devuelve únicamente JSON con puntaje entero de 0 a 100,"
             " marca_free, observaciones (objetos con muestra y detalle) y defectos"
-            f" (objetos con muestra y correccion). muestra es un entero de 1 a {len(images)}."
+            " (objetos con muestra y correccion)."
+            + (f" muestra es un entero de 1 a {len(images)}." if not batched else "")
         )
     if ad:
         for sample in checks:
@@ -624,28 +776,25 @@ def review_video(
         )
     if synthetic:
         instructions += "Considera que el crudo es una demostración técnica con barras de color. "
-    request = visual_request(
-        "agency-critic",
-        instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
-        attachments,
-        request_id,
-    )
-    try:
-        review = run_visual(request)
-    except VisualResponseFormatError:
-        # Repetir con otro ID evita reutilizar la respuesta anterior del Gateway.
-        corrected = {
-            **request,
-            "idempotencyKey": str(uuid.uuid5(uuid.UUID(request_id), "elena:corregir-formato:v1")),
-            "message": (
-                "Emite el dictamen como un único objeto JSON completo, sin Markdown ni comentarios. "
-                + request["message"]
-            ),
-        }
-        review = run_visual(corrected)
-    qa = make_verdict(
-        review, metrics, duration, plan=plan, resolution=resolution, samples=len(images)
-    )
+    batches = []
+    verdict_options = {
+        "metrics": metrics,
+        "duration": duration,
+        "plan": plan,
+        "resolution": resolution,
+    }
+    if batched:
+        qa, batches = scene_review_batches(
+            instructions, evidence, attachments, request_id, verdict_options
+        )
+    else:
+        request = visual_request(
+            "agency-critic",
+            instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
+            attachments,
+            request_id,
+        )
+        qa = make_verdict(visual_review(request), samples=len(images), **verdict_options)
     if audio_check is not None and not audio_check["aprobado"]:
         qa["decision"] = "rechazado"
         qa["reglas_duras_incumplidas"].append("La voz de la mezcla no coincide con los subtítulos")
@@ -686,6 +835,7 @@ def review_video(
         **({"creditos_musica": AD_MUSIC_CREDIT} if metrics.get("musica_catalogo") else {}),
         "dictamen": qa,
         "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
+        **({"detalle_lotes": batches} if batches else {}),
         **(
             {
                 "referencia_original": {
@@ -740,7 +890,7 @@ def audit_preview(order, edl, job, asset, out):
         "runtime": "openclaw",
         "ejecucion": "modelRun",
     }
-    publish(out, canonical(record) + b"\n")
+    publish_audit(out, record)
     return record
 
 
@@ -831,7 +981,7 @@ def audit(
         "runtime": "openclaw",
         "ejecucion": "modelRun",
     }
-    publish(out, canonical(record) + b"\n")
+    publish_audit(out, record)
     return record
 
 
