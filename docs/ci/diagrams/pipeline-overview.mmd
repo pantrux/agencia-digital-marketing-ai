@@ -70,6 +70,7 @@ flowchart TB
     ESCMULTI --> FORMATO["El diario identifica el motivo del fallo de formato"]
     ESCMULTI --> ANCLAJE["El inicio o cierre del corte determina los fotogramas del rótulo anclado"]
     MULTIQA --> LOTESQA["Elena revisa todas las muestras en lotes a 480 px y consolida el dictamen"]
+    LOTESQA --> TIEMPOSQA["Cotejar los intervalos del rótulo en segundos desde el inicio del máster"]
     MULTIQA -. "Verificar arranque de la unidad y cola vacía" .-> REVISION["Revisiones de entrega con publicación inmutable"]
     FASE6 --> BANDQA["Montaje con banda: Elena compara original y máster a la misma escala en cada instante"]
     BANDQA --> BANDTYPE["El renderer ajusta el título y el subtítulo a la banda sin invadir el encuadre"]

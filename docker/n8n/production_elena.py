@@ -471,13 +471,27 @@ def compare_mix_speech(captions, words):
 
 
 def scene_checks(scenes, *, required=()):
+    def seconds(frame):
+        return (frame * 1000 // 30) / 1000
+
     intervals, choices, rest = [], {0, *required}, []
     offset = 0
     for scene in scenes:
         length = scene["source_end_frame"] - scene["source_start_frame"]
         if label := scene.get("label"):
             start, end = offset + label["start_frame"], offset + label["end_frame"]
-            intervals.append((start, end, label))
+            intervals.append(
+                (
+                    start,
+                    end,
+                    {
+                        "texto": label["text"],
+                        "posicion": label["position"],
+                        "desde_s_video": seconds(start),
+                        "hasta_s_video": seconds(end),
+                    },
+                )
+            )
             choices.add((start + end) // 2)
             if end < offset + length:
                 rest.append(end)
@@ -490,7 +504,7 @@ def scene_checks(scenes, *, required=()):
             choices.add(frame)
     return [
         {
-            "segundo": (frame * 1000 // 30) / 1000,
+            "segundo": seconds(frame),
             "rotulo_esperado": next(
                 (label for start, end, label in intervals if start <= frame < end), None
             ),
@@ -721,6 +735,7 @@ def review_video(
             )
             + " Usa los segundos y rótulos esperados del JSON. En un intervalo sin rótulo"
             " debe quedar despejado; los textos esperados sólo aparecen en sus tiempos."
+            " desde_s_video y hasta_s_video están en segundos desde el inicio del vídeo completo."
             " Si un rótulo tapa ojos, rostro o producto principal, decláralo como defecto"
             " y pide una corrección concreta de posición, texto o duración."
             " Revisa contraste y legibilidad en móvil. Si el texto se lee completo, una mejora"
