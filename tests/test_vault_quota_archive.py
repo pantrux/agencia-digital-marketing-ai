@@ -152,7 +152,7 @@ class ArchiveTests(unittest.TestCase):
 
     def test_live_archive_stops_when_a_candidate_digest_differs(self):
         candidate = self.root / "captures" / self.old / "candidate.env"
-        candidate.write_bytes(b"contenido alterado")
+        candidate.write_bytes(b"X" + candidate.read_bytes()[1:])
         with self.assertRaisesRegex(ARCHIVER.Rejected, "CANDIDATE_SHA_OR_SIZE"):
             self.live()
         self.assertTrue((self.root / "captures" / self.newer).is_dir())

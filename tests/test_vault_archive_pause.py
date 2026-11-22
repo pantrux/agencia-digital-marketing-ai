@@ -14,6 +14,11 @@ CONTROL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CONTROL)
 
 
+def test_control_carga_el_archivador_con_su_huella_real():
+    archiver = CONTROL.load_archiver()
+    assert Path(archiver.__file__).resolve() == SOURCE.with_name("archive_vault_changes_v2.py")
+
+
 class PauseTests(unittest.TestCase):
     def setUp(self):
         self.events = []

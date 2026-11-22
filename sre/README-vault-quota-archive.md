@@ -22,6 +22,8 @@ Para instalar la tarea, usa el SHA-256 del archivador documentado en `BACKUP_VAU
 
 El Programador fija esa huella en su acción y comprueba los bytes del archivador antes de ejecutarlo. Una operación con los bloqueos ocupados se vuelve a evaluar en el siguiente disparo.
 
+Publica `archive_vault_changes_v2.py` junto a `pause_vault_quota_archive_v2.py` cuando cambien los bytes del archivador. La utilidad de pausa y reanudación verifica la misma huella antes de actuar.
+
 ## Archivo manual
 
 Pausa `Agency-Vault-Changes-V1` con el SID de la tarea. Obtén primero el PID de
