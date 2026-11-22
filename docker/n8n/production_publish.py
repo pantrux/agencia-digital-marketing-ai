@@ -30,6 +30,7 @@ PRORES_PART_BYTES = 32 * 1024**2
 PRORES_PART_WORKERS = 6
 MAX_PRORES = 5 * 1024**4
 PRORES_TYPE = "video/quicktime"
+KIT_MODES = ("sandbox", "production")
 ORDER_ERRORS = (OSError, ValueError, KeyError, TypeError, http.client.HTTPException)
 
 
@@ -164,7 +165,9 @@ def put_graphic(r2, path, graphic, size, digest):
     verify_object(r2, path, size, digest, PRORES_TYPE)
 
 
-def deliver(kit, manifest, r2, studio, *, graphic=None):
+def deliver(kit, manifest, r2, studio, *, mode="sandbox", graphic=None):
+    if mode not in KIT_MODES:
+        raise ValueError("Entorno de publicación inválido")
     digest, size = manifest["sha256"], manifest["bytes"]
     if (
         not matches(UUID, manifest["orderId"])
@@ -186,7 +189,7 @@ def deliver(kit, manifest, r2, studio, *, graphic=None):
     elif "proresBytes" in manifest or "proresSha256" in manifest:
         raise ValueError("Falta el archivo ProRes")
     expect_local(kit, size, digest)
-    object_path = f"/{BUCKET}/kits/sandbox/{manifest['orderId']}/{manifest['id']}.zip"
+    object_path = f"/{BUCKET}/kits/{mode}/{manifest['orderId']}/{manifest['id']}.zip"
     status, _, _ = r2(
         "PUT",
         object_path,
@@ -280,7 +283,9 @@ def r2_request(
         client.close()
 
 
-def studio_request(key, manifest):
+def studio_request(key, manifest, *, mode="sandbox"):
+    if mode not in KIT_MODES:
+        raise ValueError("Entorno de publicación inválido")
     stamp = str(int(time.time()))
     values = [manifest[k] for k in FIELDS]
     version = "v1"
@@ -295,7 +300,7 @@ def studio_request(key, manifest):
             raise ValueError("La revisión requiere duración y reserva")
         version = "v5" if "proresBytes" in manifest else "v4"
         values.extend((manifest["revisionId"], manifest["lease"]))
-    doc = ["studio-kit-" + version, "POST", ENDPOINT, "sandbox", stamp, values]
+    doc = ["studio-kit-" + version, "POST", ENDPOINT, mode, stamp, values]
     wire = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode()
     signature = hmac.digest(key, wire, "sha256").hex()
     headers = {
@@ -376,6 +381,7 @@ def approved_duration_ms(kit, order, *, graphic=None, project=None):
 
 
 def publish_order(intake, reviewed, info, connections, target, *, graphic=None):
+    mode = intake["mode"]
     digest = reviewed["sha256"]
     if not re.fullmatch(r"[a-f0-9]{64}", digest) or digest != info.get("kit_sha256", digest):
         raise ValueError("Huella de publicación inválida")
@@ -421,7 +427,8 @@ def publish_order(intake, reviewed, info, connections, target, *, graphic=None):
             kit,
             manifest,
             lambda m, p, h, b, **opts: r2_request(host, access, secret, m, p, h, b, LIMIT, **opts),
-            lambda value: studio_request(sign, value),
+            lambda value: studio_request(sign, value, mode=mode),
+            mode=mode,
             graphic=mov,
         )
     publish(

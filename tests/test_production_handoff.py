@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import hashlib
+import hmac
 import importlib.util
 import io
 import json
@@ -3770,6 +3771,138 @@ def test_publicacion_exige_lectura_integra_antes_de_cerrar_el_pedido(monkeypatch
         "bytes": len(kit),
     }
     assert deliver(io.BytesIO(kit), manifest, intact, lambda _: {"kit": published}) == published
+
+
+@pytest.mark.parametrize("mode", ["sandbox", "production"])
+def test_publicador_usa_el_mismo_entorno_en_r2_y_en_la_firma(monkeypatch, order, tmp_path, mode):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_publish as publisher
+
+    order["mode"] = mode
+    identity, kit_id = order["order_id"], str(uuid.uuid4())
+    slug = order["media"]["project_slug"]
+    media = tmp_path.resolve()
+    project = media / "proyectos" / slug
+    directory = project / "05_revision"
+    directory.mkdir(parents=True)
+    movie = b"grafica aprobada"
+    movie_hash = hashlib.sha256(movie).hexdigest()
+    relative_movie = f"proyectos/{slug}/06_renders/{identity}-v1-grafica/render/master.mov"
+    movie_path = media / relative_movie
+    movie_path.parent.mkdir(parents=True)
+    movie_path.write_bytes(movie)
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as kit_file:
+        kit_file.writestr(
+            "04-dictamen-qa.json",
+            json.dumps(
+                {
+                    "mediciones": {"duration": 60},
+                    "order_id": identity,
+                    "job_id": f"{identity}-v1",
+                    "dictamen": {"decision": "aprobado"},
+                }
+            ),
+        )
+    kit = archive.getvalue()
+    digest = hashlib.sha256(kit).hexdigest()
+    (directory / f"kit-studio-{digest}.zip").write_bytes(kit)
+    requests = []
+    key = b"clave de prueba"
+
+    def r2(_host, _access, _secret, method, path, headers, body, _limit, **options):
+        requests.append((method, path))
+        assert path in {
+            f"/{publisher.BUCKET}/kits/{mode}/{identity}/{kit_id}.zip",
+            f"/{publisher.BUCKET}/kits/{mode}/{identity}/{kit_id}.mov",
+        }
+        if method == "PUT":
+            assert body.read() == kit and headers["If-None-Match"] == "*"
+            return 200, {}, b""
+        if method == "HEAD":
+            assert path.endswith(".mov")
+            return 200, {}, b""
+        assert method == "GET"
+        data, content_type = (
+            (movie, publisher.PRORES_TYPE)
+            if path.endswith(".mov")
+            else (
+                kit,
+                "application/zip",
+            )
+        )
+        return (
+            200,
+            {
+                "x-amz-meta-sha256": hashlib.sha256(data).hexdigest(),
+                "content-type": content_type,
+                "content-length": str(len(data)),
+            },
+            options["read_body"](io.BytesIO(data)),
+        )
+
+    class StudioResponse(io.BytesIO):
+        status = 200
+
+    class StudioConnection:
+        def __init__(self, host, timeout):
+            assert host == "studio.e-scale.cl" and timeout > 0
+
+        def request(self, method, path, *, body, headers):
+            assert (method, path) == ("POST", "/api/internal/kits/publish")
+            values = [
+                kit_id,
+                identity,
+                order["user_id"],
+                "Prueba",
+                len(kit),
+                digest,
+                order["upload_id"],
+                order["media"]["sha256"],
+                60_000,
+                len(movie),
+                movie_hash,
+            ]
+            wire = json.dumps(
+                ["studio-kit-v3", method, path, mode, headers["timestamp"], values],
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode()
+            assert headers["signature"] == "v3=" + hmac.digest(key, wire, "sha256").hex()
+            assert "mode" not in json.loads(body)
+
+        def getresponse(self):
+            return StudioResponse(
+                json.dumps(
+                    {
+                        "kit": {
+                            "id": kit_id,
+                            "order_id": identity,
+                            "title": "Prueba",
+                            "bytes": len(kit),
+                            "prores": {"bytes": len(movie)},
+                        }
+                    }
+                ).encode()
+            )
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(publisher, "MEDIA", media)
+    monkeypatch.setattr(publisher, "r2_request", r2)
+    monkeypatch.setattr(publisher.http.client, "HTTPSConnection", StudioConnection)
+    target = media / "entrega.json"
+    publisher.publish_order(
+        order,
+        {"sha256": digest, "bytes": len(kit), "attachment_id": "adjunto"},
+        {"id": kit_id, "title": "Prueba"},
+        ("r2.invalid", "acceso de prueba", "secreto de prueba", key),
+        target,
+        graphic={"path": relative_movie, "sha256": movie_hash, "bytes": len(movie)},
+    )
+    assert [method for method, _ in requests] == ["PUT", "GET", "HEAD", "GET"]
+    assert json.loads(target.read_bytes())["kit"]["id"] == kit_id
 
 
 def test_entrega_reintenta_el_adjuntar_por_pedido_sin_bloquear_el_siguiente(
