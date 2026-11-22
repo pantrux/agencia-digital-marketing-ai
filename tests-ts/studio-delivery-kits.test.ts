@@ -278,7 +278,7 @@ it("valida el tamaño, hash declarado y título, y reserva el ID para el manifie
   expect(await (await send("GET", base)).json()).toEqual({ kits: [] });
 });
 
-function processingOrder(format: "mp4" | "prores4444" = "mp4") {
+function processingOrder(format: "mp4" | "prores4444" = "mp4", mode: "sandbox" | "production" = "sandbox") {
   const userId = "00000000-0000-4000-8000-000000000004";
   const orderId = "00000000-0000-4000-8000-000000000005";
   const uploadId = "00000000-0000-4000-8000-000000000006";
@@ -287,11 +287,11 @@ function processingOrder(format: "mp4" | "prores4444" = "mp4") {
   if (plan === "ilimitado") {
     db.prepare(`INSERT INTO subscriptions (id,user_id,plan_id,status,billing_status,provider_mode,external_reference,
       provider_subscription_id,current_period_start,current_period_end)
-      VALUES ('ilimitado-test',?,'ilimitado','active','paid','sandbox','fixture','test',unixepoch()-60,unixepoch()+600)`).run(userId);
+      VALUES ('ilimitado-test',?,'ilimitado','active','paid',?,'fixture','test',unixepoch()-60,unixepoch()+600)`).run(userId, mode);
   }
   db.prepare("INSERT INTO orders (id,user_id,plan_id,kind,status,idempotency_key,request_sha256," +
-    "project_slug,queue_priority,provider_mode,output_format) VALUES (?,?,?,'production','queued','pilot',?,'job-pilot',?,'sandbox',?)")
-    .run(orderId, userId, plan, SHA, plan === "ilimitado" ? 3 : 0, format);
+    "project_slug,queue_priority,provider_mode,output_format) VALUES (?,?,?,'production','queued','pilot',?,'job-pilot',?,?,?)")
+    .run(orderId, userId, plan, SHA, plan === "ilimitado" ? 3 : 0, mode, format);
   db.prepare("INSERT INTO usage_ledger(id,user_id,order_id,period_start) VALUES ('usage',?,?,strftime('%Y-%m-01','now'))")
     .run(userId, orderId);
   db.prepare("INSERT INTO upload_sessions(id,user_id,order_id,object_key,sha256,bytes,mime_type,extension,upload_id,status,object_etag,created_at,expires_at) " +
@@ -302,27 +302,31 @@ function processingOrder(format: "mp4" | "prores4444" = "mp4") {
   return { ...input, userId, orderId, uploadId, sourceSha256: SHA };
 }
 
-it("publica la revisión con reserva vigente y preserva la entrega anterior", async () => {
-  const original = processingOrder();
+it.each(["sandbox", "production"] as const)("publica la revisión en %s y preserva la entrega anterior", async (mode) => {
+  const original = processingOrder("mp4", mode);
   db.exec("UPDATE usage_ledger SET status='consumed'");
-  await completeOrderWithKit(env,{...original,durationMs:30000});
-  const active = {...env,STUDIO_DELIVERY_REVISION_ENABLED:"true"};
+  const scoped = {...env, BILLING_MODE:mode};
+  await completeOrderWithKit(scoped,{...original,durationMs:30000});
+  const active = {...scoped,STUDIO_DELIVERY_REVISION_ENABLED:"true",STUDIO_PRODUCTION_ORDERS_ENABLED:"true"};
   const req = new Request("https://studio.invalid/api",{method:"POST",
     headers:{"Content-Type":"application/json","Idempotency-Key":"revision"},
     body:JSON.stringify({base_kit_id:original.id,instructions:"Cambia la música"})});
+  const opposite = mode === "sandbox" ? "production" : "sandbox";
+  await expect(handleDeliveryRevisions(req.clone(), {...active,BILLING_MODE:opposite},original.userId,original.orderId))
+    .rejects.toMatchObject({status:404, code:"ORDEN_NO_ENCONTRADA"});
   const created = await (await handleDeliveryRevisions(req,active,original.userId,original.orderId)).json();
   const claimed = await (await claimDeliveryRevision(active,Math.floor(Date.now()/1000))).json();
   const next = "00000000-0000-4000-8000-000000000007";
   const revised = {...original,id:next,durationMs:30000,revisionId:created.revision.id,lease:claimed.revision.lease};
-  await expect(publishRevisionKit(env,{...revised,lease:"00000000-0000-4000-8000-000000000008"}))
+  await expect(publishRevisionKit(scoped,{...revised,lease:"00000000-0000-4000-8000-000000000008"}))
     .rejects.toMatchObject({status:409});
   expect(db.prepare("SELECT count(*) AS n FROM delivery_kits WHERE order_id=?").get(original.orderId)).toEqual({n:1});
-  const result = await publishRevisionKit(env,revised);
+  const result = await publishRevisionKit(scoped,revised);
   expect(result.id).toBe(next);
-  expect(await publishRevisionKit(env,revised)).toEqual(result);
+  expect(await publishRevisionKit(scoped,revised)).toEqual(result);
   expect(db.prepare("SELECT status,result_kit_id FROM delivery_revision_requests WHERE id=?").get(created.revision.id))
     .toEqual({status:"completed",result_kit_id:next});
-  expect(db.prepare("SELECT count(*) AS n FROM delivery_kits WHERE order_id=?").get(original.orderId)).toEqual({n:2});
+  expect(db.prepare("SELECT count(*) AS n FROM delivery_kits WHERE order_id=? AND provider_mode=?").get(original.orderId,mode)).toEqual({n:2});
 });
 
 it("firma la revisión con el productor y vincula la reserva al manifiesto", async () => {

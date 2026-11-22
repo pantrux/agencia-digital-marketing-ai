@@ -137,13 +137,22 @@ def test_worker_signature_requires_known_environment_and_plan(service):
     process(instance)
 
 
-def test_firma_autorizada_conserva_cuenta_plan_y_entorno(service):
-    instance, calls, _ = service
-    raw = envelope(actor_id="b" * 64, plan_id="ilimitado", billing_mode="production")
+@pytest.mark.parametrize(
+    ("billing_mode", "other_mode"), [("sandbox", "production"), ("production", "sandbox")]
+)
+def test_firma_autorizada_solo_admite_el_entorno_del_perfil(service, billing_mode, other_mode):
+    default, calls, _ = service
+    instance = broker.Sofia(
+        SECRET, default.ledger, default.run, default.owner, default.clock, billing_mode=billing_mode
+    )
+    other = envelope(actor_id="b" * 64, plan_id="ilimitado", billing_mode=other_mode)
+    assert_status(403, lambda: process(instance, other))
+    assert not calls
+    raw = envelope(actor_id="b" * 64, plan_id="ilimitado", billing_mode=billing_mode)
     process(instance, raw)
     assert calls[0].actor == "b" * 64
     assert calls[0].plan_id == "ilimitado"
-    assert calls[0].billing_mode == "production"
+    assert calls[0].billing_mode == billing_mode
 
 
 def test_overlap_is_atomic_across_connections(service):

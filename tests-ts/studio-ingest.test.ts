@@ -791,6 +791,36 @@ describe("Ingesta R2 multipart", () => {
     } finally { db.close(); }
   });
 
+  it("habilita la reserva comercial sin usar coberturas o cupos de ensayo", async () => {
+    const db = databaseForIngest();
+    try {
+      db.exec("DELETE FROM usage_ledger; DELETE FROM orders");
+      const subscription = db.prepare(`INSERT INTO subscriptions(id,user_id,plan_id,status,billing_status,
+        provider_mode,external_reference,provider_subscription_id,current_period_start,current_period_end)
+        VALUES(?, 'user', ?, 'active', 'paid', ?, ?, ?, unixepoch()-60, unixepoch()+60)`);
+      subscription.run("piloto", "ilimitado", "sandbox", "piloto", "mandato-piloto");
+      subscription.run("comercial", "ultra", "production", "comercial", "mandato-ficticio");
+      const blocked = { DB: sqliteAdapter(db), BILLING_MODE: "production" as const };
+      const commercial = { ...blocked, STUDIO_PRODUCTION_ORDERS_ENABLED: "true" };
+      const reserve = (env: typeof blocked | typeof commercial) => reserveOrder(new Request("https://studio.invalid/api/orders", {
+        method: "POST", headers: { "content-type": "application/json", "idempotency-key": "entorno" },
+        body: JSON.stringify({ kind: "production", output_resolution: "4k" }),
+      }), "user", env);
+      await expect(reserve(blocked)).rejects.toMatchObject({ status: 403, code: "PRODUCCION_NO_HABILITADA" });
+      expect(db.prepare("SELECT count(*) AS n FROM usage_ledger").get()?.n).toBe(0);
+      expect(await (await describePlan("user", commercial)).json()).toMatchObject({
+        plan_id: "ultra", production_available: true, used: 0,
+      });
+      const result = await reserve(commercial);
+      expect(result.status).toBe(201);
+      expect(await result.json()).toMatchObject({ plan_id: "ultra", output_resolution: "4k" });
+      expect((await reserve(commercial)).status).toBe(200);
+      expect(db.prepare("SELECT plan_id,provider_mode FROM orders").all()).toEqual([{plan_id:"ultra",provider_mode:"production"}]);
+      expect(await (await describePlan("user", { ...commercial, BILLING_MODE: "sandbox" })).json())
+        .toMatchObject({ plan_id: "ilimitado", used: 0 });
+    } finally { db.close(); }
+  });
+
   it("renueva el cupo Free exactamente al iniciar el mes en UTC", async () => {
     const db = databaseForIngest();
     const clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-30T23:59:59.999Z"));

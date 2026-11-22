@@ -50,6 +50,8 @@ Al revisar el publicador de Studio, comprueba que el entorno de la orden verific
 
 Para verificar el activador de publicación, deposita el recibo aprobado de una orden de ensayo en la carpeta de entregas mediante el escritor habitual. Comprueba que la unidad se active sin esperar al temporizador y que conserve las señales de dictamen y asignación. El temporizador comprueba los recibos pendientes cuando la unidad queda inactiva.
 
+Coteja el entorno del Worker, el perfil de OpenClaw y el argumento de aprovisionamiento de Kitsu antes de habilitar órdenes comerciales. Verifica la reserva y la revisión con coberturas de ambos entornos en la misma base de prueba para detectar cruces. [Procedimiento de Studio](../../operations/STUDIO-EXPERIENCIA-CONVERSACIONAL.md#verificación-previa-a-activación)
+
 Para ensayos del codificador facial, coteja las fuentes fijadas de Immich y prueba el formato real por API con un corpus desechable. Registra las particiones y los umbrales antes de inferir. [Aceptación facial](../../../docker/immich-server/README-ACEPTACION-FACIAL.md#ensayo-de-vistas-previas-webp-sin-pérdida)
 
 Para probar la llegada de fotos a grupos existentes, fija tres tandas en el manifiesto sintético y coteja las asignaciones acumuladas después de drenar las colas de cada una. [Sonda por manifiesto](../../../docker/immich-server/README-ACEPTACION-FACIAL.md#espacio-y-orden-de-ejecución)

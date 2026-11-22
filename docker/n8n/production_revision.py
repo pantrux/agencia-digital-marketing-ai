@@ -58,7 +58,7 @@ def legacy_direction_proof(order, receipt, direction, render, brief_hash):
 LUCAS = Path("/var/lib/agency-production-lucas")
 
 
-def load_claim_context(claim, journal, strategies, directions, revision_drafts):
+def load_claim_context(claim, journal, strategies, directions, revision_drafts, *, mode="sandbox"):
     """Localiza el material original usando solo identidades y huellas acreditadas."""
     if (
         not isinstance(claim, dict)
@@ -72,7 +72,7 @@ def load_claim_context(claim, journal, strategies, directions, revision_drafts):
     if not isinstance(order, dict):
         raise ValueError("Ingesta de revisión inválida")
     validate(order, identity)
-    if order["mode"] != "sandbox" or order["user_id"] != claim.get("user_id"):
+    if order["mode"] != mode or order["user_id"] != claim.get("user_id"):
         raise ValueError("La revisión no corresponde a la orden")
     digest = claim.get("base_kit_sha256")
     if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
@@ -408,8 +408,7 @@ def publish_staged_revision(
     verdict = review.get("dictamen", {})
     duration = review.get("mediciones", {}).get("duration")
     if (
-        order["mode"] != "sandbox"
-        or type(verdict) is not dict
+        type(verdict) is not dict
         or verdict.get("decision") != "aprobado"
         or type(verdict.get("puntaje")) is not int
         or not 85 <= verdict["puntaje"] <= 100
@@ -492,7 +491,7 @@ def publish_staged_revision(
             manifest.update(proresBytes=graphic_size, proresSha256=item.get("sha256"))
         elif "prores" in staged:
             raise ValueError("Formato de entrega inválido")
-        return deliver(kit, manifest, r2, studio, graphic=graphic)
+        return deliver(kit, manifest, r2, studio, mode=order["mode"], graphic=graphic)
 
 
 def revision_attempt_id(identity, attempt):
@@ -584,7 +583,12 @@ def run_once(profile, paths, token, gpu, r2, studio, dispatch):
     if not isinstance(claim, dict) or not matches(UUID, claim.get("lease")):
         raise ValueError("Reserva de revisión inválida")
     context = load_claim_context(
-        claim, paths["journal"], paths["strategy"], paths["direction"], paths["draft"]
+        claim,
+        paths["journal"],
+        paths["strategy"],
+        paths["direction"],
+        paths["draft"],
+        mode=profile.get("mode", "sandbox"),
     )
     if not eligible(context["receipt"]["order"], profile):
         raise ValueError("La revisión está fuera del perfil autorizado")
@@ -688,7 +692,7 @@ def main():
         return r2_request(host, access, secret, method, path, headers, body, LIMIT, **options)
 
     def studio(manifest):
-        return studio_request(signing, manifest)
+        return studio_request(signing, manifest, mode=profile.get("mode", "sandbox"))
 
     result = run_once(profile, paths, token, gpu, r2, studio, dispatch_request)
     print(json.dumps({"status": result["status"]}, separators=(",", ":")))

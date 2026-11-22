@@ -101,7 +101,8 @@ def load_profile(profile):
     doc = json.loads(read_regular(profile, 2048))
     if (
         type(doc) is not dict
-        or doc.keys() != {"key", "owner", "fixture"}
+        or doc.keys() - {"mode"} != {"key", "owner", "fixture"}
+        or doc.get("mode", "sandbox") not in ("sandbox", "production")
         or not matches(re.compile(r"[0-9a-f]{64}"), doc["key"])
     ):
         raise ValueError("Perfil de traspaso inválido")
@@ -111,16 +112,18 @@ def load_profile(profile):
 
 
 def eligible(order, profile):
-    if order["mode"] != "sandbox":
+    mode = profile.get("mode", "sandbox")
+    if mode not in ("sandbox", "production") or order["mode"] != mode:
         return False
-    if order["plan_id"] == "free":
+    if mode == "sandbox" and order["plan_id"] == "free":
         return order["user_id"] == profile["owner"] or is_test_order(order, profile)
     return order["plan_id"] in QA_ROUNDS
 
 
 def is_test_order(order, profile):
     return (
-        order["plan_id"] == "free"
+        order["mode"] == "sandbox"
+        and order["plan_id"] == "free"
         and order["order_id"] == profile["fixture"]
         and order["user_id"] != profile["owner"]
     )

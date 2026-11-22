@@ -49,14 +49,24 @@ export type ListedOrder = Omit<Order, "request_sha256"> & {
   production_issue: "qa_rechazado" | "requiere_revision" | null;
 };
 
-export interface OrderEnv {
-  DB: SqlDatabase;
+export interface ProductionModeEnv {
   BILLING_MODE: "sandbox" | "production";
+  STUDIO_PRODUCTION_ORDERS_ENABLED?: string;
+}
+
+export interface OrderEnv extends ProductionModeEnv {
+  DB: SqlDatabase;
   SOFIA_OWNER_USER_ID?: string;
 }
 
+export function productionModeEnabled(env: ProductionModeEnv): boolean {
+  return env.BILLING_MODE === "sandbox"
+    || (env.BILLING_MODE === "production" && env.STUDIO_PRODUCTION_ORDERS_ENABLED === "true");
+}
+
 function productionAvailable(env: OrderEnv, userId: string, plan: PlanId): boolean {
-  return env.BILLING_MODE === "sandbox" && (plan !== "free" || userId === env.SOFIA_OWNER_USER_ID);
+  return productionModeEnabled(env)
+    && (env.BILLING_MODE === "production" || plan !== "free" || userId === env.SOFIA_OWNER_USER_ID);
 }
 
 export function month(seconds: number): string {

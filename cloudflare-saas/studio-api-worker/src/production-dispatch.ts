@@ -1,14 +1,11 @@
 import { adDispatchFields } from "./ad-contacts.js";
-import { claimDeliveryRevision, failDeliveryRevision, renewDeliveryRevision } from "./delivery-revisions.js";
+import { claimDeliveryRevision, failDeliveryRevision, renewDeliveryRevision, type DeliveryRevisionEnv } from "./delivery-revisions.js";
 import { validateSyncJob } from "../../../src/media/sync-contract.js";
-import { HttpError, readJson, response, type SqlDatabase } from "./platform.js";
+import { HttpError, readJson, response } from "./platform.js";
 import type { OutputEdit, OutputFormat, OutputResolution } from "./orders.js";
 
-export interface ProductionDispatchEnv {
-  DB: SqlDatabase;
-  BILLING_MODE: "sandbox" | "production";
+export interface ProductionDispatchEnv extends DeliveryRevisionEnv {
   STUDIO_PRODUCTION_DISPATCH_TOKEN?: string;
-  STUDIO_DELIVERY_REVISION_ENABLED?: string;
 }
 
 type Claimed = { order_id: string; attempts: number; lease: string; available_at: number };

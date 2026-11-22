@@ -52,6 +52,28 @@ def test_each_startup_uses_a_distinct_request_id(probe, monkeypatch):
     assert first != second
     assert OLD_REQUEST not in (first, second)
     assert UUID(first).version == UUID(second).version == 4
+    assert [turn["billing_mode"] for turn in received] == ["sandbox", "sandbox"]
+
+
+def test_startup_uses_the_commercial_profile_mode(probe, monkeypatch):
+    original = probe.read_private
+
+    def read_profile(path):
+        document = original(path)
+        return (
+            {**document, "billingMode": "production"} if path.name == "profile.json" else document
+        )
+
+    turns = []
+
+    def ready(_sock, _key, payload):
+        turns.append(payload)
+        return True
+
+    monkeypatch.setattr(probe, "read_private", read_profile)
+    monkeypatch.setattr(probe, "check", ready)
+    assert probe.main() == 0
+    assert turns[0]["billing_mode"] == "production"
 
 
 def test_failed_response_leaves_next_attempt_to_systemd(probe, monkeypatch):

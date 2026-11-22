@@ -271,7 +271,7 @@ def test_servicio_de_revision_reclama_y_registra_rechazo(handoff, order, monkeyp
     monkeypatch.setattr(
         revision,
         "load_claim_context",
-        lambda *_: {
+        lambda *_, **__: {
             "receipt": {"order": order},
             "strategy": {},
             "direction": {},
@@ -546,13 +546,63 @@ def test_preparacion_identifica_cada_video_y_conserva_su_orden(
 
 
 @pytest.mark.parametrize(("plan", "rounds"), [("pro", 2), ("ultra", 3), ("ilimitado", 3)])
-def test_rondas_autonomas_y_admision_pagada_solo_en_ensayo(handoff, order, plan, rounds):
+def test_rondas_autonomas_y_admision_con_el_perfil_del_entorno(handoff, order, plan, rounds):
     profile = {"owner": str(uuid.uuid4()), "fixture": str(uuid.uuid4())}
     selected = {**order, "plan_id": plan}
     assert handoff.eligible(selected, profile)
     assert not handoff.eligible({**selected, "mode": "production"}, profile)
     assert not handoff.eligible(order, profile)
     assert handoff.qa_rounds(selected, profile) == rounds
+    commercial = {**profile, "mode": "production", "fixture": order["order_id"]}
+    assert not handoff.eligible(selected, commercial)
+    assert handoff.eligible({**selected, "mode": "production"}, commercial)
+    free = {**order, "mode": "production"}
+    assert handoff.eligible(free, commercial)
+    assert handoff.qa_rounds(free, commercial) == 1
+
+
+def test_traspaso_comercial_sella_solo_ordenes_del_perfil_configurado(
+    handoff, order, tmp_path, monkeypatch
+):
+    root = tmp_path.resolve()
+    inbox = root / "inbox.sqlite3"
+    spool = root / "salida"
+    spool.mkdir()
+    profile = root / "perfil.json"
+    settings = {
+        "mode": "production",
+        "owner": str(uuid.uuid4()),
+        "fixture": str(uuid.uuid4()),
+        "key": "ab" * 32,
+    }
+    commercial = {**order, "mode": "production"}
+    other = settings["fixture"]
+    media = {**order["media"], "job_id": other, "project_slug": "job-" + other.replace("-", "")}
+    media["object_key"] = f"ingest/{other}/{media['asset_id']}.mp4"
+    sandbox = {**order, "order_id": other, "media": media}
+    with closing(sqlite3.connect(inbox)) as db:
+        db.execute("CREATE TABLE inbox(order_id TEXT, payload TEXT, received_at INTEGER)")
+        db.executemany(
+            "INSERT INTO inbox VALUES (?, ?, 1)",
+            [(item["order_id"], json.dumps(item)) for item in (commercial, sandbox)],
+        )
+        db.commit()
+    monkeypatch.setattr(handoff, "SOURCE", inbox)
+    monkeypatch.setattr(handoff, "SPOOL", spool)
+    monkeypatch.setattr(sys, "argv", ["traspaso", str(profile)])
+    profile.write_text(json.dumps({**settings, "mode": "desconocido"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="Perfil de traspaso inválido"):
+        handoff.main()
+    profile.write_text(json.dumps(settings), encoding="utf-8")
+    handoff.main()
+    candidate = spool / f"{commercial['order_id']}.json"
+    assert list(spool.iterdir()) == [candidate]
+    assert (
+        handoff.verify(
+            candidate.read_bytes(), bytes.fromhex(settings["key"]), commercial["order_id"]
+        )
+        == commercial
+    )
 
 
 def test_inspeccion_distingue_silencio_y_rechaza_media_fuera_del_contrato(monkeypatch):
@@ -3127,9 +3177,9 @@ def test_kit_exige_aprobacion_y_huella_del_master(monkeypatch, order):
         package(order["order_id"], master, render, qa, {})
 
 
-@pytest.mark.parametrize("round_number", (1, 2))
+@pytest.mark.parametrize("round_number,mode", ((1, "sandbox"), (2, "sandbox"), (1, "production")))
 def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(
-    handoff, order, tmp_path, monkeypatch, round_number
+    handoff, order, tmp_path, monkeypatch, round_number, mode
 ):
     import production_elena as reviewer
     import production_lucas as editor
@@ -3145,6 +3195,7 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(
         stage_approved_revision,
     )
 
+    order["mode"] = mode
     identity = order["order_id"]
     brief = {"order_id": identity, "user_id": order["user_id"], "objective": "Plantas"}
     brief_hash = hashlib.sha256(handoff.canonical(brief)).hexdigest()
@@ -3205,7 +3256,10 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(
     )
     stored_base.parent.mkdir(parents=True)
     stored_base.write_bytes(raw)
-    context = load_claim_context(claim, *context_dirs.values())
+    context = load_claim_context(claim, *context_dirs.values(), mode=mode)
+    opposite = "production" if mode == "sandbox" else "sandbox"
+    with pytest.raises(ValueError, match="no corresponde"):
+        load_claim_context(claim, *context_dirs.values(), mode=opposite)
     assert context["receipt"]["order"] == order and context["direction"] == direction
     generated = []
 
@@ -3353,7 +3407,8 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(
     uploaded = (tmp_path / staged["path"]).read_bytes()
     calls_published = []
 
-    def r2(method, _path, headers, body, **options):
+    def r2(method, path, headers, body, **options):
+        assert path.startswith(f"/studio-media-bucket/kits/{mode}/{identity}/")
         if method == "PUT":
             assert body.read() == uploaded
             return 200, {}, b""
@@ -3398,7 +3453,9 @@ def test_base_de_revision_acredita_zip_escaleta_y_aprobacion(
     assert calls_published[0]["lease"] == claim["lease"]
     (context_dirs["drafts"] / f"{attempt_id}.json").write_text(json.dumps(direction))
     next_claim = {**claim, "base_kit_id": published["id"], "base_kit_sha256": staged["sha256"]}
-    assert load_claim_context(next_claim, *context_dirs.values())["direction"] == direction
+    assert (
+        load_claim_context(next_claim, *context_dirs.values(), mode=mode)["direction"] == direction
+    )
     with pytest.raises(ValueError, match="no tiene una aprobación"):
         stage_approved_revision(
             attempt_claim,
