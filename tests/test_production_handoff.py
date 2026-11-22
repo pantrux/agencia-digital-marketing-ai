@@ -2102,6 +2102,93 @@ def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
     ]
 
 
+@pytest.mark.parametrize("scene_count", [10, 32])
+def test_elena_conserva_todas_las_muestras_al_agrupar_adjuntos(monkeypatch, tmp_path, scene_count):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_elena as elena
+    from production_valeria import visual_payload
+
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        pytest.skip("FFmpeg requerido para componer las hojas de auditoría")
+    image = subprocess.check_output(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=144x256:rate=30",
+            "-frames:v",
+            "1",
+            "-threads",
+            "1",
+            "-c:v",
+            "mjpeg",
+            "-f",
+            "image2pipe",
+            "pipe:1",
+        ],
+        timeout=15,
+    )
+    metrics = {
+        "width": 1080,
+        "height": 1920,
+        "fps": 30,
+        "codec": "h264",
+        "color": "bt709",
+        "duration": scene_count * 2,
+        "lufs": -14,
+        "peak": -2,
+    }
+    scenes = [{"source_start_frame": 0, "source_end_frame": 60} for _ in range(scene_count)]
+    sample_count = scene_count + 2
+
+    def decode(_path, _digest, _duration, *, stamps):
+        assert len(stamps) == sample_count
+        return metrics, [(stamp, image) for stamp in stamps]
+
+    def run(command, **kwargs):
+        assert command[0] == "/usr/bin/ffmpeg"
+        return subprocess.run([ffmpeg, *command[1:]], **kwargs)
+
+    def run_visual(request):
+        payload = json.loads(request["message"].rsplit("\n", 1)[1])
+        groups = payload["muestras_por_adjunto"]
+        assert len(groups) == len(request["attachments"]) <= 8
+        assert [number for group in groups for number in group] == list(range(1, sample_count + 1))
+        assert (
+            len(payload["segundos_de_muestras"])
+            == len(payload["rotulos_por_muestra"])
+            == sample_count
+        )
+        assert len(visual_payload(request)) < 110_000
+        return {
+            "puntaje": 90,
+            "marca_free": "",
+            "observaciones": [{"muestra": 1, "detalle": "La apertura se entiende"}],
+            "defectos": [{"muestra": sample_count, "correccion": "Corregir el encuadre al cierre"}],
+        }
+
+    monkeypatch.setattr(elena, "decode", decode)
+    monkeypatch.setattr(elena, "subprocess", SimpleNamespace(run=run, DEVNULL=subprocess.DEVNULL))
+    monkeypatch.setattr(elena, "run_visual", run_visual)
+    props = {
+        "title": "Sansevierias",
+        "subtitle": "De interior",
+        "duration_seconds": scene_count * 2,
+        "scenes": scenes,
+    }
+    review = elena.review_video(
+        tmp_path / "master.mp4", "a" * 64, props, 1, "Ilimitado", "1080p", str(uuid.uuid4())
+    )
+    assert review["dictamen"]["decision"] == "rechazado"
+    assert review["dictamen"]["defectos"][0]["muestra"] == sample_count
+    assert len(review["muestras"]) == sample_count
+    assert sum(len(sheet["muestras"]) for sheet in review["hojas_muestras"]) == sample_count
+
+
 @pytest.mark.parametrize(
     ("plan", "marca", "resolution", "width", "height"),
     [

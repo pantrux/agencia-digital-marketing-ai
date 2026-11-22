@@ -52,6 +52,8 @@ AD_MUSIC_CREDIT = (
 )
 BAND_SAMPLE_BYTES = 12000
 BAND_COMPARISON_BYTES = 22000
+RPC_ATTACHMENT_LIMIT = 8
+SHEET_BYTES = 60_000
 
 VALERIA = Path("/var/lib/agency-production-valeria")
 LUCAS = Path("/var/lib/agency-production-lucas")
@@ -121,6 +123,83 @@ def paired_band_samples(originals, masters):
             else:
                 raise ValueError("No se pudo preparar la comparación de encuadre")
     return pairs
+
+
+def scene_contact_sheets(images):
+    """Agrupa las muestras en el orden original y conserva su numeración de QA."""
+    size = math.ceil(len(images) / RPC_ATTACHMENT_LIMIT)
+    budget = SHEET_BYTES // math.ceil(len(images) / size)
+    sheets = []
+    mapping = []
+    with tempfile.TemporaryDirectory(prefix="studio-qa-muestras-") as directory:
+        for offset in range(0, len(images), size):
+            group = images[offset : offset + size]
+            mapping.append(list(range(offset + 1, offset + len(group) + 1)))
+            if len(group) == 1 and len(group[0][1]) <= budget:
+                sheets.append(group[0])
+                continue
+            inputs = []
+            for index, (_, image) in enumerate(group):
+                source = Path(directory) / f"muestra-{index}.jpg"
+                source.write_bytes(image)
+                inputs.extend(["-protocol_whitelist", "file", "-i", str(source)])
+            for width, quality in ((216, 12), (180, 18), (144, 24), (108, 30)):
+                height = width * 16 // 9
+                columns = min(3, len(group))
+                filters = [
+                    f"[{index}:v]scale={width}:{height},setsar=1[v{index}]"
+                    for index in range(len(group))
+                ]
+                if len(group) > 1:
+                    layout = "|".join(
+                        f"{index % columns * width}_{index // columns * height}"
+                        for index in range(len(group))
+                    )
+                    labels = "".join(f"[v{index}]" for index in range(len(group)))
+                    filters.append(
+                        f"{labels}xstack=inputs={len(group)}:layout={layout}:fill=black[v]"
+                    )
+                output = "[v]" if len(group) > 1 else "[v0]"
+                image = subprocess.run(
+                    [
+                        "/usr/bin/ffmpeg",
+                        "-v",
+                        "error",
+                        "-nostdin",
+                        "-filter_complex_threads",
+                        "1",
+                        *inputs,
+                        "-filter_complex",
+                        ";".join(filters),
+                        "-map",
+                        output,
+                        "-frames:v",
+                        "1",
+                        "-threads",
+                        "1",
+                        "-c:v",
+                        "mjpeg",
+                        "-q:v",
+                        str(quality),
+                        "-f",
+                        "image2pipe",
+                        "pipe:1",
+                    ],
+                    stdin=subprocess.DEVNULL,
+                    check=True,
+                    capture_output=True,
+                    timeout=10,
+                ).stdout
+                if (
+                    4 <= len(image) <= budget
+                    and image.startswith(b"\xff\xd8")
+                    and image.endswith(b"\xff\xd9")
+                ):
+                    sheets.append((group[0][0], image))
+                    break
+            else:
+                raise ValueError("No se pudo preparar la hoja de muestras audiovisuales")
+    return sheets, mapping
 
 
 def make_verdict(review, metrics, duration, *, plan="Free", resolution="1080p", samples=3):
@@ -624,6 +703,19 @@ def review_video(
         )
     if synthetic:
         instructions += "Considera que el crudo es una demostración técnica con barras de color. "
+    sheets = []
+    if len(attachments) > RPC_ATTACHMENT_LIMIT:
+        attachments, mapping = scene_contact_sheets(attachments)
+        evidence["muestras_por_adjunto"] = mapping
+        sheets = [
+            {"muestras": numbers, "sha256": hashlib.sha256(image).hexdigest()}
+            for numbers, (_, image) in zip(mapping, attachments, strict=True)
+        ]
+        instructions += (
+            " Cada adjunto contiene las muestras indicadas en muestras_por_adjunto, ordenadas "
+            "de izquierda a derecha y de arriba abajo. En el dictamen usa el número original "
+            "de muestra indicado en esa lista. "
+        )
     request = visual_request(
         "agency-critic",
         instructions + "\n" + json.dumps(evidence, ensure_ascii=False),
@@ -686,6 +778,7 @@ def review_video(
         **({"creditos_musica": AD_MUSIC_CREDIT} if metrics.get("musica_catalogo") else {}),
         "dictamen": qa,
         "muestras": [{"segundo": s, "sha256": hashlib.sha256(p).hexdigest()} for s, p in images],
+        **({"hojas_muestras": sheets} if sheets else {}),
         **(
             {
                 "referencia_original": {
