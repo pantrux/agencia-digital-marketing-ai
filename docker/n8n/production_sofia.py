@@ -79,7 +79,7 @@ def validate_transcript(result):
     return result
 
 
-async def transcript_for(receipt, output, source, transcribe):
+async def transcribe_source(receipt, output, source, transcribe):
     audio = receipt["audio"] if source is None else source["audio"]
     if audio is None:
         return None
@@ -160,9 +160,14 @@ async def collect_transcripts(receipt, output, sources):
                 )
 
         return {
-            index: await transcript_for(receipt, output, item, transcribe)
+            index: await transcribe_source(receipt, output, item, transcribe)
             for _, index, item in sorted(sources, key=lambda entry: (entry[0], entry[1]))
         }
+
+
+def transcript_for(receipt, output, source=None):
+    """Entrega una transcripción para los consumidores síncronos de dirección."""
+    return asyncio.run(collect_transcripts(receipt, output, [(0, 0, source)]))[0]
 
 
 def start_brief(receipt, output):
