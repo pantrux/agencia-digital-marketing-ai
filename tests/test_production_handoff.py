@@ -2185,6 +2185,45 @@ def test_elena_conserva_todas_las_muestras_al_agrupar_adjuntos(monkeypatch, tmp_
     assert details[-1]["respuesta"]["observaciones"][0]["detalle"] == "🌱" * 600
 
 
+def test_elena_audita_rotulos_en_segundos_del_video_completo(handoff):
+    from production_elena import scene_checks
+
+    scenes = [
+        {"source_start_frame": 400, "source_end_frame": 1505},
+        {
+            "source_start_frame": 8,
+            "source_end_frame": 63,
+            "label": {"text": "Variedad", "start_frame": 0, "end_frame": 55, "position": "panel"},
+        },
+        {
+            "source_start_frame": 250,
+            "source_end_frame": 756,
+            "label": {"text": "Cierre", "start_frame": 416, "end_frame": 506, "position": "panel"},
+        },
+    ]
+    checks = {
+        row["segundo"]: row["rotulo_esperado"]
+        for row in scene_checks(scenes, required=(1132, 1621, 1665))
+    }
+    assert checks[37.733] == {
+        "texto": "Variedad",
+        "posicion": "panel",
+        "desde_s_video": 36.833,
+        "hasta_s_video": 38.666,
+    }
+    assert (
+        checks[54.033]
+        == checks[55.5]
+        == {
+            "texto": "Cierre",
+            "posicion": "panel",
+            "desde_s_video": 52.533,
+            "hasta_s_video": 55.533,
+        }
+    )
+    assert checks[0] is None
+
+
 @pytest.mark.parametrize(
     ("plan", "marca", "resolution", "width", "height"),
     [
