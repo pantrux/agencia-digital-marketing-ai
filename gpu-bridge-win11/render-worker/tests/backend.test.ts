@@ -1,7 +1,7 @@
 import {after, mock, test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {mkdtemp, mkdir, writeFile, rm, access, readFile, stat} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, rm, access, readFile, stat, copyFile, readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {RenderBackend, stageAdMusic, timelineImages} from '../src/backend.ts';
@@ -62,7 +62,7 @@ test('copia la pista aprobada por huella y rechaza una pista ausente o cambiada'
 });
 
 const request = parseRender({project_id: 'sansevieras', job_id: 'prueba', composition: 'AgencyVertical', plan: 'Free', props: {title: 'Prueba sintética', duration_seconds: 3, audio_path: 'proyectos/sansevieras/03_assets/voz.wav'}});
-async function setup(badPeak: boolean, options: {format?: OutputFormat; resolution?: Resolution; badAlpha?: boolean; failProresProbe?: boolean; missingColor?: boolean; duration?: number; badTiming?: boolean; recoverPeak?: boolean; normalizedVideo?: boolean; encodeStalled?: boolean} = {}) {
+async function setup(badPeak: boolean, options: {format?: OutputFormat; resolution?: Resolution; badAlpha?: boolean; failProresProbe?: boolean; missingColor?: boolean; duration?: number; badTiming?: boolean; recoverPeak?: boolean; normalizedVideo?: boolean; encodeStalled?: boolean; copyArtifact?: typeof copyFile} = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'render-backend-'));
   const nas = path.join(root, 'nas'), cache = path.join(root, 'cache');
   await mkdir(path.join(nas, 'proyectos', 'sansevieras', '03_assets'), {recursive: true}); await mkdir(cache);
@@ -84,6 +84,7 @@ async function setup(badPeak: boolean, options: {format?: OutputFormat; resoluti
   const sourceCount = Math.floor(duration * 30000 / 1001);
   const backend = await RenderBackend.create(config, {
     verifyTools: async () => {}, verifyMapping: async () => {},
+    ...(options.copyArtifact && {copyArtifact: options.copyArtifact}),
     scene: async (options, frames) => {
       captures.push(frames);
       conformed.push(options.preconformed === true);
@@ -144,6 +145,65 @@ test('salud no disponible antes de pruebas y publicación solo después de medic
     assert.ok(Object.values(result.stage_ms).reduce((sum, ms) => sum + ms, 0) <= result.elapsed_ms + 2);
     await access(path.join(fixture.nas, result.files[0]!.path));
     assert.equal(result.audio.true_peak_dbtp, -1.4);
+  } finally {await rm(fixture.root, {recursive: true, force: true});}
+});
+
+test('recupera una copia temporal interrumpida sin volver a codificar ni publicar el fragmento', async () => {
+  const copies: string[] = [];
+  const fixture = await setup(false, {copyArtifact: async (source, target, flags) => {
+    copies.push(String(target));
+    if (copies.length === 1) {
+      await writeFile(target, 'fragmento', {flag: 'wx'});
+      throw Object.assign(new Error('Copia interrumpida'), {code: 'ECONNRESET'});
+    }
+    await copyFile(source, target, flags);
+  }});
+  try {
+    await fixture.backend.initialize();
+    const signal = new AbortController().signal;
+    const result = await fixture.backend.render(request, signal);
+    assert.deepEqual(await fixture.backend.render(request, signal), result);
+    assert.equal(fixture.calls.filter(args => args.includes('h264_nvenc') && path.basename(args.at(-1)!) === 'master.mp4').length, 1);
+    assert.equal(copies.length, 2);
+    assert.notEqual(path.dirname(copies[0]!), path.dirname(copies[1]!));
+    const output = path.join(fixture.nas, result.files[0]!.path);
+    assert.deepEqual(await readdir(path.dirname(path.dirname(output))), ['render']);
+    assert.equal(createHash('sha256').update(await readFile(output)).digest('hex'), result.files[0]!.sha256);
+  } finally {await rm(fixture.root, {recursive: true, force: true});}
+});
+
+test('limita el reintento de copia y conserva el fallo de permisos o la cancelación', async () => {
+  for (const [code, expected, cancel] of [['EBUSY', 2, false], ['EACCES', 1, false], ['ECONNRESET', 1, true]] as const) {
+    let copies = 0;
+    const signaling = new AbortController();
+    const fixture = await setup(false, {copyArtifact: async (_source, target) => {
+      copies += 1;
+      await writeFile(target, 'fragmento', {flag: 'wx'});
+      if (cancel) signaling.abort();
+      throw Object.assign(new Error('Copia denegada'), {code});
+    }});
+    try {
+      await fixture.backend.initialize();
+      await assert.rejects(fixture.backend.render(request, signaling.signal), {code});
+      assert.equal(copies, expected);
+      assert.deepEqual(await readdir(path.join(fixture.nas, 'proyectos', 'sansevieras', '06_renders', 'prueba')), []);
+    } finally {await rm(fixture.root, {recursive: true, force: true});}
+  }
+});
+
+test('vuelve a acreditar los insumos antes de reintentar una copia', async () => {
+  let copies = 0;
+  const fixture = await setup(false, {copyArtifact: async (_source, target) => {
+    copies += 1;
+    await writeFile(path.join(fixture.nas, 'proyectos', 'sansevieras', '03_assets', 'voz.wav'), 'audio cambiado');
+    await writeFile(target, 'fragmento', {flag: 'wx'});
+    throw Object.assign(new Error('Copia interrumpida'), {code: 'ECONNRESET'});
+  }});
+  try {
+    await fixture.backend.initialize();
+    await assert.rejects(fixture.backend.render(request, new AbortController().signal), {code: 'INSUMO_CAMBIADO'});
+    assert.equal(copies, 1);
+    assert.deepEqual(await readdir(path.join(fixture.nas, 'proyectos', 'sansevieras', '06_renders', 'prueba')), []);
   } finally {await rm(fixture.root, {recursive: true, force: true});}
 });
 

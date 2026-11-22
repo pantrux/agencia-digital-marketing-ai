@@ -3,6 +3,7 @@ import {constants, createReadStream} from 'node:fs';
 import {createHash, createHmac, timingSafeEqual} from 'node:crypto';
 import path from 'node:path';
 import {performance} from 'node:perf_hooks';
+import {setTimeout as delay} from 'node:timers/promises';
 import {AD_MUSIC_ID, parseStills, TITLE_FADE_FRAMES, WorkerError, type RenderRequest, type StillsRequest, type InspectRequest, type MultiSourceScene} from './contracts.ts';
 import {type RuntimeConfig, verifyBinary} from './config.ts';
 import {type Backend, type Health} from './server.ts';
@@ -15,13 +16,14 @@ import {contactSheet, normalizedRuler} from './qa.ts';
 import {graphicFrames, graphicLabel} from './timeline.ts';
 import {renderHyperframes} from './hyperframes.ts';
 
-interface Dependencies {run: typeof runProcess; scene: typeof renderScene; verifyTools(config: RuntimeConfig): Promise<void>; verifyMapping(config: RuntimeConfig): Promise<void>}
+interface Dependencies {run: typeof runProcess; scene: typeof renderScene; copyArtifact: typeof copyFile; verifyTools(config: RuntimeConfig): Promise<void>; verifyMapping(config: RuntimeConfig): Promise<void>}
 interface Artifact {path: string; bytes: number; sha256: string}
 const receiptName = '.recibo-puente-v1.json';
 const hashPattern = /^[a-f0-9]{64}$/;
 type RenderStage = 'render' | 'stills';
 const linksPerImage = 512;
 const proresPacketTimeoutMs = 180_000;
+const transientNasErrors = new Set(['EAGAIN', 'EBUSY', 'ECONNABORTED', 'ECONNRESET', 'ENETRESET', 'ENOTCONN', 'ETIMEDOUT']);
 const approvedAdMusic = {
   relative: '_biblioteca_global/musica-stock/' + AD_MUSIC_ID + '.mp3',
   sha256: '8433b770a630d9b1594fd484442c677907ece899a4d149954cd2e74fd733e311',
@@ -68,6 +70,11 @@ async function sha256File(filename: string, signal?: AbortSignal): Promise<strin
   for await (const chunk of createReadStream(filename, {signal})) digest.update(chunk as Buffer);
   return digest.digest('hex');
 }
+function ioCode(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const {code} = error as NodeJS.ErrnoException;
+  return typeof code === 'string' && /^[A-Z][A-Z0-9_]{1,31}$/.test(code) ? code : undefined;
+}
 async function verifyTools(config: RuntimeConfig): Promise<void> {
   const manifest = JSON.parse(await readFile(new URL('../versions.json', import.meta.url), 'utf8')) as {ffmpeg: {executable_sha256: string; ffprobe_sha256: string}};
   await verifyBinary(config.ffmpeg, manifest.ffmpeg.executable_sha256); await verifyBinary(config.ffprobe, manifest.ffmpeg.ffprobe_sha256);
@@ -85,7 +92,7 @@ export class RenderBackend implements Backend {
   #inProgress = new Set<string>();
   private constructor(config: RuntimeConfig, nas: NasPaths, scratch: ScratchSpace, deps: Dependencies) {this.config = config; this.nas = nas; this.scratch = scratch; this.deps = deps;}
   static async create(config: RuntimeConfig, dependencies: Partial<Dependencies> = {}): Promise<RenderBackend> {
-    return new RenderBackend(config, await NasPaths.create(config.nasRoot), await ScratchSpace.create(config.cacheRoot), {run: runProcess, scene: renderScene, verifyTools, verifyMapping, ...dependencies});
+    return new RenderBackend(config, await NasPaths.create(config.nasRoot), await ScratchSpace.create(config.cacheRoot), {run: runProcess, scene: renderScene, copyArtifact: copyFile, verifyTools, verifyMapping, ...dependencies});
   }
   health(): Health {return {service: 'remotion', status: this.#ready ? 'ok' : 'degraded', ready: this.#ready, version: '4.0.541', nvenc_available: this.#nvenc, prores_available: this.#prores, checked_at: this.#checkedAt, max_concurrent_jobs: 2, output_formats: ['mp4', 'prores4444'], output_resolutions: ['1080p', '4k']};}
   async initialize(): Promise<void> {
@@ -152,13 +159,15 @@ export class RenderBackend implements Backend {
     }
     return this.deps.scene({request, scratch: work, cacheRoot: this.scratch.root, browser: this.config.browser, videoSource, signal, ...(overlay && {overlay}), ...(preconformed && {preconformed})}, frames);
   }
-  async #copyArtifacts(output: {absolute: string; relative: string}, files: string[]): Promise<Artifact[]> {
+  async #copyArtifacts(output: {absolute: string; relative: string}, files: string[], signal: AbortSignal): Promise<Artifact[]> {
     const results: Artifact[] = [];
     for (const file of files) {
+      signal.throwIfAborted();
       const name = path.basename(file), target = path.join(output.absolute, name);
-      await copyFile(file, target, constants.COPYFILE_EXCL);
-      results.push({path: `${output.relative}/${name}`, bytes: (await stat(target)).size, sha256: await sha256File(target)});
+      await this.deps.copyArtifact(file, target, constants.COPYFILE_EXCL);
+      results.push({path: `${output.relative}/${name}`, bytes: (await stat(target)).size, sha256: await sha256File(target, signal)});
     }
+    signal.throwIfAborted();
     return results;
   }
 
@@ -196,7 +205,7 @@ export class RenderBackend implements Backend {
   }
 
   async #withReceipt<T extends {files: Artifact[]}>(request: RenderRequest, kind: RenderStage, signal: AbortSignal,
-    execute: (publish: (files: string[]) => Promise<Artifact[]>) => Promise<T>): Promise<T> {
+    execute: (publish: (files: string[], publicationSignal: AbortSignal) => Promise<Artifact[]>) => Promise<T>): Promise<T> {
     this.#requireReady();
     const jobKey = `${request.project_id}/${request.job_id}/${kind}`;
     if (this.#inProgress.has(jobKey)) throw new WorkerError(409, 'TRABAJO_EN_CURSO', 'El puente ya procesa este trabajo.');
@@ -212,15 +221,28 @@ export class RenderBackend implements Backend {
       const identity = createHash('sha256').update(JSON.stringify([kind, request, sources])).digest('hex');
       const existing = await this.nas.existingOutput(request.project_id, request.job_id, kind);
       if (existing) return await this.#replay<T>(existing, identity, signal);
-      const result = await execute(async files => {
-        for (const [index, relative] of inputs.entries()) {
-          if (relative && await sha256File(await this.nas.input(relative, request.project_id), signal) !== sources[index]) {
-            throw new WorkerError(409, 'INSUMO_CAMBIADO', 'Un insumo cambió durante el render.');
+      const result = await execute(async (files, publicationSignal) => {
+        const stage = async () => {
+          for (const [index, relative] of inputs.entries()) {
+            if (relative && await sha256File(await this.nas.input(relative, request.project_id), publicationSignal) !== sources[index]) {
+              throw new WorkerError(409, 'INSUMO_CAMBIADO', 'Un insumo cambió durante el render.');
+            }
           }
+          publicationSignal.throwIfAborted();
+          folder = await this.nas.stageOutput(request.project_id, request.job_id, kind);
+          return this.#copyArtifacts(folder, files, publicationSignal);
+        };
+        try {return await stage();}
+        catch (error) {
+          const code = ioCode(error);
+          if (!folder || publicationSignal.aborted || !code || !transientNasErrors.has(code)) throw error;
+          await folder.discard();
+          folder = undefined;
+          console.warn(JSON.stringify({service: 'remotion', operation: kind, phase: 'publicacion_nas',
+            event: 'reintento_copia', io_code: code}));
+          await delay(250, undefined, {signal: publicationSignal});
+          return stage();
         }
-        signal.throwIfAborted();
-        folder = await this.nas.stageOutput(request.project_id, request.job_id, kind);
-        return this.#copyArtifacts(folder, files);
       });
       if (!folder) throw new WorkerError(500, 'RECIBO_NO_DISPONIBLE', 'No se pudo preparar el recibo del puente.');
       const body = JSON.stringify({request_sha256: identity, result});
@@ -441,7 +463,7 @@ export class RenderBackend implements Backend {
       bounded.throwIfAborted();
       const publishStarted = performance.now();
       phase = 'publicacion_nas';
-      const files = await publish([output]);
+      const files = await publish([output], bounded);
       const finished = performance.now();
       const stage_ms = {
         preparacion_audio: Math.round(framesStarted - audioStarted),
@@ -455,7 +477,7 @@ export class RenderBackend implements Backend {
       const job = createHash('sha256').update(`${request.project_id}/${request.job_id}`).digest('hex').slice(0, 16);
       console.warn(JSON.stringify({service: 'remotion', utc: new Date().toISOString(), operation: 'render',
         job, phase, elapsed_ms: Math.round(performance.now() - started),
-        error: error instanceof WorkerError ? error.code : 'FALLO_INTERNO'}));
+        error: error instanceof WorkerError ? error.code : 'FALLO_INTERNO', io_code: ioCode(error)}));
       throw error;
     });
   }
@@ -488,7 +510,7 @@ export class RenderBackend implements Backend {
       if (scene.frameCount !== request.frames.length || scene.files.length !== request.frames.length) throw new WorkerError(502, 'CAPTURAS_INCOMPLETAS', 'La composición no produjo todas las capturas solicitadas.');
       const alpha = [];
       if (request.transparent) for (const [index, file] of scene.files.entries()) alpha.push(await this.#alpha(file, work, `still-${index}`, 0, bounded));
-      return {files: await publish(scene.files), frames: request.frames, width: request.width, height: request.height, resolution: request.resolution, transparent: request.transparent, alpha_verified: request.transparent && alpha.length === scene.files.length, alpha, duration_seconds: request.durationInFrames / 30, watermark: request.watermark, elapsed_ms: Math.round(performance.now() - started)};
+      return {files: await publish(scene.files, bounded), frames: request.frames, width: request.width, height: request.height, resolution: request.resolution, transparent: request.transparent, alpha_verified: request.transparent && alpha.length === scene.files.length, alpha, duration_seconds: request.durationInFrames / 30, watermark: request.watermark, elapsed_ms: Math.round(performance.now() - started)};
     }));
   }
   async inspect(request: InspectRequest, signal: AbortSignal) {
@@ -505,7 +527,7 @@ export class RenderBackend implements Backend {
         files.push(output); frames.push({seconds, png: await readFile(output)});
       }
       const sheet = path.join(work, 'contact-sheet.svg'); await writeFile(sheet, contactSheet(frames, media), {flag: 'wx'}); files.push(sheet);
-      return {files: await this.#copyArtifacts(await this.nas.output(request.project_id, request.job_id, 'inspect'), files), media, audio, ruler: normalizedRuler(media), samples_seconds: frames.map((frame) => frame.seconds), elapsed_ms: Math.round(performance.now() - started)};
+      return {files: await this.#copyArtifacts(await this.nas.output(request.project_id, request.job_id, 'inspect'), files, bounded), media, audio, ruler: normalizedRuler(media), samples_seconds: frames.map((frame) => frame.seconds), elapsed_ms: Math.round(performance.now() - started)};
     });
   }
 }
