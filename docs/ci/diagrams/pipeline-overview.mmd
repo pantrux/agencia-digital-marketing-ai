@@ -10,6 +10,7 @@ flowchart TB
     %% Control 6 separa Python dev/contratos CPU (27), métricas (4), Immich runtime (70)/build (8) y Whisper (94).
     %% npm audita raíz y renderer; runtime Immich tiene 69 consultas OSV incluido ORT CUDA 12 y una fuente exceptuada.
     %% El validador exige cuatro JSON y cuatro stderr; avisos OSV incompletos bloquean aunque pip-audit devuelva 0.
+    %% Un 502, 503 o 504 de OSV con JSON ausente admite dos reintentos y conserva sus trazas.
     %% Los informes de seguridad disponibles se conservan 14 días aun ante fallos, sin incluir secretos.
     %% El recibo npm del renderer vincula los hashes de package.json, lock y reporte con umbral high.
     %% Las pruebas Node cubren bundle único concurrente, assets UUID y QA normalizada 0..1920 también en 4K.
