@@ -44,6 +44,8 @@ Si el formato cambia un script que otro operador autentica por SHA256, coteja la
 
 Para cambios en las reglas del receptor de métricas, valida los casos de fallo, ausencia y recuperación con `promtool test rules`. Después de la recarga, comprueba el estado de las reglas y la edad de las muestras por mTLS. [Procedimiento del NAS](../../../docker/observability/README-nas.md#alertas-de-recolección-en-prometheus)
 
+Para cambios en las rutas multipart, coteja que la familia `presign` del recolector Edge cubra las aperturas y las firmas individuales y por lotes de archivos y fuentes. Comprueba que excluya el listado y la finalización de partes. Verifica ambos filtros con la misma ventana de Cloudflare antes de activar el recolector y coteja su ejecución en Prometheus.
+
 Para ensayos del codificador facial, coteja las fuentes fijadas de Immich y prueba el formato real por API con un corpus desechable. Registra las particiones y los umbrales antes de inferir. [Aceptación facial](../../../docker/immich-server/README-ACEPTACION-FACIAL.md#ensayo-de-vistas-previas-webp-sin-pérdida)
 
 Para probar la llegada de fotos a grupos existentes, fija tres tandas en el manifiesto sintético y coteja las asignaciones acumuladas después de drenar las colas de cada una. [Sonda por manifiesto](../../../docker/immich-server/README-ACEPTACION-FACIAL.md#espacio-y-orden-de-ejecución)

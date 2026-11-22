@@ -31,7 +31,11 @@ EDGE_DENIED = f"not permitted to access column on `events.httpRequests`: {EDGE_F
 ORIGIN_FIELD = "originResponseDurationMs"
 AUTH = "clientRequestPath LIKE '/api/auth/%'"
 PRESIGN = """(clientRequestPath IN ('/api/upload/presign', '/api/uploads')
-              OR clientRequestPath LIKE '/api/uploads/%/parts/%/sign')"""
+              OR clientRequestPath LIKE '/api/uploads/%/parts/%/sign'
+              OR clientRequestPath LIKE '/api/uploads/%/parts/sign'
+              OR clientRequestPath LIKE '/api/orders/%/sources/%/upload'
+              OR clientRequestPath LIKE '/api/orders/%/sources/%/parts/%/sign'
+              OR clientRequestPath LIKE '/api/orders/%/sources/%/parts/sign')"""
 STATUS_COUNTS = """
     COUNT(*) AS total,
     countIf(edgeResponseStatus BETWEEN 200 AND 399) AS respuestas_2xx_3xx,
