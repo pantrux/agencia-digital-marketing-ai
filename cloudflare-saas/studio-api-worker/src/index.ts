@@ -17,7 +17,7 @@ import { handleProductionDispatch, productionDispatchPath, type ProductionDispat
 import { handleProductionBrief, productionBriefRoute } from "./production-brief.js";
 import { handleSourceSet, sourceSetRoute } from "./production-sources.js";
 import { handleReference, referenceRoute, type ReferenceEnv } from "./references.js";
-import { completeSourceUpload, createSourceUpload, listSourceParts, signSourcePart } from "./source-upload.js";
+import { completeSourceUpload, createSourceUpload, handleSourcePartAccess } from "./source-upload.js";
 import { response, HttpError, readJson, type ExecutionTasks } from "./platform.js";
 
 interface AnalyticsDataset {
@@ -155,6 +155,13 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
       ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));
       return result;
     }
+    const signingSourcePart = request.method === "POST" && sourceUpload?.[4];
+    if (sourceUpload && (signingSourcePart || (request.method === "GET" && sourceUpload[3] === "parts"))
+      && uploadsConfigured(env)) {
+      const owner = await sessionLookup(request, env);
+      return await handleSourcePartAccess(env, owner, sourceUpload[1]!, sourceUpload[2]!,
+        signingSourcePart ? Number(signingSourcePart) : undefined);
+    }
     const user = await identity(request, env);
     if (path === "/api/metrics/ttfb" && request.method === "POST") {
       return await recordBrowserTimings(request, env, user.email.toLowerCase().endsWith(".invalid"));
@@ -180,9 +187,7 @@ export async function route(request: Request, env: WorkerEnv, ctx: ExecutionTask
     if (sourceSet && !url.search) return await handleSourceSet(request, env, user.id, sourceSet[1]!);
     if (sourceUpload) {
       if (!uploadsConfigured(env)) throw new HttpError(503, "SUBIDA_NO_DISPONIBLE");
-      const [, orderId, sourceId, action, part] = sourceUpload;
-      if (request.method === "GET" && action === "parts") return await listSourceParts(env, user.id, orderId!, sourceId!);
-      if (request.method === "POST" && part) return await signSourcePart(env, user.id, orderId!, sourceId!, Number(part));
+      const [, orderId, sourceId, action] = sourceUpload;
       if (request.method === "POST" && action === "complete") {
         const result = await completeSourceUpload(request, env, user.id, orderId!, sourceId!);
         ctx.waitUntil(dispatchSourceOutbox(env).catch(() => {}));

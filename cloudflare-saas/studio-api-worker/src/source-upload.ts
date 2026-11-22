@@ -149,57 +149,48 @@ export async function createSourceUpload(env: IngestEnv, owner: SourceOwner, ord
   return info({ ...row, status: "open", upload_id: upload.uploadId }, true, initialParts);
 }
 
-/** Firma únicamente una parte de una fuente abierta y perteneciente al titular. */
-export async function signSourcePart(
-  env: IngestEnv, user: string, order: string, sourceId: string, number: number,
+function sourcePartJob(order: string, row: SourceRow & UploadRow): SyncJob {
+  return validateSyncJob({ job_id: order, asset_id: row.id, project_slug: row.project_slug,
+    extension: row.extension, bytes: row.bytes, sha256: row.sha256, object_key: row.object_key },
+  { maxObjectBytes: 1024 ** 3 });
+}
+
+/** Lista o firma partes tras verificar la sesión y la fuente en un solo lote de D1. */
+export async function handleSourcePartAccess(
+  env: IngestEnv, owner: Awaited<ReturnType<typeof sessionLookup>>, order: string, sourceId: string, number?: number,
 ): Promise<Response> {
-  const row = await env.DB.withSession("first-primary").prepare(`SELECT source.id,source.order_id,source.bytes,
+  const [sessions, uploads] = await env.DB.batch<PortalIdentity | (SourceRow & UploadRow)>([
+    owner.statement(env.DB),
+    prepareOwnedStatement(env.DB, owner, `SELECT source.id,source.order_id,source.bytes,
     source.sha256,source.extension,o.project_slug,o.status AS order_status,ledger.status AS usage_status,
     upload.object_key,upload.upload_id,upload.status,upload.expires_at
     FROM production_sources source JOIN production_source_sets source_set ON source_set.order_id=source.order_id
     JOIN orders o ON o.id=source_set.order_id AND o.user_id=source_set.user_id
     JOIN usage_ledger ledger ON ledger.order_id=o.id AND ledger.user_id=o.user_id
     JOIN production_source_uploads upload ON upload.source_id=source.id
-    WHERE source.id=? AND o.id=? AND o.user_id=? AND COALESCE(o.provider_mode,'production')=?`)
-    .bind(sourceId, order, user, env.BILLING_MODE).first<SourceRow & UploadRow>();
-  if (!row) throw new HttpError(404, "MATERIAL_NO_ENCONTRADO");
+    WHERE source.id=? AND o.id=? AND o.user_id=${ownerId} AND COALESCE(o.provider_mode,'production')=?`,
+    sourceId, order, env.BILLING_MODE),
+  ]);
+  if (!sessions?.results[0]) throw new HttpError(401, "AUTENTICACION_REQUERIDA");
+  const row = uploads?.results[0];
+  if (!row || !("upload_id" in row)) throw new HttpError(404, "MATERIAL_NO_ENCONTRADO");
   if (row.order_status !== "queued" || row.usage_status !== "reserved") throw new HttpError(409, "ORDEN_NO_RESERVADA");
   const now = Math.floor(Date.now() / 1000);
   if (row.expires_at <= now) throw new HttpError(410, "SUBIDA_VENCIDA");
   if (row.status !== "open" || !row.upload_id) throw new HttpError(409, "SUBIDA_NO_ABIERTA");
+  if (number === undefined) {
+    return response({ parts: await listMultipartParts(env, sourcePartJob(order, row), row.upload_id) });
+  }
   const count = Math.ceil(row.bytes / partSize);
   if (!Number.isSafeInteger(number) || number < 1 || number > count) throw new HttpError(405, "METODO_INVALIDO");
   const contentType = mime[row.extension];
   if (!contentType) throw new HttpError(422, "MATERIAL_INVALIDO");
-  const job = validateSyncJob({ job_id: order, asset_id: row.id, project_slug: row.project_slug,
-    extension: row.extension, bytes: row.bytes, sha256: row.sha256, object_key: row.object_key },
-  { maxObjectBytes: 1024 ** 3 });
-  return response(await signR2UploadPart(job, { maxObjectBytes: 1024 ** 3 }, {
+  return response(await signR2UploadPart(sourcePartJob(order, row), { maxObjectBytes: 1024 ** 3 }, {
     accountId: env.R2_ACCOUNT_ID, accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY,
   }, new Date().toISOString().replace(/[-:]|\.\d{3}/gu, ""), {
     uploadId: row.upload_id, partNumber: number, bytes: Math.min(partSize, row.bytes - (number - 1) * partSize),
     mimeType: contentType, expires: Math.min(300, row.expires_at - now),
   }));
-}
-
-/** Consulta las partes ya almacenadas para reanudar la transferencia. */
-export async function listSourceParts(env: IngestEnv, user: string, order: string, sourceId: string): Promise<Response> {
-  const row = await env.DB.withSession("first-primary").prepare(`SELECT source.id,source.order_id,source.bytes,
-    source.sha256,source.extension,o.project_slug,o.status AS order_status,ledger.status AS usage_status,
-    upload.object_key,upload.upload_id,upload.status,upload.expires_at
-    FROM production_sources source JOIN production_source_sets source_set ON source_set.order_id=source.order_id
-    JOIN orders o ON o.id=source_set.order_id AND o.user_id=source_set.user_id
-    JOIN usage_ledger ledger ON ledger.order_id=o.id AND ledger.user_id=o.user_id
-    JOIN production_source_uploads upload ON upload.source_id=source.id
-    WHERE source.id=? AND o.id=? AND o.user_id=? AND COALESCE(o.provider_mode,'production')=?`)
-    .bind(sourceId, order, user, env.BILLING_MODE).first<SourceRow & UploadRow>();
-  if (!row) throw new HttpError(404, "MATERIAL_NO_ENCONTRADO");
-  if (row.order_status !== "queued" || row.usage_status !== "reserved") throw new HttpError(409, "ORDEN_NO_RESERVADA");
-  if (row.expires_at <= Math.floor(Date.now() / 1000)) throw new HttpError(410, "SUBIDA_VENCIDA");
-  if (row.status !== "open" || !row.upload_id) throw new HttpError(409, "SUBIDA_NO_ABIERTA");
-  const job = validateSyncJob({ job_id: order, asset_id: row.id, project_slug: row.project_slug,
-    extension: row.extension, bytes: row.bytes, sha256: row.sha256, object_key: row.object_key }, { maxObjectBytes: 1024 ** 3 });
-  return response({ parts: await listMultipartParts(env, job, row.upload_id) });
 }
 
 /** Confirma una fuente solo después de comprobar tamaño, metadatos y SHA-256. */
