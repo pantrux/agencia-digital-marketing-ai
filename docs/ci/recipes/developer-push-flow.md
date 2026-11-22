@@ -263,3 +263,8 @@ Para verificar cambios de transcripción, comprueba que Valeria puede leer
 los recibos del audio inicial y de los materiales adicionales. Con recibos
 válidos de Sofía, la lectura debe devolver las marcas de tiempo sin abrir
 otra sesión del inspector ni volver a transcribir el audio.
+
+Para verificar la recuperación de la copia diaria de D1, prueba el arranque
+de una VM después de la ventana de las 03:00. Coteja el origen del recibo
+con su fecha real y confirma que un segundo disparo no duplica el snapshot.
+Verifica la huella del mismo SQL desde Synology y R2.
