@@ -438,20 +438,24 @@ export class MercadoPagoClient {
     return invoice;
   }
 
-  async findLatestInvoice(subscriptionId: string): Promise<MercadoPagoInvoice | null> {
+  async findLatestDueInvoiceWithPayment(subscriptionId: string, asOf: number): Promise<MercadoPagoInvoice | null> {
     idFor(subscriptionId);
+    requireValue(integer(asOf, 1, Number.MAX_SAFE_INTEGER), 'invalid_input');
     const records = await this.#searchRows('/authorized_payments/search', { preapproval_id: subscriptionId });
-    let result: MercadoPagoInvoice | null = null;
+    const due: Array<MercadoPagoInvoice & { debitAt: number }> = [];
     for (const record of records) {
-      const current = this.#invoice(record);
-      requireValue(current.subscriptionId === subscriptionId, 'provider_binding');
-      requireValue(current.debitAt !== undefined, 'provider_payload');
-      if (!result || current.debitAt > (result.debitAt ?? 0)) result = current;
-      else if (current.debitAt === result.debitAt && current.id !== result.id) {
-        throw new MercadoPagoError('provider_ambiguous');
-      }
+      const invoice = this.#invoice(record);
+      requireValue(invoice.subscriptionId === subscriptionId, 'provider_binding');
+      if (invoice.paymentId === null) continue;
+      const { debitAt } = invoice;
+      requireValue(debitAt !== undefined, 'provider_payload');
+      if (debitAt <= asOf) due.push({ ...invoice, debitAt });
     }
-    return result;
+    due.sort((left, right) => right.debitAt - left.debitAt);
+    const [latest] = due;
+    requireValue(!latest || !due.some(invoice => invoice.debitAt === latest.debitAt && invoice.id !== latest.id),
+      'provider_ambiguous');
+    return latest ?? null;
   }
 
   async findInvoiceByPayment(id: string): Promise<MercadoPagoInvoice | null> {
