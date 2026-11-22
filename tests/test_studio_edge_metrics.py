@@ -1,5 +1,7 @@
 import io
 import json
+import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime
 from urllib.error import HTTPError, URLError
 
@@ -8,6 +10,39 @@ import pytest
 from sre import studio_edge_metrics as edge
 
 NOW = datetime(2026, 11, 15, 15, tzinfo=UTC)
+
+
+def test_mide_apertura_y_firmas_multipart_para_archivos_y_fuentes():
+    archivo = "/api/uploads/1024e07e-7733-4770-8cc1-3931e28a4d32"
+    fuente = (
+        "/api/orders/8d23dbf8-666c-466e-9055-16ac19e06cda"
+        "/sources/a822e19d-b15c-40d2-9fb0-ed6fda609493"
+    )
+    presign = [
+        "/api/upload/presign",
+        "/api/uploads",
+        f"{archivo}/parts/4/sign",
+        f"{archivo}/parts/sign",
+        f"{fuente}/upload",
+        f"{fuente}/parts/4/sign",
+        f"{fuente}/parts/sign",
+    ]
+    otras_rutas = [
+        "/api/auth/me",
+        "/api/orders",
+        f"{archivo}/parts",
+        f"{fuente}/parts",
+        f"{fuente}/complete",
+    ]
+    with closing(sqlite3.connect(":memory:")) as database:
+        database.execute("CREATE TABLE peticiones (clientRequestPath TEXT)")
+        database.executemany(
+            "INSERT INTO peticiones VALUES (?)", [(route,) for route in presign + otras_rutas]
+        )
+        result = database.execute(
+            f"SELECT clientRequestPath FROM peticiones WHERE {edge.PRESIGN} ORDER BY rowid"
+        ).fetchall()
+    assert result == [(route,) for route in presign]
 
 
 def fake_source(query):
