@@ -146,27 +146,19 @@ Para activar la recepción de másteres y kits largos en Kitsu, aplica `docker/k
    | Whisper | `gpu-bridge-win11/requirements-whisper.lock` y su manifiesto deben coincidir con las 94 ruedas fijadas para Windows/Python 3.12; auditar el grafo completo. |
    | Renderer | Usar su `package-lock.json`, instalación sin scripts y `npm audit --audit-level=high`, además de la auditoría npm de la raíz. |
 
-   Generar entradas auditables desde los manifiestos, consultar los cuatro grafos y validar su cobertura. En Linux/CI, usando el entorno de auditoría ya preparado:
+   Usa el entorno de auditoría para generar las entradas, consultar los cuatro grafos y validar su cobertura. En Linux y CI ejecuta el siguiente comando.
 
    ```bash
-   python scripts/ci/check_gpu_dependencies.py prepare --output .tools/evidence/gpu-dependencies
-   for graph in metrics immich-runtime immich-build whisper; do
-     .tools/venvs/python-audit/bin/python -m pip_audit --strict --no-deps --disable-pip --vulnerability-service osv --progress-spinner off --requirement ".tools/evidence/gpu-dependencies/$graph.requirements.txt" --format json --output ".tools/evidence/gpu-dependencies/$graph.json" 2> ".tools/evidence/gpu-dependencies/$graph.stderr.txt" || exit 1
-   done
-   python scripts/ci/check_gpu_dependencies.py validate --inventory .tools/evidence/gpu-dependencies/inventory.json --reports-dir .tools/evidence/gpu-dependencies
+   .tools/venvs/python-audit/bin/python scripts/ci/check_gpu_dependencies.py audit --output .tools/evidence/gpu-dependencies
    ```
 
-   En Windows, sustituir el bucle por este bloque después del mismo comando `prepare`; `$pythonAuditoria` es el ejecutable del entorno aislado definido arriba:
+   En Windows, usa `$pythonAuditoria`, el ejecutable del entorno aislado definido arriba.
 
    ```powershell
-   foreach ($grafo in @('metrics', 'immich-runtime', 'immich-build', 'whisper')) {
-       & $pythonAuditoria -m pip_audit --strict --no-deps --disable-pip --vulnerability-service osv --progress-spinner off --requirement ".tools/evidence/gpu-dependencies/$grafo.requirements.txt" --format json --output ".tools/evidence/gpu-dependencies/$grafo.json" 2> ".tools/evidence/gpu-dependencies/$grafo.stderr.txt"
-       if ($LASTEXITCODE -ne 0) { throw "Falló la auditoría del grafo $grafo." }
-   }
-   python scripts/ci/check_gpu_dependencies.py validate --inventory .tools/evidence/gpu-dependencies/inventory.json --reports-dir .tools/evidence/gpu-dependencies
+   & $pythonAuditoria scripts/ci/check_gpu_dependencies.py audit --output .tools/evidence/gpu-dependencies
    ```
 
-   El validador recompone las fuentes y sus hashes y exige correspondencia exacta de cada nombre/versión entre inventario e informes. También exige los cuatro archivos `stderr.txt`: rechaza avisos OSV con esquema incompatible o sin lista `affected`, aunque pip-audit termine con salida cero. Sólo entonces emite `receipt.json`, con hashes del inventario, cuatro JSON y cuatro diagnósticos. Regenerar los informes en cada corrida: un reporte que omita versiones o conserve un grafo anterior no acredita la cobertura actual. Estos comandos consultan versiones declaradas sin instalar los runtimes Windows en el runner Linux.
+   El auditor puede repetir un grafo cuando OSV devuelve HTTP 502, 503 o 504 y el JSON está ausente. Conserva hasta dos diagnósticos de reintento en `*.intento-*.stderr.txt`. El validador recompone las fuentes y sus hashes y exige correspondencia exacta de cada nombre y versión entre inventario e informes. Examina los cuatro archivos `stderr.txt` y rechaza avisos OSV con esquema incompatible o sin lista `affected`, incluso con salida cero de pip-audit. Emite `receipt.json` con los hashes del inventario, los cuatro JSON y los cuatro diagnósticos tras confirmar la cobertura. Los comandos consultan los pines declarados sin instalar los runtimes Windows en el runner Linux.
 
    Los informes sólo acreditan las dependencias enumeradas y verificadas. No descargan pesos ni prueban CUDA o NVENC. El manifiesto Immich mantiene `buffalo_l` bloqueado para SaaS facial comercial hasta resolver una licencia independiente; el permiso del código no se extiende automáticamente a los pesos.
 4. Si se modifica un workflow, manifiesto o contrato SRE, actualizar en el mismo cambio esta receta, el [diagrama](../diagrams/pipeline-overview.mmd) y el procedimiento afectado. Registrar evidencia real y dependencias pendientes en `ESTADO.md`.

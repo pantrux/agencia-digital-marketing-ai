@@ -4,6 +4,9 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
+import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -17,6 +20,13 @@ FILES = (
     "whisper-artifacts.json",
 )
 COUNTS = {"metrics": 4, "immich-runtime": 70, "immich-build": 8, "whisper": 94}
+OSV_SCHEMA_WARNINGS = ("Unsupported OSV schema version", "missing 'affected' list")
+OSV_TRANSIENT = re.compile(
+    r"^requests\.exceptions\.HTTPError: 50[234] Server Error:[^\r\n]*"
+    r" for url: https://api\.osv\.dev/v1/query\r?$",
+    re.MULTILINE,
+)
+OSV_RETRY_DELAYS = (2, 5)
 SOURCE_EXCEPTION = {
     "name": "immich-model",
     "version": "0.2.0",
@@ -290,6 +300,57 @@ def prepare(root, output):
     return inventory
 
 
+def audit_graph(output, name):
+    report = output / f"{name}.json"
+    diagnostic = output / f"{name}.stderr.txt"
+    report.unlink(missing_ok=True)
+    for attempt in range(1, len(OSV_RETRY_DELAYS) + 1):
+        (output / f"{name}.intento-{attempt}.stderr.txt").unlink(missing_ok=True)
+    command = [
+        sys.executable,
+        "-m",
+        "pip_audit",
+        "--strict",
+        "--no-deps",
+        "--disable-pip",
+        "--vulnerability-service",
+        "osv",
+        "--progress-spinner",
+        "off",
+        "--requirement",
+        str(output / f"{name}.requirements.txt"),
+        "--format",
+        "json",
+        "--output",
+        str(report),
+    ]
+    for attempt, delay in enumerate((*OSV_RETRY_DELAYS, None), 1):
+        with diagnostic.open("wb") as stderr:
+            process = subprocess.run(command, stderr=stderr, check=False)
+        if process.returncode == 0:
+            return True
+        if delay is None or report.exists():
+            return False
+        text = diagnostic.read_text(encoding="utf-8-sig", errors="replace")
+        if any(warning in text for warning in OSV_SCHEMA_WARNINGS) or not OSV_TRANSIENT.search(
+            text
+        ):
+            return False
+        diagnostic.replace(output / f"{name}.intento-{attempt}.stderr.txt")
+        print(f"OSV devolvió un error transitorio para {name}. Reintento en {delay} s.", flush=True)
+        time.sleep(delay)
+
+
+def audit(root, output):
+    inventory = prepare(root, output)
+    failed = [name for name in inventory["graphs"] if not audit_graph(output, name)]
+    if failed:
+        raise ValueError(
+            "Falló la auditoría OSV de " + ", ".join(failed) + ". Revisar sus diagnósticos."
+        )
+    return validate_reports(root, output / "inventory.json", output)
+
+
 def validate_report(report, expected):
     if (
         not isinstance(report, dict)
@@ -336,7 +397,7 @@ def validate_reports(root, inventory_file, reports_dir):
         errors = validate_report(load_json(report), graph["audit"])
         diagnostic = reports_dir / f"{name}.stderr.txt"
         text = diagnostic.read_text(encoding="utf-8-sig")
-        if "Unsupported OSV schema version" in text or "missing 'affected' list" in text:
+        if any(warning in text for warning in OSV_SCHEMA_WARNINGS):
             errors.append("OSV omitió un aviso por esquema no compatible o incompleto.")
         if errors:
             raise ValueError(f"Auditoría {name} rechazada: " + "; ".join(errors))
@@ -370,6 +431,10 @@ def main():
         "prepare", help="Genera cuatro inventarios auditables sin instalar nada."
     )
     generator.add_argument("--output", type=Path, required=True)
+    auditor = commands.add_parser(
+        "audit", help="Prepara, consulta y valida los cuatro grafos en OSV."
+    )
+    auditor.add_argument("--output", type=Path, required=True)
     validator = commands.add_parser(
         "validate", help="Exige cobertura exacta y genera recibo con hashes."
     )
@@ -390,7 +455,11 @@ def main():
                 )
             )
         else:
-            value = validate_reports(ROOT, args.inventory, args.reports_dir)
+            value = (
+                audit(ROOT, args.output)
+                if args.mode == "audit"
+                else validate_reports(ROOT, args.inventory, args.reports_dir)
+            )
             print(
                 json.dumps(
                     {"audited": value["audited_counts"], "known_vulnerabilities": 0},

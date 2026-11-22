@@ -323,20 +323,7 @@ jobs:
           .tools/venvs/python-audit/bin/python -m pip_audit --strict --progress-spinner off --vulnerability-service pypi --requirement requirements-dev.txt --format json --output .tools/evidence/python-sca.json
           .tools/venvs/python-audit/bin/python scripts/ci/check_python_audit.py --report .tools/evidence/python-sca.json
       - name: Auditar por OSV los cuatro grafos GPU sin instalar sus ruedas Windows
-        run: |
-          python scripts/ci/check_gpu_dependencies.py prepare --output .tools/evidence/gpu-dependencies
-          audit_status=0
-          for graph in metrics immich-runtime immich-build whisper; do
-            .tools/venvs/python-audit/bin/python -m pip_audit --strict --no-deps --disable-pip \
-              --vulnerability-service osv --progress-spinner off \
-              --requirement ".tools/evidence/gpu-dependencies/${graph}.requirements.txt" \
-              --format json --output ".tools/evidence/gpu-dependencies/${graph}.json" \
-              2> ".tools/evidence/gpu-dependencies/${graph}.stderr.txt" || audit_status=1
-          done
-          python scripts/ci/check_gpu_dependencies.py validate \
-            --inventory .tools/evidence/gpu-dependencies/inventory.json \
-            --reports-dir .tools/evidence/gpu-dependencies
-          exit "$audit_status"
+        run: .tools/venvs/python-audit/bin/python scripts/ci/check_gpu_dependencies.py audit --output .tools/evidence/gpu-dependencies
       - name: Instalar el renderizador aislado sin scripts de paquetes
         run: npm ci --ignore-scripts --prefix gpu-bridge-win11/render-worker
       - name: Auditar el lock npm propio del renderizador con el mismo umbral

@@ -4,9 +4,11 @@ import copy
 import importlib.util
 import json
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 PROJECT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -20,6 +22,10 @@ INPUTS = (
     "immich-artifacts.json",
     "requirements-whisper.lock",
     "whisper-artifacts.json",
+)
+OSV_TIMEOUT = (
+    b"requests.exceptions.HTTPError: 504 Server Error: Gateway Timeout "
+    b"for url: https://api.osv.dev/v1/query\n"
 )
 
 
@@ -259,6 +265,93 @@ class DependenciasGpu(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE.validate_reports(self.root, output / "inventory.json", output)
         self.assertFalse((output / "receipt.json").exists())
+
+    def test_reintenta_solo_el_grafo_con_timeout_y_acredita_los_cuatro(self):
+        output = self.root / "reports"
+        calls = []
+
+        def pip_audit(command, *, stderr, check):
+            self.assertFalse(check)
+            requirements = Path(command[command.index("--requirement") + 1])
+            name = requirements.name.removesuffix(".requirements.txt")
+            calls.append(name)
+            if name == "immich-runtime" and calls.count(name) == 1:
+                stderr.write(OSV_TIMEOUT)
+                return subprocess.CompletedProcess(command, 1)
+            packages = [
+                line.split("==") for line in requirements.read_text(encoding="utf-8").splitlines()
+            ]
+            report = {
+                "dependencies": [
+                    {"name": key, "version": value, "vulns": []} for key, value in packages
+                ]
+            }
+            Path(command[-1]).write_text(json.dumps(report), encoding="utf-8")
+            return subprocess.CompletedProcess(command, 0)
+
+        with (
+            patch.object(MODULE.subprocess, "run", side_effect=pip_audit),
+            patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            receipt = MODULE.audit(self.root, output)
+        self.assertEqual(
+            calls, ["metrics", "immich-runtime", "immich-runtime", "immich-build", "whisper"]
+        )
+        sleep.assert_called_once_with(2)
+        self.assertEqual((output / "immich-runtime.intento-1.stderr.txt").read_bytes(), OSV_TIMEOUT)
+        self.assertEqual((output / "immich-runtime.stderr.txt").read_bytes(), b"")
+        self.assertEqual(receipt["audited_counts"]["immich-runtime"], 69)
+
+    def test_no_reintenta_un_informe_con_hallazgos_ni_un_aviso_incompleto(self):
+        output = self.root / "reports"
+        MODULE.prepare(self.root, output)
+        findings = {
+            "dependencies": [{"name": "h11", "version": "0.16.0", "vulns": [{"id": "ENSAYO"}]}]
+        }
+        cases = (
+            (OSV_TIMEOUT, findings),
+            (OSV_TIMEOUT + b"Unsupported OSV schema version\n", None),
+            (OSV_TIMEOUT.replace(b"api.osv.dev", b"otro.ejemplo"), None),
+        )
+        for diagnostic, submitted in cases:
+
+            def pip_audit(command, *, stderr, check, diagnostic=diagnostic, submitted=submitted):
+                stderr.write(diagnostic)
+                if submitted is not None:
+                    Path(command[-1]).write_text(json.dumps(submitted), encoding="utf-8")
+                return subprocess.CompletedProcess(command, 1)
+
+            with (
+                self.subTest(diagnostic=diagnostic, submitted=submitted),
+                patch.object(MODULE.subprocess, "run", side_effect=pip_audit) as process,
+                patch.object(MODULE.time, "sleep") as sleep,
+            ):
+                self.assertFalse(MODULE.audit_graph(output, "metrics"))
+                process.assert_called_once()
+                sleep.assert_not_called()
+                self.assertEqual((output / "metrics.stderr.txt").read_bytes(), diagnostic)
+
+    def test_agota_dos_reintentos_y_retira_el_recibo_previo(self):
+        output = self.root / "reports"
+        inventory = MODULE.prepare(self.root, output)
+        self.reports(output, inventory)
+        MODULE.validate_reports(self.root, output / "inventory.json", output)
+
+        def pip_audit(command, *, stderr, check):
+            stderr.write(OSV_TIMEOUT)
+            return subprocess.CompletedProcess(command, 1)
+
+        with (
+            patch.object(MODULE.subprocess, "run", side_effect=pip_audit) as process,
+            patch.object(MODULE.time, "sleep") as sleep,
+            self.assertRaisesRegex(ValueError, "Falló la auditoría OSV"),
+        ):
+            MODULE.audit(self.root, output)
+        self.assertEqual(process.call_count, 12)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 5] * 4)
+        self.assertEqual((output / "whisper.intento-2.stderr.txt").read_bytes(), OSV_TIMEOUT)
+        self.assertFalse((output / "receipt.json").exists())
+        self.assertFalse((output / "whisper.json").exists())
 
 
 if __name__ == "__main__":
