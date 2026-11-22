@@ -97,12 +97,16 @@ class TranscriptionMetrics:
     """Conserva tiempos agregados por proceso, sin guardar datos del audio."""
 
     name = "agency_whisper_inference_seconds_per_minute"
+    duration_name = f"{name}_by_audio_duration"
     bounds = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 24, 40, 80)
+    duration_bounds = (15, 45, 75)
+    duration_ranges = ("hasta_15s", "de_15_a_45s", "de_45_a_75s", "mas_de_75s")
 
     def __init__(self):
         self.lock = threading.Lock()
-        self.buckets = [0] * (len(self.bounds) + 1)
-        self.total_seconds = 0.0
+        self.histograms = {
+            group: (0.0, [0] * (len(self.bounds) + 1)) for group in (None, *self.duration_ranges)
+        }
 
     def observe(self, duration, elapsed):
         if not math.isfinite(duration) or duration <= 0:
@@ -110,22 +114,42 @@ class TranscriptionMetrics:
         seconds_per_minute = elapsed * (60 / duration)
         if not math.isfinite(seconds_per_minute) or seconds_per_minute < 0:
             return
+        bucket = bisect_left(self.bounds, seconds_per_minute)
+        audio_range = self.duration_ranges[bisect_left(self.duration_bounds, duration)]
         with self.lock:
-            self.buckets[bisect_left(self.bounds, seconds_per_minute)] += 1
-            self.total_seconds += seconds_per_minute
+            for group in (None, audio_range):
+                total, buckets = self.histograms[group]
+                buckets[bucket] += 1
+                self.histograms[group] = (total + seconds_per_minute, buckets)
+
+    def histogram_lines(self, name, total, buckets, audio_range=None):
+        label = f'audio_range="{audio_range}"' if audio_range else ""
+        label_suffix = f",{label}" if label else ""
+        labels = f"{{{label}}}" if label else ""
+        cumulative = 0
+        for limit, count in zip((*self.bounds, "+Inf"), buckets, strict=True):
+            cumulative += count
+            yield f'{name}_bucket{{le="{limit}"{label_suffix}}} {cumulative}'
+        yield f"{name}_sum{labels} {total}"
+        yield f"{name}_count{labels} {cumulative}"
 
     def render(self):
         with self.lock:
-            buckets, total_seconds = tuple(self.buckets), self.total_seconds
-        cumulative = 0
+            snapshot = {
+                group: (total, tuple(buckets))
+                for group, (total, buckets) in self.histograms.items()
+            }
         lines = [
             f"# HELP {self.name} Segundos de inferencia por minuto de audio.",
             f"# TYPE {self.name} histogram",
+            *self.histogram_lines(self.name, *snapshot[None]),
+            f"# HELP {self.duration_name} Segundos de inferencia por minuto según duración del audio.",
+            f"# TYPE {self.duration_name} histogram",
         ]
-        for limit, count in zip((*self.bounds, "+Inf"), buckets, strict=True):
-            cumulative += count
-            lines.append(f'{self.name}_bucket{{le="{limit}"}} {cumulative}')
-        lines.extend((f"{self.name}_sum {total_seconds}", f"{self.name}_count {cumulative}"))
+        for group in self.duration_ranges:
+            lines.extend(
+                self.histogram_lines(self.duration_name, *snapshot[group], audio_range=group)
+            )
         return ("\n".join(lines) + "\n").encode("utf-8")
 
 

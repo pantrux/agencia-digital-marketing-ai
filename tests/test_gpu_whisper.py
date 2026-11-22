@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "gpu-bridge-win11"))
@@ -242,7 +245,40 @@ class AdmissionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("agency_whisper_inference_seconds_per_minute_count 2\n", body)
         self.assertIn("agency_whisper_inference_seconds_per_minute_sum 17.0\n", body)
         self.assertIn('agency_whisper_inference_seconds_per_minute_bucket{le="8"} 1\n', body)
+        duration_name = "agency_whisper_inference_seconds_per_minute_by_audio_duration"
+        self.assertIn(f'{duration_name}_bucket{{le="8",audio_range="de_15_a_45s"}} 1\n', body)
+        self.assertIn(f'{duration_name}_bucket{{le="8",audio_range="de_45_a_75s"}} 0\n', body)
+        self.assertIn(f'{duration_name}_count{{audio_range="de_45_a_75s"}} 1\n', body)
         self.assertNotIn("ensayo", body)
+
+    def test_intervalos_y_presupuesto_del_colector_whisper(self):
+        metrics = whisper.TranscriptionMetrics()
+        for duration in (15, 15.01, 45, 45.01, 75, 75.01):
+            metrics.observe(duration, duration / 60)
+        for duration, elapsed in ((0, 1), (float("inf"), 1), (60, -1), (60, float("nan"))):
+            metrics.observe(duration, elapsed)
+
+        samples = dict(
+            line.rsplit(" ", 1)
+            for line in metrics.render().decode().splitlines()
+            if not line.startswith("#")
+        )
+        self.assertEqual(samples[f"{metrics.name}_count"], "6")
+        expected_counts = {"hasta_15s": 1, "de_15_a_45s": 2, "de_45_a_75s": 2, "mas_de_75s": 1}
+        for group, expected in expected_counts.items():
+            with self.subTest(group=group):
+                self.assertEqual(
+                    samples[f'{metrics.duration_name}_count{{audio_range="{group}"}}'],
+                    str(expected),
+                )
+        collector = yaml.safe_load(
+            (ROOT / "docker/observability/otel-collector.gpu.yml").read_text(encoding="utf-8")
+        )
+        jobs = collector["receivers"]["prometheus"]["config"]["scrape_configs"]
+        job = next(job for job in jobs if job["job_name"] == "agency-whisper")
+        allowed_names = re.compile(job["metric_relabel_configs"][0]["regex"])
+        self.assertLess(len(samples), job["sample_limit"])
+        self.assertTrue(all(allowed_names.fullmatch(sample.split("{", 1)[0]) for sample in samples))
 
     async def test_solo_una_peticion_y_cuerpo_original_hasta_final(self):
         entered, finish = asyncio.Event(), asyncio.Event()

@@ -78,6 +78,20 @@ El [colector del puente GPU](otel-collector.gpu.yml) ejecuta el mismo binario va
 
 La tarea de recolección `agency-whisper` lee el histograma de inferencia en `GET /metrics` del puerto 8000 con la misma credencial del puente. El tiempo va desde la llamada al motor hasta que termina el generador. El histograma convierte cada duración a segundos por minuto del audio original y agrega sólo inferencias completas. La prueba CUDA de arranque se excluye. Los paneles de Grafana calculan el p95 y muestran el volumen estimado de observaciones de 30 días. El p95 usa interpolación entre los límites del histograma. Antes de acreditar el SLO, comprueba la cobertura de la ventana, el volumen y la continuidad del recolector. Prometheus conserva hasta 35 días con un límite de 2 GiB. [Cálculo de percentiles](https://prometheus.io/docs/practices/histograms/)
 
+El histograma `agency_whisper_inference_seconds_per_minute_by_audio_duration` permite investigar el p95 por duración del audio original. Los rangos son hasta 15 s, más de 15 hasta 45 s, más de 45 hasta 75 s y más de 75 s. Consulta junto al número de inferencias completas de cada rango para interpretar el percentil. La serie global sigue siendo la referencia del objetivo mensual.
+
+```promql
+histogram_quantile(0.95, sum by (audio_range, le) (
+  increase(agency_whisper_inference_seconds_per_minute_by_audio_duration_bucket{job="agency-whisper"}[24h])
+))
+```
+
+```promql
+sum by (audio_range) (
+  increase(agency_whisper_inference_seconds_per_minute_by_audio_duration_count{job="agency-whisper"}[24h])
+)
+```
+
 Grafana sirve `/grafana/` dentro del NAS y se abre desde la LAN en [Grafana](https://grafana-lan.e-scale.cl:9444/grafana/). El DNS devuelve la IP privada del NAS. El proxy dedicado `agency-grafana-lan` usa red del host para conservar la IP de origen y limita el acceso a `192.168.0.0/24`. El [archivo del proxy](grafana-lan.nginx.conf) conserva la subruta y traduce la URL heredada en el login. El contenedor existente de Grafana mantiene su configuración y sigue en su red Docker. Si cambia su dirección interna, actualiza `proxy_pass` y vuelve a verificar el login y la API.
 
 El proxy usa la imagen fijada en `GRAFANA_LAN_PROXY_IMAGE`, montaje de certificados de sólo lectura desde `/volume1/docker/agency-grafana-lan` y política de reinicio `unless-stopped`. El certificado se emitió con Certbot y validación DNS-01, usando la CSR y la clave respaldadas en la bóveda. Vence el 12 de febrero de 2027 a las 12:20 UTC. La renovación de este certificado se ejecuta bajo demanda. Tras renovar, valida el SAN, la cadena y la correspondencia con la clave, respalda los PEM y comprueba `nginx -t` antes de recargar el proxy. [Validación DNS-01](https://letsencrypt.org/docs/challenge-types/#dns-01-challenge) · [Configuración del proxy y subruta en Grafana](https://grafana.com/tutorials/run-grafana-behind-a-proxy/)
