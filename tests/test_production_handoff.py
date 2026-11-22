@@ -4,7 +4,9 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import sqlite3
+import subprocess
 import sys
 import uuid
 import zipfile
@@ -1875,6 +1877,100 @@ def test_elena_reintenta_un_dictamen_sin_json_con_las_mismas_muestras(monkeypatc
     assert requests[1]["attachments"] == requests[0]["attachments"]
 
 
+def test_elena_compone_la_fuente_y_el_master_con_los_mismos_bordes(monkeypatch):
+    monkeypatch.syspath_prepend(str(SCRIPTS))
+    import production_elena as elena
+
+    ffmpeg = shutil.which("ffmpeg")
+    assert ffmpeg, "FFmpeg es necesario para probar la geometría de encuadre."
+
+    def encode(background, *, band):
+        width, height = 360, 640
+        frame = bytearray(bytes(background) * width * height)
+        left, right, top, bottom = (24, 334, 88, 640) if band else (0, 360, 0, 640)
+        for y in range(top, bottom):
+            relative_y = (y - top) / (bottom - top)
+            for x in range(left, right):
+                relative_x = (x - left) / (right - left)
+                if relative_y < 0.07:
+                    pixel = (190, 38, 30)
+                elif relative_y > 0.93:
+                    pixel = (27, 58, 200)
+                elif relative_x < 0.07:
+                    pixel = (218, 186, 42)
+                elif relative_x > 0.93:
+                    pixel = (164, 51, 156)
+                else:
+                    pixel = (43, 169, 83)
+                position = (y * width + x) * 3
+                frame[position : position + 3] = bytes(pixel)
+        ppm = b"P6\n360 640\n255\n" + frame
+        return subprocess.check_output(
+            [
+                ffmpeg,
+                "-v",
+                "error",
+                "-i",
+                "pipe:0",
+                "-frames:v",
+                "1",
+                "-threads",
+                "1",
+                "-q:v",
+                "3",
+                "-c:v",
+                "mjpeg",
+                "-f",
+                "image2pipe",
+                "pipe:1",
+            ],
+            input=ppm,
+            timeout=15,
+        )
+
+    def run(command, **kwargs):
+        assert command[0] == "/usr/bin/ffmpeg"
+        return subprocess.run([ffmpeg, *command[1:]], **kwargs)
+
+    monkeypatch.setattr(elena, "subprocess", SimpleNamespace(run=run, DEVNULL=subprocess.DEVNULL))
+    [(seconds, jpeg)] = elena.paired_band_samples(
+        [(30.0, encode((20, 26, 21), band=False))],
+        [(30.0, encode((20, 26, 21), band=True))],
+    )
+    assert seconds == 30.0 and len(jpeg) <= elena.BAND_COMPARISON_BYTES
+    rgb = subprocess.check_output(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-i",
+            "pipe:0",
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "pipe:1",
+        ],
+        input=jpeg,
+        timeout=15,
+    )
+    assert len(rgb) == 720 * 640 * 3
+    for x, y, expected in (
+        (180, 78, (20, 26, 21)),
+        (180, 96, (190, 38, 30)),
+        (180, 632, (27, 58, 200)),
+        (14, 320, (20, 26, 21)),
+        (32, 320, (218, 186, 42)),
+        (327, 320, (164, 51, 156)),
+        (346, 320, (20, 26, 21)),
+    ):
+        for offset in (0, 360):
+            index = (y * 720 + x + offset) * 3
+            assert rgb[index : index + 3] == pytest.approx(tuple(expected), abs=20)
+
+
 @pytest.mark.parametrize("crop_added_by_render", [False, True])
 def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
     monkeypatch, order, tmp_path, crop_added_by_render
@@ -1905,11 +2001,19 @@ def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
         assert stamps == [0.55, 30.0, 59.88] and limit == 12000
         return [(second, b"original") for second in stamps]
 
+    def paired_band_samples(originals, masters):
+        stamps = [0.55, 30.0, 59.88]
+        assert originals == [(second, b"original") for second in stamps]
+        assert masters == [(second, b"master") for second in stamps]
+        return [(second, b"par en el mismo instante") for second in stamps]
+
     def run_visual(request):
         evidence = json.loads(request["message"].rsplit("\n", 1)[1])
         assert evidence["objetivo_confirmado"] == objective
-        assert [row["original"] for row in evidence["comparacion_encuadre"]] == [4, 5, 6]
-        assert len(request["attachments"]) == 6
+        assert [row["muestra"] for row in evidence["comparacion_encuadre"]] == [1, 2, 3]
+        assert "A la izquierda está la toma completa" in request["message"]
+        assert "A la derecha está el máster" in request["message"]
+        assert len(request["attachments"]) == 3
         return {
             "puntaje": 92,
             "marca_free": "",
@@ -1923,6 +2027,7 @@ def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
 
     monkeypatch.setattr(elena, "decode", decode)
     monkeypatch.setattr(elena, "sample_frames", sample_frames)
+    monkeypatch.setattr(elena, "paired_band_samples", paired_band_samples)
     monkeypatch.setattr(elena, "run_visual", run_visual)
     props = {
         "title": "Sansevierias",
@@ -1946,6 +2051,11 @@ def test_elena_compara_el_encuadre_de_la_banda_con_el_original(
     assert review["referencia_original"]["sha256"] == order["media"]["sha256"]
     assert [row["segundo"] for row in review["muestras"]] == [
         row["segundo"] for row in review["referencia_original"]["muestras"]
+    ]
+    assert [row["segundo"] for row in review["referencia_original"]["comparaciones"]] == [
+        0.55,
+        30.0,
+        59.88,
     ]
 
 

@@ -10,6 +10,8 @@ Para habilitar HyperFrames, instala las dependencias fijadas del renderer y veri
 
 Para habilitar la banda de títulos del montaje continuo, actualiza primero el puente GPU. Comprueba un MP4 NVENC con la fuente completa debajo de la banda y que el alfa de la gráfica ProRes conserva transparente el área del vídeo. Después actualiza Valeria y Elena. Verifica en la escaleta las muestras de inicio y cierre y en el dictamen de Elena el encuadre del vídeo publicado.
 
+Cuando el montaje usa banda, coteja que cada imagen de la revisión muestre la fuente ajustada a la izquierda y el máster a la derecha en el mismo instante y a la misma escala. Ensaya un encuadre conservado y un recorte real. El dictamen debe señalar el contenido que desaparece en el máster para atribuir el recorte a la edición. El control 4 ejecuta FFmpeg con una imagen sintética para verificar la geometría y el límite de tamaño de la comparación.
+
 Para probar la comparación de encuadre de Elena, audita un máster con banda cuyo original ya tenga un elemento parcialmente fuera de cuadro. Comprueba que ambos archivos se cotejan al inicio, al centro y al cierre con la huella del original de la orden. El dictamen debe distinguir un encuadre heredado de uno introducido por la edición y seguir rechazando los casos que incumplen el objetivo del brief. El cambio se verifica en los adaptadores de OpenClaw.
 
 Para verificar el p95 de entregas automáticas, compara una orden entregada sin intervención con otra reanudada tras un ajuste humano. Coteja la guarda y el historial de ajustes en D1 antes de comparar el recuento y el percentil por entorno con Prometheus. Ambas órdenes deben aparecer en el total de entregas. Sólo la automática debe influir en el p95 y en el recuento bajo 360 s.
