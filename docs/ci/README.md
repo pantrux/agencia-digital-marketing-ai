@@ -1,6 +1,6 @@
 # Estándar CI/CD y confiabilidad SRE
 
-Índice canónico para desarrollar, verificar y operar la Agencia Digital de Marketing AI conforme a la arquitectura v4.1. Responsable: equipo de plataforma / SRE. Última revisión: 2026-11-06.
+Índice canónico para desarrollar, verificar y operar la Agencia Digital de Marketing AI conforme a la arquitectura v4.1. El equipo de plataforma y SRE revisó esta guía el 22 de noviembre de 2026.
 
 La ubicación NAS vigente es `/volume2/producciones`, por [ADR-001](../decisions/ADR-001-volumen-producciones.md). El origen NFS es `192.168.0.8:/volume2/producciones`; el recurso SMB conserva el nombre `producciones`. Los ~2753,63 GiB libres observados en `/volume2` el 2026-11-05 no son una reserva exclusiva. El recurso, los dos montajes y la lectura compartida ya tienen [evidencia real de Fase 2](evidence/2026-11-05-fase-2.md); su cierre fue confirmado el 2026-11-05, con 220 pruebas Python y controles finales aprobados. Se conserva el datastore existente `/volume2/NFS`.
 
@@ -8,7 +8,7 @@ La ubicación NAS vigente es `/volume2/producciones`, por [ADR-001](../decisions
 
 La Fase 0 preparó controles locales, el workflow de calidad, cinco procedimientos de incidentes y scripts de salud y reversión ensayados con simulación. El manifiesto `config/phase-capabilities.json` declara `phase: 7` con `deployment_enabled: false` y exige las fuentes del ciclo de producción y reversión, además del portal y del Worker. La [evidencia real de Fase 3](evidence/2026-11-05-fase-3.md) acredita inferencia CUDA, MP4 NVENC y ProRes 4444 con alfa en 1080p/4K, salud autenticada y convivencia.
 
-Los siete controles son bloqueantes dentro del workflow. La protección efectiva de `main`, la ejecución en GitHub y los accesos del runner requieren configuración del repositorio en fases posteriores. No se ha autorizado ejecutar comandos de Git en esta sesión. No activar entrega continua ni publicar una vista previa hasta disponer de sus recursos aislados, salvaguardas y pruebas reales.
+El repositorio público con licencia MIT recibe los cambios en `main` por solicitud de cambio. La regla activa de GitHub exige `Greptile Review`, `Los siete controles bloqueantes` y una rama al día con `main`, sin excepciones de acceso directo. Antes de fusionar, el responsable comprueba también que Greptile dio 5/5 en el último commit del PR. La publicación operativa parte del commit fusionado y pasa por las verificaciones de despliegue y reversión. El manifiesto mantiene `deployment_enabled: false` para la entrega continua del workflow. [Receta del desarrollador](recipes/developer-push-flow.md) · [Controles aprobados del PR #35](https://github.com/pantrux/agencia-digital-marketing-ai/pull/35/checks)
 
 La [Fase 4 de aplicaciones y copias](../specs/FASE-4-APLICACIONES-Y-BACKUPS.md) pasó los criterios operativos del plan. Se acreditaron 27 roles, los logins de Immich y Kitsu, el receptor Prometheus en NAS y la restauración del conjunto real de copias desde NAS y R2. El cron y la retención de R2 quedaron instalados. La observación del primer disparo automático, Grafana y el piloto facial previo a medios de clientes se registran en el estado. Ruff incluye `docker/`. [Estado operativo](../../ESTADO.md#qué-falta-para-cerrar-la-fase-4)
 
