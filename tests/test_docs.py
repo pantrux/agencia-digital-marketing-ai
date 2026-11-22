@@ -45,6 +45,7 @@ class PruebasDocumentacion(unittest.TestCase):
             "ingress/README.md",
             "sre/README-backup-321-orchestrator.md",
             "sre/README-d1-export.md",
+            "sre/README-vault-quota-archive.md",
             "tests/test_gpu_stop.py",
         ):
             destination = self.raiz / relative
